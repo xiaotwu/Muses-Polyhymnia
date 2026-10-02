@@ -532,6 +532,8 @@ struct RootView: View {
                 .accessibilityHidden(true)
             ZStack(alignment: .bottom) {
                 detailStack
+                    .environment(\.collectionSurfaceAccessibilityHidden,
+                                 showNowPlaying || showYouTubeVideo || galleryPresentation.preview != nil)
                     .environment(\.collectionPresentation, collectionMemory.entry(for: browseRoute))
                     .id(section == .settings ? BrowseRoute.section(.settings) : browseRoute)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)

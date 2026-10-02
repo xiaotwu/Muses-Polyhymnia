@@ -1,6 +1,17 @@
 import AppKit
 import SwiftUI
 
+private struct CollectionSurfaceAccessibilityHiddenKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    var collectionSurfaceAccessibilityHidden: Bool {
+        get { self[CollectionSurfaceAccessibilityHiddenKey.self] }
+        set { self[CollectionSurfaceAccessibilityHiddenKey.self] = newValue }
+    }
+}
+
 /// Keep native table state alive while excluding the inactive surface from
 /// rendering, hit testing, first-responder navigation and the AppKit AX tree.
 struct RetainedCollectionSurface<Content: View>: NSViewRepresentable {
@@ -36,7 +47,8 @@ struct RetainedCollectionSurface<Content: View>: NSViewRepresentable {
             host.rootView = root(context)
         }
         context.coordinator.wasVisible = isVisible
-        if !isVisible, let responder = host.window?.firstResponder as? NSView,
+        let accessibilityHidden = !isVisible || context.environment.collectionSurfaceAccessibilityHidden
+        if accessibilityHidden, let responder = host.window?.firstResponder as? NSView,
            responder.isDescendant(of: host) {
             host.window?.makeFirstResponder(nil)
         }
@@ -44,6 +56,8 @@ struct RetainedCollectionSurface<Content: View>: NSViewRepresentable {
     }
 
     private func root(_ context: Context) -> AnyView {
-        AnyView(content.environment(\.self, context.environment))
+        AnyView(content
+            .environment(\.self, context.environment)
+            .accessibilityHidden(!isVisible || context.environment.collectionSurfaceAccessibilityHidden))
     }
 }
