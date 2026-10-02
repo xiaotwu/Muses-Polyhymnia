@@ -351,6 +351,17 @@ final class QueueService {
     func restoreFromHistory(at index: Int) {
         guard history.indices.contains(index) else { return }
         var entry = history.remove(at: index)
+        // Played collection entries remain in the collection. Restoring their
+        // history creates a separate insertion, while removed entries keep their ID.
+        if items.contains(where: { $0.id == entry.id })
+            || upNext.contains(where: { $0.id == entry.id })
+            || insertedCurrent?.id == entry.id {
+            var insertion = QueueItem(track: entry.track, queuedAt: entry.queuedAt,
+                                      fromContext: entry.fromContext, locked: entry.locked,
+                                      groupId: entry.groupId, priority: entry.priority)
+            insertion.collectionAnchorID = entry.collectionAnchorID
+            entry = insertion
+        }
         entry.historyState = nil
         entry.recommendationSourceVideoID = nil
         upNext.append(entry)

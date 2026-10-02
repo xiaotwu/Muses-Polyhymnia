@@ -171,4 +171,70 @@ struct QueueActivationTests {
         #expect(restored.items.map(\.id) == [anchorID])
         #expect(restored.upNext.first?.track.title == "new")
     }
+
+    @Test("Restoring played collection history creates an independent insertion occurrence")
+    func restoredCollectionCollision() throws {
+        let container = try makeModelContainer(inMemory: true)
+        let queue = QueueService()
+        queue.modelContext = ModelContext(container)
+        let first = track("first"), second = track("second")
+        queue.play(first, context: [first, second], from: .playlist)
+        let originalID = queue.items[0].id
+        let group = queue.addGroup("Group")
+        queue.items[0].groupId = group
+        queue.items[0].locked = true
+        queue.items[0].priority = 7
+        let queuedAt = queue.items[0].queuedAt
+        _ = queue.next()
+        queue.restoreFromHistory(at: 0)
+        let insertion = try #require(queue.upNext.first)
+        #expect(insertion.id != originalID)
+        #expect(insertion.track == first)
+        #expect(insertion.fromContext == .playlist)
+        #expect(insertion.queuedAt == queuedAt)
+        #expect(insertion.groupId == group)
+        #expect(insertion.locked)
+        #expect(insertion.priority == 7)
+        #expect(insertion.historyState == nil)
+        _ = queue.activateItem(id: insertion.id)
+        #expect(queue.currentIndex == 1)
+        #expect(queue.current()?.id == insertion.id)
+        #expect(queue.upNext.isEmpty)
+        #expect(queue.items[0].id == originalID)
+        let restored = QueueService()
+        restored.modelContext = ModelContext(container)
+        restored.restore()
+        #expect(restored.current()?.id == insertion.id)
+        #expect(restored.currentIndex == 1)
+        #expect(restored.items[0].id == originalID)
+    }
+
+    @Test("Restore rekeys collisions with Up Next or active insertion but keeps removed identities")
+    func restoredOtherCollisions() throws {
+        let queue = QueueService()
+        let first = track("first")
+        queue.play(first, context: [first], from: .songs)
+        queue.playNext(track("inserted"))
+        let insertionID = queue.upNext[0].id
+        var historical = queue.upNext[0]
+        historical.historyState = .played
+        historical.collectionAnchorID = queue.items[0].id
+        historical.recommendationSourceVideoID = "old-recommendation"
+        queue.history = [historical]
+        queue.restoreFromHistory(at: 0)
+        let restoredInsertion = try #require(queue.upNext.last)
+        #expect(restoredInsertion.id != insertionID)
+        #expect(restoredInsertion.collectionAnchorID == historical.collectionAnchorID)
+        #expect(restoredInsertion.recommendationSourceVideoID == nil)
+        _ = queue.activateItem(id: insertionID)
+        queue.history = [historical]
+        queue.restoreFromHistory(at: 0)
+        #expect(queue.upNext.last?.id != insertionID)
+        #expect(queue.current()?.id == insertionID)
+        let removedID = try #require(queue.upNext.last).id
+        queue.removeUpNext(at: queue.upNext.count - 1)
+        queue.restoreFromHistory(at: 0)
+        #expect(queue.upNext.last?.id == removedID)
+        #expect(queue.upNext.last?.historyState == nil)
+    }
 }
