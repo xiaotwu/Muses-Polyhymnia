@@ -87,11 +87,11 @@ struct SidebarView: View {
         .padding(6)
         .frame(width: expanded ? 218 : 56, alignment: .leading)
         .musesGlass(in: RoundedRectangle(cornerRadius: 28), role: .navigationIsland)
-        .frame(width: 56, alignment: .leading)
         .onHover { inside in
             if inside { hoveredIsland = key }
             else if hoveredIsland == key { hoveredIsland = nil }
         }
+        .frame(width: 56, alignment: .leading)
         .animation(MusesMotion.hoverAnimation(reduceMotion: reduceMotion), value: expanded)
     }
 
@@ -115,6 +115,8 @@ struct SidebarView: View {
             Button(SidebarSection.artists.title, systemImage: "person.2.fill") { navigate(.artists) }
         } label: {
             islandLabel(title, icon: "square.stack.fill", selected: selected, expanded: expanded)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(title)
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
@@ -151,6 +153,7 @@ struct SidebarView: View {
             Image(systemName: icon)
                 .font(MusesTypography.system(size: 17, weight: .semibold))
                 .frame(width: 44, height: 44)
+                .accessibilityHidden(true)
             if expanded {
                 Text(title)
                     .font(MusesTypography.system(size: 13, weight: selected ? .semibold : .regular))

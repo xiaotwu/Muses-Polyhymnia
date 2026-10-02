@@ -68,9 +68,11 @@ enum MusesTypography {
         ]), size: scaled) ?? NSFont.systemFont(ofSize: scaled)
     }
 
-    static var pageTitle: Font { Font(native(.heading, size: 34)) }
-    static var sectionTitle: Font { Font(native(.heading, size: 22)) }
-    static var settingsTitle: Font { sectionTitle }
+    // Browsing and Settings share native heading hierarchy. Editorial artwork,
+    // immersive information and lyrics retain the expressive F3 families.
+    static var pageTitle: Font { system(size: 28, weight: .semibold) }
+    static var sectionTitle: Font { system(size: 20, weight: .semibold) }
+    static var settingsTitle: Font { pageTitle }
 
     static func song(size: CGFloat = 14, emphasized: Bool = false, text: String = "") -> Font {
         Font(native(emphasized ? .strongSong : .song, size: size, japanese: hasKana(text)))
