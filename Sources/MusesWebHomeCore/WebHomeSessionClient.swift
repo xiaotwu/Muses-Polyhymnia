@@ -129,7 +129,7 @@ struct WebHomeIdentityParser: Sendable {
         visit(root)
         guard selectedCount == 1, handles.count == 1, let handle = handles.first,
               handle.hasPrefix("@"), (2...100).contains(handle.count),
-              handle.unicodeScalars.dropFirst().allSatisfy({ CharacterSet.alphanumerics.contains($0) || "._-".unicodeScalars.contains($0) }) else {
+              handle.unicodeScalars.dropFirst().allSatisfy({ CharacterSet.alphanumerics.contains($0) || "._-·".unicodeScalars.contains($0) }) else {
             throw WebHomeCoreError.code(.identityUnavailable)
         }
         return handle
@@ -151,43 +151,42 @@ struct WebHomeIdentityParser: Sendable {
               let root = try? JSONSerialization.jsonObject(with: data) else {
             throw WebHomeCoreError.code(.identityUnavailable)
         }
-        guard let candidate = exactActiveChannelID(in: root),
-              isChannelID(candidate) else {
+        let candidates = exactActiveChannelIDs(in: root)
+        guard candidates.count <= 1 else {
+            // Conflicting authoritative identities must never trigger an alternate identity fallback.
+            throw WebHomeCoreError.code(.accountMismatch)
+        }
+        guard let candidate = candidates.first else {
             throw WebHomeCoreError.code(.identityUnavailable)
         }
         return candidate
     }
 
-    private func exactActiveChannelID(in value: Any) -> String? {
+    private func exactActiveChannelIDs(in value: Any) -> Set<String> {
+        var candidates = Set<String>()
         if let dictionary = value as? [String: Any] {
-            // The current account menu no longer places channelId inside
-            // activeAccountHeaderRenderer. Its exact "your channel" endpoint
-            // is a compact link in the same multi-page menu. Accept it only
-            // when that menu has an active-account header and resolves to one
-            // unique channel ID; never scan arbitrary browse endpoints.
+            // Only a menu with an active-account header can supply current-channel links.
+            // Generic recommendations and unrelated browse endpoints are never candidates.
             if let menu = dictionary["multiPageMenuRenderer"] as? [String: Any],
-               hasActiveAccountHeader(in: menu),
-               let channelID = uniqueCurrentChannelLinkID(in: menu) {
-                return channelID
+               hasActiveAccountHeader(in: menu) {
+                candidates.formUnion(currentChannelLinkIDs(in: menu))
             }
-            if let header = dictionary["activeAccountHeaderRenderer"] as? [String: Any],
-               let channelID = explicitChannelID(in: header) {
-                return channelID
+            if let header = dictionary["activeAccountHeaderRenderer"] as? [String: Any] {
+                candidates.formUnion(explicitChannelIDs(in: header))
             }
             if let item = dictionary["accountItemRenderer"] as? [String: Any],
-               item["isSelected"] as? Bool == true,
-               let channelID = explicitChannelID(in: item) {
-                return channelID
+               item["isSelected"] as? Bool == true {
+                candidates.formUnion(explicitChannelIDs(in: item))
             }
             for child in dictionary.values {
-                if let found = exactActiveChannelID(in: child) { return found }
+                candidates.formUnion(exactActiveChannelIDs(in: child))
             }
         } else if let array = value as? [Any] {
             for child in array {
-                if let found = exactActiveChannelID(in: child) { return found }
+                candidates.formUnion(exactActiveChannelIDs(in: child))
             }
         }
-        return nil
+        return candidates
     }
 
     private func hasActiveAccountHeader(in menu: [String: Any]) -> Bool {
@@ -198,8 +197,8 @@ struct WebHomeIdentityParser: Sendable {
         return true
     }
 
-    private func uniqueCurrentChannelLinkID(in menu: [String: Any]) -> String? {
-        guard let sections = menu["sections"] as? [Any] else { return nil }
+    private func currentChannelLinkIDs(in menu: [String: Any]) -> Set<String> {
+        guard let sections = menu["sections"] as? [Any] else { return [] }
         var candidates = Set<String>()
         for sectionValue in sections {
             guard let section = sectionValue as? [String: Any],
@@ -218,27 +217,27 @@ struct WebHomeIdentityParser: Sendable {
                 candidates.insert(browseID)
             }
         }
-        return candidates.count == 1 ? candidates.first : nil
+        return candidates
     }
 
-    private func explicitChannelID(in dictionary: [String: Any]) -> String? {
+    private func explicitChannelIDs(in dictionary: [String: Any]) -> Set<String> {
+        var candidates = Set<String>()
         for key in ["channelId", "channelID", "browseId"] {
             if let value = dictionary[key] as? String, isChannelID(value) {
-                return value
+                candidates.insert(value)
             }
         }
         if let endpoint = dictionary["browseEndpoint"] as? [String: Any],
            let browseID = endpoint["browseId"] as? String,
            isChannelID(browseID) {
-            return browseID
+            candidates.insert(browseID)
         }
         for key in ["endpoint", "serviceEndpoint", "navigationEndpoint"] {
-            if let child = dictionary[key] as? [String: Any],
-               let value = explicitChannelID(in: child) {
-                return value
+            if let child = dictionary[key] as? [String: Any] {
+                candidates.formUnion(explicitChannelIDs(in: child))
             }
         }
-        return nil
+        return candidates
     }
 
     private func isChannelID(_ value: String) -> Bool {

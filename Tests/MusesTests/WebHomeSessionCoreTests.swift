@@ -298,6 +298,102 @@ struct WebHomeSessionCoreTests {
         #expect(await transport.requests.isEmpty)
     }
 
+    @Test("Only unique authoritative identity candidates are accepted")
+    func authoritativeIdentityUniqueness() throws {
+        let parser = WebHomeIdentityParser()
+        let wrongID = "UC9999999999999999999999"
+        let header: [String: Any] = ["activeAccountHeaderRenderer": ["channelId": channelID]]
+        let selected: [String: Any] = ["accountItemRenderer": ["isSelected": true, "channelId": channelID]]
+        let unrelated: [String: Any] = ["recommendations": [["browseEndpoint": ["browseId": wrongID]]],
+                                       "accountItemRenderer": ["isSelected": false, "channelId": wrongID]]
+        let duplicate = try JSONSerialization.data(withJSONObject: [header, header, selected, unrelated])
+        #expect(try parser.channelID(from: duplicate) == channelID)
+        let conflicts: [[String: Any]] = [
+            ["activeAccountHeaderRenderer": ["channelId": wrongID]],
+            ["accountItemRenderer": ["isSelected": true, "channelId": wrongID]],
+            ["activeAccountHeaderRenderer": ["channelId": channelID, "channelID": wrongID]]
+        ]
+        for conflict in conflicts {
+            #expect(throws: WebHomeCoreError.code(.accountMismatch)) {
+                try parser.channelID(from: JSONSerialization.data(withJSONObject: [header, conflict]))
+            }
+        }
+        func currentMenu(linkIDs: [String], includeHeader: Bool = true) -> [String: Any] {
+            let links: [[String: Any]] = linkIDs.map { id in
+                ["compactLinkRenderer": ["navigationEndpoint": ["browseEndpoint": ["browseId": id]]]]
+            }
+            var menu: [String: Any] = [
+                "sections": [["multiPageMenuSectionRenderer": ["items": links + [
+                    ["videoRenderer": ["navigationEndpoint": ["browseEndpoint": ["browseId": wrongID]]]]
+                ]]]],
+                // A compact link outside the current-account section is not authority.
+                "recommendations": [["compactLinkRenderer": ["navigationEndpoint": ["browseEndpoint": ["browseId": wrongID]]]]]
+            ]
+            if includeHeader { menu["header"] = header }
+            return ["multiPageMenuRenderer": menu]
+        }
+        let repeatedCurrentLinks = try JSONSerialization.data(withJSONObject: currentMenu(linkIDs: [channelID, channelID]))
+        #expect(try parser.channelID(from: repeatedCurrentLinks) == channelID)
+        #expect(throws: WebHomeCoreError.code(.accountMismatch)) {
+            try parser.channelID(from: JSONSerialization.data(withJSONObject: currentMenu(linkIDs: [wrongID])))
+        }
+        // An unrelated menu must not borrow an active header from elsewhere in the response.
+        let unrelatedMenu = try JSONSerialization.data(withJSONObject: [header, currentMenu(linkIDs: [wrongID], includeHeader: false)])
+        #expect(try parser.channelID(from: unrelatedMenu) == channelID)
+    }
+
+    @Test("Conflicting active identities fail before WEB fallback")
+    func conflictingIdentityStopsFallback() async throws {
+        let conflicting = try JSONSerialization.data(withJSONObject: [
+            ["activeAccountHeaderRenderer": ["channelId": channelID]],
+            ["accountItemRenderer": ["isSelected": true, "channelId": "UC9999999999999999999999"]]
+        ])
+        let transport = QueueWebHomeTransport(responses: [response(bootstrapHTML), response(conflicting)])
+        await expectCoreError(.accountMismatch) {
+            try await WebHomeSessionClient(transport: transport).execute(
+                request: request(expectedChannelID: channelID), cookies: cookieJar)
+        }
+        #expect(await transport.requests.count == 2)
+    }
+
+    @Test("Middle-dot handles resolve read-only and still require the exact OAuth channel")
+    func middleDotHandleResolution() async throws {
+        let handle = "@foo·bar"
+        let accounts = try JSONSerialization.data(withJSONObject: [
+            "accountItem": ["isSelected": true, "channelHandle": ["runs": [["text": handle]]]]
+        ])
+        #expect(try WebHomeIdentityParser().selectedHandle(from: accounts) == handle)
+        let resolved = try JSONSerialization.data(withJSONObject: ["endpoint": ["browseEndpoint": ["browseId": channelID]]])
+        let web = WebHomeTransportResponse(data: bootstrapHTML, statusCode: 200,
+                                          finalURL: URL(string: "https://www.youtube.com/"))
+        for expectedID in [channelID, "UC9999999999999999999999"] {
+            let empty = response(Data("{}".utf8))
+            let transport = QueueWebHomeTransport(responses: [response(bootstrapHTML), empty, web, empty,
+                                                             response(accounts), response(resolved)])
+            let client = WebHomeSessionClient(transport: transport)
+            if expectedID == channelID {
+                let result = try await client.execute(request: request(expectedChannelID: expectedID), cookies: cookieJar)
+                #expect(result.channelID == channelID)
+                #expect(result.payload == nil)
+            } else {
+                await expectCoreError(.accountMismatch) {
+                    try await client.execute(request: request(expectedChannelID: expectedID), cookies: cookieJar)
+                }
+            }
+            let requests = await transport.requests
+            #expect(requests.count == 6)
+            let resolveRequest = try #require(requests.last)
+            #expect(resolveRequest.url?.path == "/youtubei/v1/navigation/resolve_url")
+            let body = try #require(resolveRequest.httpBody)
+            let object = try #require(JSONSerialization.jsonObject(with: body) as? [String: Any])
+            let resolvedURL = try #require(object["url"] as? String)
+            let components = try #require(URLComponents(string: resolvedURL))
+            #expect(components.scheme == "https")
+            #expect(components.host == "www.youtube.com")
+            #expect(components.path == "/" + handle)
+        }
+    }
+
     @Test("WEB identity fallback verifies the same account without fetching Home")
     func identityFallback() async throws {
         let web = WebHomeTransportResponse(data: bootstrapHTML, statusCode: 200,
