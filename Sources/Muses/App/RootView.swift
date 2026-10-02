@@ -342,10 +342,10 @@ struct RootView: View {
     private var navigationWired: some View {
         sheetHost
             .onReceive(NotificationCenter.default.publisher(for: .musesSelectPlaylist)) { note in
-                if let playlist = note.object as? Playlist { selectedPlaylist = playlist }
+                if let playlist = note.object as? Playlist { applyBrowseRoute(.playlist(playlist.id)) }
             }
             .onReceive(NotificationCenter.default.publisher(for: .musesNavigateYouTubeImport)) { note in
-                if let ytImport = note.object as? YouTubeImport { selectedYouTubeImport = ytImport }
+                if let ytImport = note.object as? YouTubeImport { applyBrowseRoute(.youTubeImport(ytImport.id)) }
             }
             .onReceive(NotificationCenter.default.publisher(for: .musesCloseYouTubeAlbum)) { _ in
                 selectedYouTubeImport = nil
