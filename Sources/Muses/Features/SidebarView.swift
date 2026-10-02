@@ -67,9 +67,11 @@ struct SidebarView: View {
         .onChange(of: focusedItem) { _, item in
             onKeyboardFocusChange(item != nil)
         }
-        .onChange(of: selection) { _, new in
-            hoveredIsland = nil
-            focusedItem = nil
+        .onChange(of: selection) { old, new in
+            if (old == .settings) != (new == .settings) {
+                hoveredIsland = nil
+                focusedItem = nil
+            }
             if new != .playlists {
                 selectedPlaylist = nil
                 selectedYouTubeImport = nil
