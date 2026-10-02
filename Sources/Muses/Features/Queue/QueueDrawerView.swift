@@ -571,12 +571,7 @@ struct QueueDrawerView: View {
     }
 
     private func playQueueItem(_ item: QueueItem) {
-        let context = playback.queue.items.map(\.track) + playback.queue.upNext.map(\.track)
-        playback.playTrack(
-            item.track,
-            context: context.isEmpty ? [item.track] : context,
-            from: item.fromContext
-        )
+        playback.playQueueItem(id: item.id)
     }
 
     private func canRemove(item: QueueItem, inUpNext: Bool) -> Bool {

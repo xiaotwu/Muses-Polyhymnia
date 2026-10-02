@@ -50,6 +50,29 @@ final class QueueService {
         persist()
     }
 
+    func playableItem(id: QueueItem.ID) -> QueueItem? {
+        current().flatMap { $0.id == id ? $0 : nil }
+            ?? items.first { $0.id == id }
+            ?? upNext.first { $0.id == id }
+    }
+
+    /// Select an existing occurrence without replacing its collection. An Up Next
+    /// selection consumes only that insertion and resumes after the current anchor.
+    func activateItem(id: QueueItem.ID) -> QueueItem? {
+        guard let selected = playableItem(id: id) else { return nil }
+        if current()?.id == id { return selected }
+        if let index = items.firstIndex(where: { $0.id == id }) {
+            currentIndex = index
+            insertedCurrent = nil
+        } else if let index = upNext.firstIndex(where: { $0.id == id }) {
+            var insertion = upNext.remove(at: index)
+            insertion.collectionAnchorID = items.indices.contains(currentIndex) ? items[currentIndex].id : nil
+            insertedCurrent = insertion
+        }
+        persist()
+        return current()
+    }
+
     func addToQueue(_ track: TrackSnapshot) {
         if smartShuffle.pending?.track.youTubeId == track.youTubeId { smartShuffle.pending = nil }
         let item = QueueItem(track: track)

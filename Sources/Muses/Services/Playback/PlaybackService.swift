@@ -207,6 +207,19 @@ final class PlaybackService {
         scheduleLoad(track, resumeMs: resumeAtMs)
     }
 
+    /// Queue controls select the occurrence, not its potentially repeated track.
+    /// A stale UI identity must not displace playback or create a new collection.
+    func playQueueItem(id: QueueItem.ID) {
+        guard queue.playableItem(id: id) != nil else { return }
+        retireVideoSession()
+        let isSkip = currentDisplacementIsSkip()
+        postDisplacementForCurrent(isSkip: isSkip)
+        guard let item = queue.activateItem(id: id) else { return }
+        playbackRequested = true
+        startedTrackId = nil
+        scheduleLoad(item.track)
+    }
+
     func toggle() {
         if let videoSession {
             videoSession.setPlaying(!videoSession.requestedPlay)
