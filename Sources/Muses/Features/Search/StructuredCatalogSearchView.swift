@@ -156,9 +156,17 @@ struct StructuredCatalogSearchView: View {
     private func row(_ item: MusicCatalogItem, index: Int? = nil, related: Bool = false) -> some View {
         if let entry = item.playableEntry,
            podcastState(item)?.availability != .unavailable {
+            let sourceItems = related ? browser.relatedItems : browser.items
+            let contextItems = sourceItems.filter { ($0.kind == .episode) == (item.kind == .episode) }
             rowContent(item, index: index, related: related)
                 .youTubeEntryContextMenu(entry: entry,
-                                         mediaKind: item.kind == .episode ? .podcastEpisode : .song) {
+                                         mediaKind: item.kind == .episode ? .podcastEpisode : .song,
+                                         videoContext: contextItems.compactMap(\.playableEntry),
+                                         videoSelectedIndex: index.map { sourceItems.prefix($0).filter {
+                                             ($0.kind == .episode) == (item.kind == .episode)
+                                         }.compactMap(\.playableEntry).count },
+                                         videoResumeAtMs: podcastState(item).flatMap { $0.completed ? nil : $0.lastPositionMs },
+                                         videoSource: item.kind == .episode ? .podcast : .search) {
                     activate(item, index: index, related: related)
                 }
         } else { rowContent(item, index: index, related: related) }

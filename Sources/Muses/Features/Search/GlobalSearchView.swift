@@ -307,7 +307,8 @@ struct GlobalSearchView: View {
                                                        isSaved: savedYouTubeIDs.contains(entry.id)) {
                                     Task { await playYouTube(entry) }
                                 }
-                                .youTubeEntryContextMenu(entry: entry) {
+                                .youTubeEntryContextMenu(entry: entry,
+                                    videoContext: search.youtubeResults.filter { $0.resourceKind == .video }) {
                                     Task { await playYouTube(entry) }
                                 }
                                 } else if entry.resourceURL != nil {

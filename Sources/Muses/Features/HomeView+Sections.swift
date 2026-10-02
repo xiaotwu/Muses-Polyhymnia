@@ -32,7 +32,7 @@ extension HomeView {
                                           informationStyle: .bottomGradient,
                                           onOpen: { openWebCard(card) },
                                           onPlay: { Task { await play(card) } })
-                                .youTubeEntryContextMenu(card: card, showsMenuButton: true,
+                                .youTubeEntryContextMenu(card: card, videoContext: remoteCards(in: itemsContaining(card)), showsMenuButton: true,
                                                         menuButtonAlignment: .topTrailing, menuButtonTrailingInset: 0) {
                                     Task { await play(card) }
                                 }
@@ -120,7 +120,7 @@ extension HomeView {
                 onOpen: { openWebCard(card) },
                 onPlay: { Task { await play(card) } }
             )
-            .youTubeEntryContextMenu(card: card, showsMenuButton: true, menuButtonTrailingInset: 0) {
+            .youTubeEntryContextMenu(card: card, videoContext: remoteCards(in: itemsContaining(card)), showsMenuButton: true, menuButtonTrailingInset: 0) {
                 Task { await play(card) }
             }
         case .track(let snapshot):
@@ -339,7 +339,7 @@ extension HomeView {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.fullAreaPlain)
-            .youTubeEntryContextMenu(card: card) {
+            .youTubeEntryContextMenu(card: card, videoContext: remoteCards(in: context)) {
                 Task { await play(card, siblings: context) }
             }
         case .track(let snapshot):
@@ -400,7 +400,7 @@ extension HomeView {
                     }
                 }
             )
-            .youTubeEntryContextMenu(card: card, showsMenuButton: true) {
+            .youTubeEntryContextMenu(card: card, videoContext: remoteCards(in: sectionItems), showsMenuButton: true) {
                 Task { await play(card, siblings: sectionItems) }
             }
         case .track(let snapshot):
@@ -451,7 +451,7 @@ extension HomeView {
                         },
                         onPlay: { Task { await play(entry) } }
                     )
-                    .youTubeEntryContextMenu(entry: entry, showsMenuButton: true,
+                    .youTubeEntryContextMenu(entry: entry, videoContext: fallbackEntries, showsMenuButton: true,
                                              menuButtonTrailingInset: 0) {
                         Task { await play(entry) }
                     }
@@ -911,6 +911,13 @@ extension HomeView {
                 return candidate.id == card.id
             }
         }?.items ?? []
+    }
+
+    private func remoteCards(in items: [DiscoveryItem]) -> [YouTubeDiscoveryCard] {
+        items.compactMap { item in
+            if case .youTube(let card) = item { return card }
+            return nil
+        }
     }
 
     func isPlayableDiscoveryItem(_ item: DiscoveryItem) -> Bool {

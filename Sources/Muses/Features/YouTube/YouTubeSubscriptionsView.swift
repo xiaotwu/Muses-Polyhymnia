@@ -226,7 +226,8 @@ private struct YouTubeChannelVideosView: View {
                                         artwork: .resolve(remoteURL: nil, youTubeId: entry.id), size: 220,
                                         role: .browse, artworkHeight: 124, isYouTube: true, showsHoverPlay: true,
                                         onSelect: { openPreview(entry) }, onPlay: { playRequest = entry })
-                            .youTubeEntryContextMenu(entry: entry, showsMenuButton: true) { playRequest = entry }
+                            .youTubeEntryContextMenu(entry: entry, videoContext: state.value ?? [],
+                                                     showsMenuButton: true) { playRequest = entry }
                     }
                 }
                 if nextOffset != nil {

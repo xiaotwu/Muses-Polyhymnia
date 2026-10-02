@@ -216,7 +216,7 @@ struct NewView: View {
                                     onOpen: { openPreview(card, siblings: featuredPersonalCards) },
                                     onPlay: { Task { await play(card) } }
                                 )
-                                .youTubeEntryContextMenu(card: card, showsMenuButton: true,
+                                .youTubeEntryContextMenu(card: card, videoContext: featuredPersonalCards, showsMenuButton: true,
                                                         menuButtonAlignment: .bottomLeading,
                                                         menuButtonTrailingInset: 0) {
                                     Task { await play(card) }
@@ -309,7 +309,7 @@ struct NewView: View {
                             onSelect: { openPreview(card, siblings: cards) },
                             onPlay: { Task { await play(card, siblings: cards) } }
                         )
-                        .youTubeEntryContextMenu(card: card, showsMenuButton: true) {
+                        .youTubeEntryContextMenu(card: card, videoContext: cards, showsMenuButton: true) {
                             Task { await play(card, siblings: cards) }
                         }
                     }

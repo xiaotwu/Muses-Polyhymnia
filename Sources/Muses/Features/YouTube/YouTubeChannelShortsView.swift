@@ -46,7 +46,7 @@ struct YouTubeChannelShortsView: View {
                                         size: 180, role: .browse, artworkHeight: 320,
                                         isYouTube: true, showsHoverPlay: true,
                                         onSelect: { openPreview(entry) }, onPlay: { playRequest = entry })
-                            .youTubeEntryContextMenu(entry: entry, showsMenuButton: true) {
+                            .youTubeEntryContextMenu(entry: entry, videoContext: state.value ?? [], showsMenuButton: true) {
                                 playRequest = entry
                             }
                     }

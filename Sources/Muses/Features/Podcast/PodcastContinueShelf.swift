@@ -30,6 +30,9 @@ struct PodcastContinueShelf: View {
                                                     onPlay: { preparingVideoID = episode.videoID })
                                         .youTubeEntryContextMenu(entry: entry(for: episode),
                                                                  mediaKind: .podcastEpisode,
+                                                                 videoContext: episodes.map { entry(for: $0) },
+                                                                 videoResumeAtMs: episode.lastPositionMs,
+                                                                 videoSource: .podcast,
                                                                  showsMenuButton: true) {
                                             preparingVideoID = episode.videoID
                                         }

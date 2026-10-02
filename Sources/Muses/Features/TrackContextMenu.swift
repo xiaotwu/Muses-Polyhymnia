@@ -81,6 +81,10 @@ private struct YouTubeEntryContextMenu: ViewModifier {
     let entry: YTDlpBridge.YTDlpPlaylistEntry
     let mediaKind: TrackMediaKind
     let onPlay: () -> Void
+    let videoContext: [YTDlpBridge.YTDlpPlaylistEntry]
+    let videoSelectedIndex: Int?
+    let videoResumeAtMs: Double?
+    let videoSource: QueueSource
     var showsMenuButton = false
     var menuButtonAlignment: Alignment = .topTrailing
     var menuButtonTrailingInset: CGFloat = 40
@@ -138,7 +142,13 @@ private struct YouTubeEntryContextMenu: ViewModifier {
                 NSPasteboard.general.setString(url.absoluteString, forType: .string)
             }
             Button {
-                resolve { PlaybackPresentation.video($0, playback: playback) }
+                resolve { snapshot in
+                    PlaybackPresentation.video(snapshot,
+                        context: TrackSnapshot.playbackContext(playing: snapshot,
+                            youTubeEntries: videoContext, selectedIndex: videoSelectedIndex,
+                            mediaKind: mediaKind),
+                        source: videoSource, resumeAtMs: videoResumeAtMs, playback: playback)
+                }
             } label: {
                 Label {
                     Text(tr("Floating video", "悬浮视频"))
@@ -323,12 +333,18 @@ extension View {
     func youTubeEntryContextMenu(
         entry: YTDlpBridge.YTDlpPlaylistEntry,
         mediaKind: TrackMediaKind = .song,
+        videoContext: [YTDlpBridge.YTDlpPlaylistEntry] = [],
+        videoSelectedIndex: Int? = nil,
+        videoResumeAtMs: Double? = nil,
+        videoSource: QueueSource = .search,
         showsMenuButton: Bool = false,
         menuButtonAlignment: Alignment = .topTrailing,
         menuButtonTrailingInset: CGFloat = 40,
         onPlay: @escaping () -> Void
     ) -> some View {
         modifier(YouTubeEntryContextMenu(entry: entry, mediaKind: mediaKind, onPlay: onPlay,
+                                        videoContext: videoContext, videoSelectedIndex: videoSelectedIndex,
+                                        videoResumeAtMs: videoResumeAtMs, videoSource: videoSource,
                                         showsMenuButton: showsMenuButton, menuButtonAlignment: menuButtonAlignment,
                                         menuButtonTrailingInset: menuButtonTrailingInset))
     }
@@ -336,6 +352,7 @@ extension View {
     @ViewBuilder
     func youTubeEntryContextMenu(
         card: YouTubeDiscoveryCard,
+        videoContext: [YouTubeDiscoveryCard] = [],
         showsMenuButton: Bool = false,
         menuButtonAlignment: Alignment = .topTrailing,
         menuButtonTrailingInset: CGFloat = 40,
@@ -349,6 +366,11 @@ extension View {
                     uploader: card.uploader,
                     duration: card.duration
                 ),
+                videoContext: videoContext.compactMap { sibling in
+                    guard let id = sibling.playableVideoID else { return nil }
+                    return YTDlpBridge.YTDlpPlaylistEntry(id: id, title: sibling.title,
+                        uploader: sibling.uploader, duration: sibling.duration)
+                },
                 showsMenuButton: showsMenuButton,
                 menuButtonAlignment: menuButtonAlignment,
                 menuButtonTrailingInset: menuButtonTrailingInset,

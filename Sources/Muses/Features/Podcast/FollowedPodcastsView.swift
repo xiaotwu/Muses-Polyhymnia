@@ -108,7 +108,13 @@ struct FollowedPodcastsView: View {
                             } else {
                                 episodeRow(item, index: index)
                                     .youTubeEntryContextMenu(entry: entry,
-                                                             mediaKind: .podcastEpisode) {
+                                                             mediaKind: .podcastEpisode,
+                                                             videoContext: browser.items.filter { $0.kind == .episode }
+                                                                .compactMap { episodeEntry($0, showTitle: show.title) },
+                                                             videoSelectedIndex: browser.items.prefix(index).filter { $0.kind == .episode }
+                                                                .compactMap { episodeEntry($0, showTitle: show.title) }.count,
+                                                             videoResumeAtMs: episodeStates[entry.id].flatMap { $0.completed ? nil : $0.lastPositionMs },
+                                                             videoSource: .podcast) {
                                         play(item, at: index)
                                     }
                             }

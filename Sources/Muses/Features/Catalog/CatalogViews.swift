@@ -624,7 +624,7 @@ struct CatalogReleaseDetailView: View {
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)
-                    .youTubeEntryContextMenu(entry: entry) { playOnlineTrack(entry) }
+                    .youTubeEntryContextMenu(entry: entry, videoContext: onlineTracks, videoSource: .album) { playOnlineTrack(entry) }
                 }
             }
             .background(BrandColors.surface.opacity(0.5), in: Capsule())
@@ -1309,7 +1309,7 @@ struct CatalogArtistDetailView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
-        .youTubeEntryContextMenu(entry: entry) { playOnlineTrack(entry) }
+        .youTubeEntryContextMenu(entry: entry, videoContext: discography?.topTracks ?? [], videoSource: .artist) { playOnlineTrack(entry) }
     }
 
     private func onlineReleaseCard(_ release: OnlineReleaseItem) -> some View {
