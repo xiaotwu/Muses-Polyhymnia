@@ -585,6 +585,7 @@ struct RootView: View {
         }
         .ignoresSafeArea(edges: [.bottom, .leading])
         .tint(BrandColors.accent)
+        .accessibilityElement(children: showNowPlaying || showYouTubeVideo ? .ignore : .contain)
         .accessibilityHidden(showNowPlaying || showYouTubeVideo)
         .disabled(showYouTubeVideo || showNowPlaying)
     }
