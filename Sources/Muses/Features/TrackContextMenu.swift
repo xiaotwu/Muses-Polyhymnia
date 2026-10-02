@@ -184,6 +184,14 @@ enum YouTubeContextMenuLink {
     }
 }
 
+enum TrackContextMenuPlaybackPolicy {
+    static func isCurrent(snapshotID: UUID, currentTrackID: UUID?,
+                          queueItemID: UUID?, currentQueueItemID: UUID?) -> Bool {
+        if let queueItemID { return queueItemID == currentQueueItemID }
+        return snapshotID == currentTrackID
+    }
+}
+
 /// Shared menu content for cards and native Table selections. Presentation state
 /// (sheets and dialogs) stays with the owning surface so a transient menu never owns it.
 struct TrackContextMenuItems: View {
@@ -191,6 +199,8 @@ struct TrackContextMenuItems: View {
     var track: Track? = nil
     var playlists: [Playlist] = []
     let onPlay: () -> Void
+    /// Queue menus distinguish repeated occurrences of the same recording.
+    var queueItemID: QueueItem.ID? = nil
     var videoContext: [TrackSnapshot] = []
     var videoSource: QueueSource = .search
     var onRemoveFromContainer: (() -> Void)? = nil
@@ -205,7 +215,12 @@ struct TrackContextMenuItems: View {
     @Environment(LibraryService.self) private var library
     @Environment(PlaylistService.self) private var playlistService
 
-    private var isCurrent: Bool { playback.transportState.track?.id == snapshot.id }
+    private var isCurrent: Bool {
+        TrackContextMenuPlaybackPolicy.isCurrent(
+            snapshotID: snapshot.id, currentTrackID: playback.transportState.track?.id,
+            queueItemID: queueItemID,
+            currentQueueItemID: queueItemID == nil ? nil : playback.queue.current()?.id)
+    }
 
     @ViewBuilder
     var body: some View {

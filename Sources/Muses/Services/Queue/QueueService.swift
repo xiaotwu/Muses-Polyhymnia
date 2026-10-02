@@ -256,10 +256,12 @@ final class QueueService {
         persist()
     }
 
-    /// Deletes a group: unlinks its items/upNext entries (groupId = nil) before removing the group.
+    /// Deletes a group and unlinks collection, insertion and history memberships.
     func removeGroup(id: UUID) {
         for i in items.indices where items[i].groupId == id { items[i].groupId = nil }
         for i in upNext.indices where upNext[i].groupId == id { upNext[i].groupId = nil }
+        if insertedCurrent?.groupId == id { insertedCurrent?.groupId = nil }
+        for i in history.indices where history[i].groupId == id { history[i].groupId = nil }
         groups.removeAll { $0.id == id }
         persist()
     }

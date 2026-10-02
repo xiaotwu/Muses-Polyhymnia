@@ -258,6 +258,7 @@ struct QueueDrawerView: View {
                 QueueRow(item: item, isCurrent: true)
                     .queueRowActions(title: item.track.title) {
                         TrackContextMenuItems(snapshot: item.track, onPlay: { playback.toggle() },
+                            queueItemID: item.id,
                             videoContext: playback.queue.items.map(\.track) + playback.queue.upNext.map(\.track),
                             videoSource: item.fromContext)
                     }
@@ -507,6 +508,7 @@ struct QueueDrawerView: View {
         TrackContextMenuItems(
             snapshot: item.track,
             onPlay: { playQueueItem(item) },
+            queueItemID: item.id,
             videoContext: playback.queue.items.map(\.track) + playback.queue.upNext.map(\.track),
             videoSource: item.fromContext,
             showsPlayNext: false,

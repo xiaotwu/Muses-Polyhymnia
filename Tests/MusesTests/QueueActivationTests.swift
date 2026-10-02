@@ -103,4 +103,72 @@ struct QueueActivationTests {
         #expect(engine.loadCallCount == 2)
         #expect(queue.history.map(\.id) == historyIDs)
     }
+
+    @Test("Queue menu toggles only the current occurrence; other surfaces retain track matching")
+    func menuOccurrenceIdentity() {
+        let trackID = UUID(), currentID = UUID(), duplicateID = UUID()
+        #expect(TrackContextMenuPlaybackPolicy.isCurrent(
+            snapshotID: trackID, currentTrackID: trackID,
+            queueItemID: currentID, currentQueueItemID: currentID))
+        #expect(!TrackContextMenuPlaybackPolicy.isCurrent(
+            snapshotID: trackID, currentTrackID: trackID,
+            queueItemID: duplicateID, currentQueueItemID: currentID))
+        #expect(!TrackContextMenuPlaybackPolicy.isCurrent(
+            snapshotID: trackID, currentTrackID: trackID,
+            queueItemID: duplicateID, currentQueueItemID: nil))
+        #expect(TrackContextMenuPlaybackPolicy.isCurrent(
+            snapshotID: trackID, currentTrackID: trackID,
+            queueItemID: nil, currentQueueItemID: nil))
+        #expect(!TrackContextMenuPlaybackPolicy.isCurrent(
+            snapshotID: UUID(), currentTrackID: trackID,
+            queueItemID: nil, currentQueueItemID: nil))
+    }
+
+    @Test("Moving and deleting a group preserves the active insertion and unlinks restored history")
+    func deletingActiveInsertionGroup() throws {
+        let container = try makeModelContainer(inMemory: true)
+        let queue = QueueService()
+        queue.modelContext = ModelContext(container)
+        let group = queue.addGroup("Selected"), remaining = queue.addGroup("Remaining")
+        let first = track("first"), removed = track("removed")
+        queue.play(first, context: [first, removed], from: .playlist)
+        let anchorID = queue.items[0].id
+        queue.items[1].groupId = group
+        queue.items[1].locked = true
+        let historyID = queue.items[1].id
+        queue.removeItem(at: 1)
+        queue.addToQueue(track("insertion"))
+        queue.upNext[0].groupId = group
+        queue.upNext[0].locked = true
+        let insertionID = queue.upNext[0].id
+        _ = queue.activateItem(id: insertionID)
+        queue.moveGroup(from: 0, to: 1)
+        #expect(queue.current()?.id == insertionID)
+        #expect(queue.current()?.groupId == group)
+        #expect(queue.current()?.locked == true)
+        queue.removeGroup(id: group)
+        #expect(queue.groups.map(\.id) == [remaining])
+        #expect(queue.current()?.id == insertionID)
+        #expect(queue.current()?.groupId == nil)
+        #expect(queue.current()?.locked == true)
+        #expect(queue.current()?.collectionAnchorID == anchorID)
+        #expect(queue.history.first?.id == historyID)
+        #expect(queue.history.first?.historyState == .removed)
+        #expect(queue.history.first?.locked == true)
+        #expect(queue.history.first?.groupId == nil)
+        let restored = QueueService()
+        restored.modelContext = ModelContext(container)
+        restored.restore()
+        #expect(restored.current()?.id == insertionID)
+        #expect(restored.current()?.groupId == nil)
+        #expect(restored.current()?.locked == true)
+        #expect(restored.current()?.collectionAnchorID == anchorID)
+        restored.restoreFromHistory(at: 0)
+        #expect(restored.upNext.first?.id == historyID)
+        #expect(restored.upNext.first?.locked == true)
+        #expect(restored.upNext.first?.groupId == nil)
+        restored.playAfterCurrentGroup(track("new"))
+        #expect(restored.items.map(\.id) == [anchorID])
+        #expect(restored.upNext.first?.track.title == "new")
+    }
 }
