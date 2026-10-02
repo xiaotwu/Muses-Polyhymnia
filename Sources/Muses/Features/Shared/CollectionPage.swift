@@ -348,6 +348,7 @@ private struct CollectionTrackTable: View {
     @State private var selection = Set<UUID>()
     @State private var sortOrder: [KeyPathComparator<CollectionTrackRow>]
     @State private var columnCustomization = TableColumnCustomization<CollectionTrackRow>()
+    @State private var nativeTableContentWidth: CGFloat = 1280
     @State private var likedIDs = Set<UUID>()
     @State private var editingTrack: Track?
     @State private var notesTrack: Track?
@@ -504,107 +505,116 @@ private struct CollectionTrackTable: View {
                 Color.clear.frame(height: OverlayChromeMetrics.scrollBottomInset)
             }
         } else {
-            Table(
-                tableRows,
-                selection: $selection,
-                sortOrder: $sortOrder,
-                columnCustomization: $columnCustomization
-            ) {
-                TableColumn(tr("Order", "顺序"), value: \.canonicalIndex) { row in
-                    Text("\(row.canonicalIndex + 1)")
-                        .foregroundStyle(BrandColors.textSecondary)
-                        .monospacedDigit()
-                }
-                .width(min: 44, ideal: 52, max: 72)
-                .customizationID("collection-order")
+            GeometryReader { viewport in
+                ScrollView(.horizontal) {
+                    Table(
+                        tableRows,
+                        selection: $selection,
+                        sortOrder: $sortOrder,
+                        columnCustomization: $columnCustomization
+                    ) {
+                        TableColumn(tr("Order", "顺序"), value: \.canonicalIndex) { row in
+                            Text("\(row.canonicalIndex + 1)")
+                                .foregroundStyle(BrandColors.textSecondary)
+                                .monospacedDigit()
+                        }
+                        .width(min: 44, ideal: 52, max: 72)
+                        .customizationID("collection-order")
 
-                TableColumn(
-                    tr("Title", "标题"),
-                    value: \.title,
-                    comparator: .localizedStandard
-                ) { row in
-                    CollectionTrackTitleCell(
-                        row: row,
-                        liked: likedIDs.contains(row.snapshot.id),
-                        isPlaying: matchesCurrent(row),
-                        onPlay: { onPlay(row) },
-                        onToggleLike: { library.toggleLike(snapshot: row.snapshot) },
-                        onRemove: onRemove.map { handler in { handler(row) } }
-                    )
-                }
-                .width(min: 220, ideal: 300)
-                .customizationID("collection-title")
-                .disabledCustomizationBehavior(.visibility)
+                        TableColumn(
+                            tr("Title", "标题"),
+                            value: \.title,
+                            comparator: .localizedStandard
+                        ) { row in
+                            CollectionTrackTitleCell(
+                                row: row,
+                                liked: likedIDs.contains(row.snapshot.id),
+                                isPlaying: matchesCurrent(row),
+                                onPlay: { onPlay(row) },
+                                onToggleLike: { library.toggleLike(snapshot: row.snapshot) },
+                                onRemove: onRemove.map { handler in { handler(row) } }
+                            )
+                        }
+                        .width(min: 220, ideal: 300)
+                        .customizationID("collection-title")
+                        .disabledCustomizationBehavior(.visibility)
 
-                TableColumn(
-                    tr("Artist", "艺术家"),
-                    value: \.artist,
-                    comparator: .localizedStandard
-                ) { row in
-                    secondaryText(row.displayArtist)
-                }
-                .width(min: 120, ideal: 170)
-                .customizationID("collection-artist")
+                        TableColumn(
+                            tr("Artist", "艺术家"),
+                            value: \.artist,
+                            comparator: .localizedStandard
+                        ) { row in
+                            secondaryText(row.displayArtist)
+                        }
+                        .width(min: 120, ideal: 170)
+                        .customizationID("collection-artist")
 
-                TableColumn(
-                    tr("Album", "专辑"),
-                    value: \.album,
-                    comparator: .localizedStandard
-                ) { row in
-                    secondaryText(row.album)
-                }
-                .width(min: 130, ideal: 190)
-                .customizationID("collection-album")
+                        TableColumn(
+                            tr("Album", "专辑"),
+                            value: \.album,
+                            comparator: .localizedStandard
+                        ) { row in
+                            secondaryText(row.album)
+                        }
+                        .width(min: 130, ideal: 190)
+                        .customizationID("collection-album")
 
-                TableColumn(tr("Year", "年份"), value: \.yearSortValue) { row in
-                    secondaryText(row.year.map(String.init) ?? "—")
-                        .monospacedDigit()
-                }
-                .width(min: 58, ideal: 66, max: 82)
-                .customizationID("collection-year")
+                        TableColumn(tr("Year", "年份"), value: \.yearSortValue) { row in
+                            secondaryText(row.year.map(String.init) ?? "—")
+                                .monospacedDigit()
+                        }
+                        .width(min: 58, ideal: 66, max: 82)
+                        .customizationID("collection-year")
 
-                TableColumn(
-                    tr("Genre", "类型"),
-                    value: \.genreSortValue,
-                    comparator: .localizedStandard
-                ) { row in
-                    secondaryText(row.genre ?? "—")
-                }
-                .width(min: 90, ideal: 120)
-                .customizationID("collection-genre")
+                        TableColumn(
+                            tr("Genre", "类型"),
+                            value: \.genreSortValue,
+                            comparator: .localizedStandard
+                        ) { row in
+                            secondaryText(row.genre ?? "—")
+                        }
+                        .width(min: 90, ideal: 120)
+                        .customizationID("collection-genre")
 
-                TableColumn(tr("Time", "时长"), value: \.duration) { row in
-                    secondaryText(formatDuration(row.duration))
-                        .monospacedDigit()
-                }
-                .width(min: 64, ideal: 72, max: 86)
-                .customizationID("collection-duration")
+                        TableColumn(tr("Time", "时长"), value: \.duration) { row in
+                            secondaryText(formatDuration(row.duration))
+                                .monospacedDigit()
+                        }
+                        .width(min: 64, ideal: 72, max: 86)
+                        .customizationID("collection-duration")
 
-                TableColumn(tr("Date Added", "添加日期"), value: \.addedAtSortValue) { row in
-                    secondaryText(formatDate(row.addedAt))
-                }
-                .width(min: 100, ideal: 124)
-                .customizationID("collection-date-added")
+                        TableColumn(tr("Date Added", "添加日期"), value: \.addedAtSortValue) { row in
+                            secondaryText(formatDate(row.addedAt))
+                        }
+                        .width(min: 100, ideal: 124)
+                        .customizationID("collection-date-added")
 
-                TableColumn(tr("Plays", "播放次数"), value: \.playCount) { row in
-                    secondaryText("\(row.playCount)")
-                        .monospacedDigit()
-                }
-                .width(min: 62, ideal: 72, max: 92)
-                .customizationID("collection-plays")
+                        TableColumn(tr("Plays", "播放次数"), value: \.playCount) { row in
+                            secondaryText("\(row.playCount)")
+                                .monospacedDigit()
+                        }
+                        .width(min: 62, ideal: 72, max: 92)
+                        .customizationID("collection-plays")
 
-            }
-            .tableStyle(.inset(alternatesRowBackgrounds: false))
-            .scrollContentBackground(.hidden)
-            .background(BrandColors.background)
-            .contextMenu(forSelectionType: UUID.self) { selectedIDs in
-                contextMenu(for: selectedIDs)
-            } primaryAction: { selectedIDs in
-                guard let row = firstRow(in: selectedIDs) else { return }
-                onPlay(row)
-            }
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                Color.clear.frame(height: OverlayChromeMetrics.scrollBottomInset)
+                    }
+                    .tableStyle(.inset(alternatesRowBackgrounds: false))
+                    // In measured overflow cases, accessibility queries were expensive with
+                    // Table owning both axes. Keep horizontal scrolling in the outer view.
+                    .scrollIndicators(.hidden, axes: .horizontal)
+                    .scrollContentBackground(.hidden)
+                    .background(BrandColors.background)
+                    .contextMenu(forSelectionType: UUID.self) { selectedIDs in
+                        contextMenu(for: selectedIDs)
+                    } primaryAction: { selectedIDs in
+                        guard let row = firstRow(in: selectedIDs) else { return }
+                        onPlay(row)
+                    }
+                    .safeAreaInset(edge: .bottom, spacing: 0) {
+                        Color.clear.frame(height: OverlayChromeMetrics.scrollBottomInset)
+                    }
+                    .background(CollectionTableWidthObserver { nativeTableContentWidth = $0 })
+                    .frame(width: max(viewport.size.width, nativeTableContentWidth), height: viewport.size.height)
+                }
             }
         }
         }
