@@ -237,4 +237,42 @@ struct QueueActivationTests {
         #expect(queue.upNext.last?.id == removedID)
         #expect(queue.upNext.last?.historyState == nil)
     }
+
+    @Test("Previous after repeating an insertion does not also enqueue the same occurrence")
+    func previousRepeatedInsertion() throws {
+        let container = try makeModelContainer(inMemory: true)
+        let queue = QueueService()
+        queue.modelContext = ModelContext(container)
+        let first = track("first"), second = track("second")
+        queue.play(first, context: [first, second], from: .playlist)
+        let anchorID = queue.items[0].id
+        let group = queue.addGroup("Group")
+        queue.playNext(track("inserted"))
+        queue.upNext[0].locked = true
+        queue.upNext[0].groupId = group
+        let insertionID = queue.upNext[0].id
+        #expect(queue.next()?.id == insertionID)
+        queue.setRepeat(.one)
+        #expect(queue.next()?.id == insertionID)
+        #expect(queue.history.map(\.id) == [insertionID, anchorID])
+        #expect(queue.previous()?.id == insertionID)
+        #expect(queue.upNext.isEmpty)
+        #expect(queue.history.map(\.id) == [anchorID])
+        #expect(queue.current()?.locked == true)
+        #expect(queue.current()?.groupId == group)
+        #expect(queue.current()?.collectionAnchorID == anchorID)
+        let restored = QueueService()
+        restored.modelContext = ModelContext(container)
+        restored.restore()
+        #expect(restored.repeatMode == .one)
+        #expect(restored.current()?.id == insertionID)
+        #expect(restored.current()?.locked == true)
+        #expect(restored.current()?.groupId == group)
+        #expect(restored.current()?.collectionAnchorID == anchorID)
+        #expect(restored.upNext.isEmpty)
+        #expect(restored.previous()?.id == anchorID)
+        #expect(restored.upNext.map(\.id) == [insertionID])
+        #expect(restored.next()?.id == insertionID)
+        #expect(restored.upNext.isEmpty)
+    }
 }

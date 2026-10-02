@@ -140,7 +140,9 @@ final class QueueService {
     func previous() -> QueueItem? {
         if let h = history.first {
             history.removeFirst()
-            if let insertedCurrent { upNext.insert(insertedCurrent, at: 0) }
+            if let insertedCurrent, insertedCurrent.id != h.id {
+                upNext.insert(insertedCurrent, at: 0)
+            }
             if let idx = items.firstIndex(where: { $0.id == h.id }) {
                 currentIndex = idx
                 insertedCurrent = nil
