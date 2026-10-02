@@ -141,7 +141,7 @@ struct HomeDiscoveryTrustTests {
     }
 
     @Test("baseline and Web partitions use independent paths and freshness windows")
-    func sourcePartitionsAreIndependent() {
+    func sourcePartitionsAreIndependent() throws {
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("muses-home-partitions-\(UUID().uuidString)", isDirectory: true)
         let cache = HomeFeedCache(
@@ -167,13 +167,11 @@ struct HomeDiscoveryTrustTests {
 
         #expect(cache.set(baseline, for: account, layer: .baseline))
         #expect(cache.set(web, for: account, layer: .web))
-        let cachedBaseline = cache.get(for: account, layer: .baseline, now: now)
-        let cachedWeb = cache.get(for: account, layer: .web, now: now)
+        let cachedBaseline = try #require(cache.get(for: account, layer: .baseline, now: now))
+        let cachedWeb = try #require(cache.get(for: account, layer: .web, now: now))
 
-        #expect(cachedBaseline != nil)
-        #expect(cachedWeb != nil)
-        #expect(cache.isFresh(cachedBaseline!, layer: .baseline, now: now))
-        #expect(!cache.isFresh(cachedWeb!, layer: .web, now: now))
+        #expect(cache.isFresh(cachedBaseline, layer: .baseline, now: now))
+        #expect(!cache.isFresh(cachedWeb, layer: .web, now: now))
         #expect(cache.directoryURL(
             for: account.scope, layer: .baseline,
             language: account.language, region: account.region).path
