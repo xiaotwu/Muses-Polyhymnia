@@ -200,28 +200,30 @@ struct TrackContextMenuItems: View {
                 playback.queue.addToQueue(snapshot)
             }
         }
-        if !snapshot.youTubeId.isEmpty,
-           let url = URL(string: "https://youtu.be/\(snapshot.youTubeId)") {
-            if let target = YouTubeShareTarget(kind: .video, id: snapshot.youTubeId) {
-                YouTubeShareMenu(target: target)
+        if let resolvedTrack {
+            Divider()
+            let _ = library.likedRevision
+            let liked = library.isLiked(id: resolvedTrack.id)
+            Button(liked ? tr("Unlike", "取消收藏") : tr("Like", "收藏"),
+                   systemImage: liked ? "heart.fill" : "heart") {
+                library.toggleLike(resolvedTrack)
             }
-            Button(tr("Copy Link", "复制链接"), systemImage: "link") {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(url.absoluteString, forType: .string)
-            }
-            Button {
-                PlaybackPresentation.video(snapshot, playback: playback)
-            } label: {
-                Label {
-                    Text(tr("Floating video", "悬浮视频"))
-                } icon: {
-                    YouTubeMark(size: 12)
-                        .accessibilityHidden(true)
+            if onCreatePlaylist != nil || !playlists.isEmpty {
+                Menu(tr("Add to Playlist", "添加到歌单")) {
+                    if let onCreatePlaylist {
+                        Button(tr("New Playlist…", "新建歌单…"), action: onCreatePlaylist)
+                    }
+                    if !playlists.isEmpty {
+                        if onCreatePlaylist != nil { Divider() }
+                        ForEach(playlists, id: \.id) { playlist in
+                            Button(playlist.name) {
+                                playlistService.addTrack(playlist, track: resolvedTrack)
+                            }
+                        }
+                    }
                 }
             }
-            .accessibilityLabel(tr("Floating video", "悬浮视频"))
         }
-
         Divider()
         if !snapshot.artist.isEmpty && snapshot.artist != "Unknown" {
             Button(tr("Go to Artist", "前往艺人"), systemImage: "person.circle") {
@@ -242,28 +244,7 @@ struct TrackContextMenuItems: View {
             }
         }
 
-        if let resolvedTrack {
-            Divider()
-            let _ = library.likedRevision
-            let liked = library.isLiked(id: resolvedTrack.id)
-            Button(liked ? tr("Unlike", "取消收藏") : tr("Like", "收藏")) {
-                library.toggleLike(resolvedTrack)
-            }
-            if onCreatePlaylist != nil || !playlists.isEmpty {
-                Menu(tr("Add to Playlist", "添加到歌单")) {
-                    if let onCreatePlaylist {
-                        Button(tr("New Playlist…", "新建歌单…"), action: onCreatePlaylist)
-                    }
-                    if !playlists.isEmpty {
-                        if onCreatePlaylist != nil { Divider() }
-                        ForEach(playlists, id: \.id) { playlist in
-                            Button(playlist.name) {
-                                playlistService.addTrack(playlist, track: resolvedTrack)
-                            }
-                        }
-                    }
-                }
-            }
+        if resolvedTrack != nil {
             if onEditTrack != nil || onTrackNotes != nil {
                 Divider()
             }
@@ -282,6 +263,28 @@ struct TrackContextMenuItems: View {
                 role: .destructive,
                 action: onRemoveFromContainer
             )
+        }
+        Divider()
+        if !snapshot.youTubeId.isEmpty,
+           let url = URL(string: "https://youtu.be/\(snapshot.youTubeId)") {
+            if let target = YouTubeShareTarget(kind: .video, id: snapshot.youTubeId) {
+                YouTubeShareMenu(target: target)
+            }
+            Button(tr("Copy Link", "复制链接"), systemImage: "link") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(url.absoluteString, forType: .string)
+            }
+            Button {
+                PlaybackPresentation.video(snapshot, playback: playback)
+            } label: {
+                Label {
+                    Text(tr("Floating video", "悬浮视频"))
+                } icon: {
+                    YouTubeMark(size: 12)
+                        .accessibilityHidden(true)
+                }
+            }
+            .accessibilityLabel(tr("Floating video", "悬浮视频"))
         }
     }
 

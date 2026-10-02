@@ -14,6 +14,7 @@ enum MusesResources {
 struct UpdatesSettingsView: View {
     @Environment(UpdateService.self) private var updater
     @State private var showProgress = false
+    @State private var showRequestedCheckResult = false
 
     var body: some View {
         Section {
@@ -25,6 +26,7 @@ struct UpdatesSettingsView: View {
                         SettingsInfoButton(title: tr("Update details", "更新详情"), message: error)
                     }
                     SettingsIconButton(title: tr("Check for updates", "检查更新"), symbol: "arrow.clockwise") {
+                        showRequestedCheckResult = true
                         Task { await updater.checkForUpdates() }
                     }.disabled(!updater.canCheck)
                 }
@@ -45,7 +47,7 @@ struct UpdatesSettingsView: View {
                 Button(tr("Open release page", "打开版本页面")) { updater.openReleasePage() }.settingsAction()
             } else {
                 statusView
-                if updater.phase == .downloading || updater.phase == .verifying || updater.phase == .ready || updater.phase == .failed {
+                if updater.phase == .downloading || updater.phase == .verifying || updater.phase == .ready || updater.phase == .failed || updater.phase == .upToDate {
                     Button(tr("Progress & result…", "进度与结果…")) { showProgress = true }.settingsAction()
                 }
             }
@@ -62,14 +64,21 @@ struct UpdatesSettingsView: View {
                     Button(tr("Close", "关闭")) { showProgress = false }.keyboardShortcut(.cancelAction)
                     Spacer()
                     if updater.phase == .failed {
-                        Button(tr("Retry", "重试")) { Task { await updater.checkForUpdates() } }
+                        Button(tr("Retry", "重试")) {
+                            showRequestedCheckResult = true
+                            Task { await updater.checkForUpdates() }
+                        }
                             .buttonStyle(.glassProminent).disabled(!updater.canCheck)
                     }
                 }
             }.padding(24).frame(width: 480)
         }
         .onChange(of: updater.phase) { old, phase in
-            if phase == .failed || ((old == .downloading || old == .verifying) && phase == .ready) { showProgress = true }
+            let requestedCheckFinished = old == .checking && showRequestedCheckResult
+            if requestedCheckFinished { showRequestedCheckResult = false }
+            if phase == .failed
+                || (requestedCheckFinished && phase == .upToDate)
+                || ((old == .downloading || old == .verifying) && phase == .ready) { showProgress = true }
         }
     }
 

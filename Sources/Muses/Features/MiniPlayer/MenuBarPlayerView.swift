@@ -12,10 +12,11 @@ struct MenuBarPlayerView: View {
     var onQuit: () -> Void = {}
     @State private var isSeeking = false
     @State private var seekPosition = 0.0
+    @State private var seekTrackID: UUID?
 
     private var track: TrackSnapshot? { playback.transportState.track }
     private var duration: Double { max(0, playback.transportState.duration) }
-    private var position: Double { isSeeking ? seekPosition : playback.transportState.position }
+    private var position: Double { isSeeking && seekTrackID == track?.id ? seekPosition : playback.transportState.position }
 
     private var songInformation: SongDisplayInformation? {
         guard let current = track else { return nil }
@@ -54,15 +55,20 @@ struct MenuBarPlayerView: View {
 
             VStack(spacing: 2) {
                 Slider(value: Binding(get: { min(duration, max(0, position)) }, set: {
+                    guard !isSeeking || seekTrackID == track?.id else { return }
                     seekPosition = $0
                     if !isSeeking { playback.seek(to: $0) }
                 }),
                        in: 0...max(1, duration), onEditingChanged: { editing in
-                    if editing { seekPosition = playback.transportState.position }
-                    else { playback.seek(to: seekPosition) }
+                    if editing {
+                        seekTrackID = track?.id
+                        seekPosition = playback.transportState.position
+                    } else {
+                        if seekTrackID == track?.id { playback.seek(to: seekPosition) }
+                        seekTrackID = nil
+                    }
                     isSeeking = editing
                 })
-                .focusEffectDisabled()
                 .disabled(track == nil || duration <= 0)
                 .accessibilityLabel(tr("Playback position", "播放位置", zhHant: "播放位置"))
                 HStack {
@@ -104,6 +110,7 @@ struct MenuBarPlayerView: View {
                         }
                     }
                     Button(tr("Shuffle", "随机播放")) { playback.queue.toggleShuffle() }
+                        .disabled(track == nil)
                     if let id = track?.youTubeId, let url = URL(string: "https://youtu.be/\(id)") {
                         ShareLink(item: url)
                     }
@@ -135,7 +142,10 @@ struct MenuBarPlayerView: View {
             songMetadata = metadata
         }
         .onAppear { audioDevices?.refresh() }
-        .onChange(of: track?.id) { _, _ in isSeeking = false }
+        .onChange(of: track?.id) { _, _ in
+            if !isSeeking { seekTrackID = nil }
+        }
+        .onDisappear { isSeeking = false; seekTrackID = nil }
     }
 
     private func formatTime(_ value: Double) -> String {

@@ -33,6 +33,7 @@ struct RootView: View {
     @State private var showNowPlaying = false
     @State private var immersiveNavigationHovered = false
     @State private var immersiveNavigationFocused = false
+    @State private var immersiveToolbarRevealed = false
     @State private var lyricsSearchRequest: LyricsSearchRequest?
     private struct LyricsSearchRequest: Identifiable {
         let id = UUID()
@@ -72,6 +73,18 @@ struct RootView: View {
     var body: some View {
         notificationWired
             .toolbar { windowNavigationToolbar }
+            .toolbarVisibility(showNowPlaying && !immersiveToolbarRevealed ? .hidden : .visible,
+                               for: .windowToolbar)
+            .onContinuousHover { phase in
+                guard showNowPlaying else { return }
+                if case .active(let location) = phase {
+                    let revealed = location.y <= 48
+                    if immersiveToolbarRevealed != revealed {
+                        immersiveToolbarRevealed = revealed
+                    }
+                }
+            }
+            .onChange(of: showNowPlaying) { _, _ in immersiveToolbarRevealed = false }
             .modifier(MainWindowTitleHidden())
             .alert(tr("Unable to Open Link", "无法打开链接", zhHant: "無法開啟連結"), isPresented: Binding(
                 get: { externalPlaybackRouter.errorMessage != nil },
@@ -424,6 +437,11 @@ struct RootView: View {
             selectedCatalogRelease = nil
             selectedCatalogArtist = nil
             section = destination
+        case .channel(let id):
+            selectedCatalogRelease = nil
+            selectedCatalogArtist = nil
+            selectedChannelID = id
+            section = .subscriptions
         case .release(let release):
             selectedCatalogArtist = nil
             selectedCatalogRelease = release

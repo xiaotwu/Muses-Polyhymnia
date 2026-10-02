@@ -111,7 +111,9 @@ extension HomeView {
                     remoteURL: card.thumbnailURL, youTubeId: card.playableVideoID),
                 videoEntry: card.playableVideoID.map { .init(id: $0, title: card.title, uploader: card.uploader, duration: card.duration) },
                 isYouTube: true,
-                style: card.browseEndpoint?.kind == .channel ? .portraitOverlay : .home,
+                // A UC endpoint identifies a channel, not a person or portrait artwork.
+                // Keep square media until the provider supplies a reliable person type.
+                style: .home,
                 showsHoverPlay: card.playableVideoID != nil,
                 onOpen: { openWebCard(card) },
                 onPlay: { Task { await play(card) } }

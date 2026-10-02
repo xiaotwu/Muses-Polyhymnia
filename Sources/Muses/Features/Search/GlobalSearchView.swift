@@ -3,6 +3,7 @@ import SwiftUI
 
 enum GlobalSearchRoute {
     case section(SidebarSection)
+    case channel(String)
     case release(CatalogReleaseProjection)
     case artist(CatalogArtistProjection)
 }

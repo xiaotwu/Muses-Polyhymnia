@@ -9,7 +9,7 @@ struct NewView: View {
     @Environment(YouTubeAccountService.self) private var youTubeAccount
     @Environment(YouTubeSearchService.self) private var youTubeSearch
 
-    private enum DiscoverySource: String { case all, library, account }
+    private enum DiscoverySource: String { case all, library, account, subscriptions }
     @State private var discoverySource: DiscoverySource = .all
     @State private var sections: [SituationalSection] = []
     @State private var newTracks: [TrackSnapshot] = []
@@ -62,10 +62,7 @@ struct NewView: View {
                     Button(tr("Library rediscovery", "资料库重发现")) { discoverySource = .library }
                     Button(tr("Account recommendations", "账号推荐")) { discoverySource = .account }
                     Divider()
-                    Button(tr("Subscribed channels", "订阅频道")) {
-                        NotificationCenter.default.post(name: .musesNavigateFromSearch,
-                                                        object: GlobalSearchRoute.section(.subscriptions))
-                    }
+                    Button(tr("Subscribed channels", "订阅频道")) { discoverySource = .subscriptions }
                 } label: {
                     Label(tr("Discovery source", "发现来源"), systemImage: "line.3.horizontal.decrease")
                 }
@@ -82,7 +79,9 @@ struct NewView: View {
                     Text(playbackError).font(.callout).foregroundStyle(.secondary)
                         .padding(.horizontal, AppleMusicTokens.contentPaddingX)
                 }
-                if recommendationsLoading && !hasContent {
+                if discoverySource == .subscriptions {
+                    subscriptionDiscovery
+                } else if recommendationsLoading && !hasContent {
                     loadingState
                 } else if hasContent {
                     editorialSection
@@ -136,6 +135,52 @@ struct NewView: View {
         .onChange(of: library.playRevision) { _, _ in loadRecommendations() }
         .onChange(of: youTubeAccount.isConnected) { _, _ in loadPersonalDiscovery() }
         .onChange(of: youTubeAccount.activeChannelID) { _, _ in loadPersonalDiscovery() }
+    }
+
+    @ViewBuilder
+    private var subscriptionDiscovery: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            SectionHeader(title: tr("Subscribed channels", "订阅频道"),
+                          subtitle: tr("Only channels from your connected YouTube account", "仅显示已连接 YouTube 账号的订阅频道"))
+            if !youTubeAccount.isConnected {
+                ContentUnavailableView {
+                    Label(tr("Connect YouTube", "连接 YouTube"), systemImage: "person.crop.circle")
+                } description: {
+                    Text(tr("Connect to browse discovery from your subscriptions.", "连接账号后，从订阅频道发现内容。"))
+                } actions: {
+                    Button(tr("Account Settings", "账号设置")) {
+                        NotificationCenter.default.post(name: .musesOpenSettings, object: SettingsCategory.youtube)
+                    }
+                }
+            } else {
+                if youTubeAccount.subscriptionsState.isLoading { ProgressView() }
+                if let message = youTubeAccount.subscriptionsState.errorMessage {
+                    Text(message).font(.callout).foregroundStyle(.secondary)
+                }
+                let channels = youTubeAccount.subscriptionsState.value ?? []
+                if channels.isEmpty && !youTubeAccount.subscriptionsState.isLoading {
+                    ContentUnavailableView {
+                        Label(tr("No subscribed channels available", "暂无可用的订阅频道"), systemImage: "person.crop.rectangle.stack")
+                    } actions: {
+                        Button(tr("Refresh", "刷新")) { Task { await youTubeAccount.refresh() } }
+                    }
+                } else {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), alignment: .top)], spacing: 24) {
+                        ForEach(channels, id: \.channelId) { channel in
+                            AlbumObjectView(title: channel.title, subtitle: tr("Subscribed channel", "已订阅频道"),
+                                            artwork: .resolve(remoteURL: channel.thumbnailURL), size: 164,
+                                            isYouTube: true, showsHoverPlay: false,
+                                            onSelect: {
+                                                NotificationCenter.default.post(name: .musesNavigateFromSearch,
+                                                    object: GlobalSearchRoute.channel(channel.channelId))
+                                            }, onPlay: {})
+                        }
+                    }
+                    Button(tr("Refresh subscriptions", "刷新订阅")) { Task { await youTubeAccount.refresh() } }
+                        .disabled(youTubeAccount.subscriptionsState.isLoading)
+                }
+            }
+        }.padding(.horizontal, AppleMusicTokens.contentPaddingX)
     }
 
     @ViewBuilder

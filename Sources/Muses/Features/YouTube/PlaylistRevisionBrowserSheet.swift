@@ -103,6 +103,7 @@ struct PlaylistRevisionBrowserSheet: View {
         return HStack(spacing: 10) {
             Button {
                 selectedRevisionID = revision.id
+                selectAdjacentComparison()
                 updateComparison()
             } label: {
                 HStack(spacing: 10) {
@@ -194,10 +195,14 @@ struct PlaylistRevisionBrowserSheet: View {
                     }
                 } else {
                     ContentUnavailableView(
-                        tr("Select a Version to Compare", "选择要比较的版本"),
+                        revisions.count <= 1 || selectedRevisionID == revisions.last?.id
+                            ? tr("First Recovery Point", "首个恢复点")
+                            : tr("Select a Version to Compare", "选择要比较的版本"),
                         systemImage: "arrow.left.arrow.right",
-                        description: Text(tr("Inserted, removed, and moved occurrences are shown in order.",
-                                             "将按顺序显示新增、移除和移动的条目。")))
+                        description: Text(revisions.count <= 1 || selectedRevisionID == revisions.last?.id
+                            ? tr("There is no earlier recovery point. Choose another version to compare.", "没有更早的恢复点。可选择其他版本进行比较。")
+                            : tr("Inserted, removed, and moved occurrences are shown in order.",
+                                 "将按顺序显示新增、移除和移动的条目。")))
                 }
             } else {
                 ContentUnavailableView(tr("Select a Recovery Point", "选择恢复点"),
@@ -277,8 +282,8 @@ struct PlaylistRevisionBrowserSheet: View {
         do {
             revisions = try sync.revisionSummaries(importID: importID)
             selectedRevisionID = selection ?? selectedRevisionID ?? revisions.first?.id
-            if comparisonRevisionID == selectedRevisionID {
-                comparisonRevisionID = nil
+            if comparisonRevisionID == nil || comparisonRevisionID == selectedRevisionID {
+                selectAdjacentComparison()
             }
             errorMessage = nil
             updateComparison()
@@ -294,6 +299,16 @@ struct PlaylistRevisionBrowserSheet: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    /// Selection immediately reveals the change since the preceding recovery point.
+    private func selectAdjacentComparison() {
+        guard let selectedRevisionID,
+              let index = revisions.firstIndex(where: { $0.id == selectedRevisionID }) else {
+            comparisonRevisionID = nil
+            return
+        }
+        comparisonRevisionID = index + 1 < revisions.count ? revisions[index + 1].id : nil
     }
 
     private func updateComparison() {

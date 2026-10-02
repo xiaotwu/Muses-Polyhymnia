@@ -1,6 +1,6 @@
 # Muses UI/UX reconstruction acceptance — 2026-10-02
 
-The approved choices are implemented in production surfaces, with mature service/data workflows retained where they already satisfy the selected contract. The [implementation plan](ui-ux-implementation-plan.md) accounts for each of the 64 areas and preserves the exact user choices. **Comprehensive acceptance is not complete.** A production implementation, a passing test and an exercised live workflow are different evidence categories.
+The approved choices have broad production coverage, with mature service/data workflows retained where they satisfy the selected contract. The exact-choice follow-up audit identified small omitted implementation branches; the completion pass below precedes the eight new screenshot fixes. The [implementation plan](ui-ux-implementation-plan.md) accounts for each of the 64 areas and preserves the exact user choices. **Comprehensive acceptance is not complete.** A production implementation, a passing test and an exercised live workflow are different evidence categories.
 
 Implementation commits: `782f633` (production surfaces and meaningful service/guardrail tests) and `6df4cf2` (rendered music-video overflow and oversized mini-window repairs).
 
@@ -36,3 +36,20 @@ Final rendered repairs: a populated two-card music-video grid initially overflow
 5. Measure active-versus-disabled visual CPU/frame/energy behavior before claiming reduced-visual performance benefits. Check representative lyric artwork contrast and auxiliary-window show/hide/lifetime paths.
 
 Linear completion must reflect this distinction: implementation can be delivered while live or comprehensive acceptance remains open. Coordination parents and XW-12 must not be closed as fully accepted until the outstanding evidence is recorded.
+
+## Original-choice branch completion pass — 2026-10-02
+
+The user requested applying any original-task leftovers before beginning screenshot repairs. The follow-up audit identified actual omissions, rather than merely missing acceptance evidence:
+
+- 02C: native immersive toolbar visibility now follows pointer proximity to the upper content edge; browsing retains its native toolbar and keyboard exit remains available.
+- 09D: a UC identity proves a channel, not a person portrait. Top Picks now use square artwork when person classification is unavailable. No inferred person metadata is created.
+- 25C: selecting a recovery version defaults to the preceding recovery point difference; the initial version explains the absence of an earlier point.
+- 30B: New provides an in-place subscribed-channel filter using the connected account's real subscription state; opening a channel retains main-window history.
+- 47A: shared track menu sections place playback and organization before information and external actions, retaining remote snapshot catalog actions.
+- 54C: the unconfigured account has one clear state conclusion.
+- 56C/57D/61C: truthful external-config location status, native lyric-model recovery actions, and an explicit update-check result surface.
+- Menu-bar native seek focus and media-identity guarding are completed without changing the new PlayerBar seek requirements.
+
+Row keyboard and VoiceOver semantics (63C), rendered upper-edge toolbar behavior, connected subscription states and configured update results require live verification. Passing source/build checks do not establish those states as accepted. The eight new screenshot repairs remain a separate subsequent increment.
+
+Completion-pass verification: all **774 tests in 106 suites** passed (`/tmp/muses-original-branch-full-tests.log`); the signed release package passed app/helper verification and both bundled yt-dlp launches (`/tmp/muses-original-branch-package.log`). The package cold-launched in the existing separate acceptance namespace. Native inspection confirmed the subscription filter stays on New with guest recovery, Account has one unconfigured conclusion, the ready local-model popover exposes Close/Refresh and fallback explanation, and VoiceOver's actual paged song path exposes one Button per song with a Like auxiliary action and a complete native context menu in the approved order. Entering Now Playing hides the native toolbar, and Command-[ exits to the existing browsing page. Pointer upper-edge reveal and full Tab/VoiceOver traversal are not asserted as accepted: automated coordinate clicks did not establish continuous hover, and Tab did not expose a changed AX focus. Private evidence is under `~/.muses/acceptance/original-branches-20261002`. No system accessibility settings, credentials or production library data were changed.

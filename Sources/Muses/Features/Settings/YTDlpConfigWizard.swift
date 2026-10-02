@@ -34,11 +34,11 @@ struct YTDlpConfigWizard: View {
                 if let status { Text(status).font(MusesTypography.caption).foregroundStyle(.secondary) }
             }
             DisclosureGroup(tr("External configuration", "外部配置")) {
-                LabeledContent(tr("Source", "来源")) {
+                LabeledContent(tr("Default external location", "默认外部位置")) {
                     Text(externalConfig.path).font(MusesTypography.caption.monospaced()).textSelection(.enabled)
                 }
-                Text(tr("Production yt-dlp can read its external user configuration. Isolated acceptance runs ignore it. This panel does not display cookie contents or change that file.",
-                        "生产版 yt-dlp 可以读取外部用户配置，隔离验收运行忽略该配置。此面板不显示 Cookie 内容或修改该文件。"))
+                Text(tr("Production yt-dlp can read external user configuration, including other locations selected by its environment. This standard path is not a claim that a file was loaded. Isolated acceptance runs ignore external configuration. This panel does not display cookie contents or change that file.",
+                        "生产版 yt-dlp 可以读取外部用户配置，也可能按运行环境读取其他位置。此标准路径不代表文件已被加载。隔离验收运行忽略外部配置；此面板不显示 Cookie 内容或修改该文件。"))
                     .font(MusesTypography.caption).foregroundStyle(.secondary)
                 Button(tr("Show location", "显示所在位置")) {
                     NSWorkspace.shared.activateFileViewerSelecting([externalConfig.deletingLastPathComponent()])

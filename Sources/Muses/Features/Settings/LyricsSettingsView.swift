@@ -32,7 +32,7 @@ struct LyricsSettingsView: View {
             HStack(spacing: 8) {
                 Toggle(tr("Intelligent matching", "智能匹配"), isOn: $intelligentMatching)
                     .disabled(availability != .available && !intelligentMatching)
-                SettingsInfoButton(title: tr("Intelligent matching", "智能匹配"), message: availability.message)
+                LyricsIntelligenceStatusControl(availability: $availability)
             }
             SettingsStatus(title: availability.message,
                            symbol: availability == .available ? "checkmark.circle" : "info.circle")
@@ -57,6 +57,71 @@ struct LyricsSettingsView: View {
     private var supportsTranslation: Bool {
         if #available(macOS 15.0, *) { return true }
         return false
+    }
+}
+
+/// Availability is read-only; recovery opens native settings or rechecks the local model.
+private struct LyricsIntelligenceStatusControl: View {
+    @Binding var availability: LyricsIntelligence.Availability
+    @State private var presented = false
+
+    var body: some View {
+        Button { presented = true } label: {
+            Image(systemName: "info.circle").frame(width: 28, height: 28)
+        }
+        .buttonStyle(.fullAreaPlain)
+        .accessibilityLabel(tr("Intelligent matching status and recovery", "智能匹配状态与恢复"))
+        .help(availability.message)
+        .popover(isPresented: $presented) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(tr("Intelligent matching", "智能匹配")).font(.headline)
+                SettingsStatus(title: availability.message,
+                               symbol: availability == .available ? "checkmark.circle" : "info.circle")
+                Text(tr("Uses Apple's on-device model on a supported Mac and in a supported region, with Apple Intelligence enabled and its model ready. It selects retrieved candidates; it never generates lyrics or timing.",
+                        "需要支持的 Mac 与地区、已启用的 Apple Intelligence 及就绪的设备端模型。它仅选择已检索的候选，不生成歌词或时序。"))
+                    .font(.callout).fixedSize(horizontal: false, vertical: true)
+                Text(recoveryExplanation).font(.callout).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack {
+                    Button(tr("Close", "关闭")) { presented = false }.keyboardShortcut(.cancelAction)
+                    Spacer()
+                    switch availability {
+                    case .disabled:
+                        Button(tr("System Settings", "系统设置")) {
+                            if let url = URL(string: "x-apple.systempreferences:") { NSWorkspace.shared.open(url) }
+                        }.settingsAction()
+                    case .olderSystem, .ineligible:
+                        Link(tr("Support conditions", "支持条件"), destination: URL(string: "https://support.apple.com/121115")!)
+                            .settingsAction()
+                    case .available, .downloading, .unavailable:
+                        Button(tr("Refresh status", "刷新状态")) { availability = LyricsIntelligence.availability }
+                            .settingsAction()
+                    }
+                }
+            }
+            .padding(16).frame(width: 340)
+            .onExitCommand { presented = false }
+        }
+    }
+
+    private var recoveryExplanation: String {
+        switch availability {
+        case .available:
+            tr("If matching fails, ordinary source retrieval still works. Choose a candidate with Match Lyrics in the reading menu; the original lyrics remain available.",
+               "匹配失败时仍可普通检索。在阅读菜单使用“匹配歌词”选择候选；原文歌词仍可使用。")
+        case .disabled:
+            tr("Enable Apple Intelligence in System Settings, then return to Muses. Ordinary lyric retrieval remains available.",
+               "请在系统设置中启用 Apple Intelligence 后返回 Muses。普通歌词检索仍可使用。")
+        case .downloading:
+            tr("Wait for Apple's model preparation to finish, then refresh this status. Ordinary lyric retrieval remains available while you wait.",
+               "请等待 Apple 完成模型准备，再刷新此状态。等待期间仍可普通检索歌词。")
+        case .olderSystem, .ineligible:
+            tr("Review Apple's device, language and region support. Use ordinary lyric retrieval or manual matching on this Mac.",
+               "请查看 Apple 对设备、语言及地区的支持条件。此 Mac 可使用普通检索或手动匹配歌词。")
+        case .unavailable:
+            tr("Recheck the local model status. If it remains unavailable, use ordinary source retrieval or manual matching; no extra permission is required.",
+               "请重新检查本机模型状态。若仍不可用，可使用普通检索或手动匹配，无需额外权限。")
+        }
     }
 }
 

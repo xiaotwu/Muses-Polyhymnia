@@ -441,41 +441,43 @@ private struct CollectionTrackTable: View {
             ScrollView {
                 LazyVStack(spacing: 0) {
                     ForEach(tableRows) { row in
-                        HStack(spacing: 12) {
-                            Button { onPlay(row) } label: {
-                                HStack(spacing: 12) {
-                                    Text("\(row.canonicalIndex + 1)")
-                                        .monospacedDigit()
-                                        .foregroundStyle(BrandColors.textSecondary)
-                                        .frame(width: 40, alignment: .trailing)
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(row.title).font(MusesTypography.song(size: 14, emphasized: true, text: row.title)).lineLimit(1)
-                                        Text(row.displayArtist).font(MusesTypography.song(size: 12, text: row.displayArtist))
-                                            .foregroundStyle(BrandColors.textSecondary)
-                                            .lineLimit(1)
-                                    }
-                                    Spacer(minLength: 8)
-                                    Text(formatDuration(row.duration))
-                                        .monospacedDigit()
-                                        .foregroundStyle(BrandColors.textSecondary)
+                        Button { onPlay(row) } label: {
+                            HStack(spacing: 12) {
+                                Text("\(row.canonicalIndex + 1)")
+                                    .monospacedDigit()
+                                    .foregroundStyle(BrandColors.textSecondary)
+                                    .frame(width: 40, alignment: .trailing)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(row.title).font(MusesTypography.song(size: 14, emphasized: true, text: row.title)).lineLimit(1)
+                                    Text(row.displayArtist).font(MusesTypography.song(size: 12, text: row.displayArtist))
+                                        .foregroundStyle(BrandColors.textSecondary).lineLimit(1)
                                 }
-                                .frame(minHeight: 42)
-                                .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.fullAreaPlain)
-                            .accessibilityLabel(tr("Play \(row.title) by \(row.displayArtist)",
-                                                   "播放 \(row.displayArtist) 的 \(row.title)",
-                                                   zhHant: "播放 \(row.displayArtist) 的 \(row.title)"))
-                            Button { library.toggleLike(snapshot: row.snapshot) } label: {
+                                Spacer(minLength: 8)
+                                Text(formatDuration(row.duration))
+                                    .monospacedDigit().foregroundStyle(BrandColors.textSecondary)
                                 Image(systemName: likedIDs.contains(row.snapshot.id) ? "heart.fill" : "heart")
+                                    .foregroundStyle(likedIDs.contains(row.snapshot.id) ? BrandColors.accent : BrandColors.textSecondary)
                                     .frame(width: 28, height: 28)
+                                    .accessibilityHidden(true)
                             }
-                            .buttonStyle(.fullAreaPlain)
-                            .accessibilityLabel(likedIDs.contains(row.snapshot.id)
-                                ? tr("Unlike \(row.title)", "取消收藏 \(row.title)", zhHant: "取消喜愛 \(row.title)")
-                                : tr("Like \(row.title)", "收藏 \(row.title)", zhHant: "喜愛 \(row.title)"))
+                            .frame(minHeight: 42)
+                            .contentShape(Rectangle())
                         }
+                        .buttonStyle(.fullAreaPlain)
                         .padding(.horizontal, 16)
+                        .help(tr("Play \(row.title)", "播放 \(row.title)"))
+                        .accessibilityLabel("\(row.title), \(row.displayArtist)")
+                        .accessibilityValue(formatDuration(row.duration) + " · " + (likedIDs.contains(row.snapshot.id)
+                            ? tr("Liked", "已收藏") : tr("Not liked", "未收藏")))
+                        .accessibilityAction(named: Text(likedIDs.contains(row.snapshot.id)
+                            ? tr("Unlike", "取消收藏") : tr("Like", "收藏"))) {
+                            library.toggleLike(snapshot: row.snapshot)
+                        }
+                        .accessibilityActions {
+                            if let onRemove {
+                                Button(tr("Remove", "移除"), role: .destructive) { onRemove(row) }
+                            }
+                        }
                         .contextMenu { contextMenu(for: [row.id]) }
                         Divider()
                     }
@@ -734,6 +736,7 @@ private struct CollectionTrackTitleCell: View {
                 }
             }
             .buttonStyle(.fullAreaPlain)
+            .focusable(false)
             .onHover { hoveringArtwork = $0 }
             .help(tr("Play \(row.title)", "播放 \(row.title)", zhHant: "播放 \(row.title)"))
             .accessibilityLabel(tr("Play \(row.title)", "播放 \(row.title)", zhHant: "播放 \(row.title)"))
@@ -753,6 +756,7 @@ private struct CollectionTrackTitleCell: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.fullAreaPlain)
+            .focusable(false)
             .help(liked ? tr("Unlike", "取消收藏") : tr("Like", "收藏"))
             .accessibilityLabel(liked ? tr("Unlike \(row.title)", "取消收藏 \(row.title)", zhHant: "取消喜愛項目 \(row.title)")
                                       : tr("Like \(row.title)", "收藏 \(row.title)", zhHant: "喜愛項目 \(row.title)"))
@@ -766,10 +770,21 @@ private struct CollectionTrackTitleCell: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.fullAreaPlain)
+            .focusable(false)
                 .help(tr("Remove \(row.title)", "移除 \(row.title)", zhHant: "移除 \(row.title)"))
                 .accessibilityLabel(tr("Remove \(row.title)", "移除 \(row.title)", zhHant: "移除 \(row.title)"))
             }
         }
         .frame(minHeight: 42)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(row.title)
+        .accessibilityValue(row.displayArtist)
+        .accessibilityAction(named: Text(tr("Play", "播放")), onPlay)
+        .accessibilityAction(named: Text(liked ? tr("Unlike", "取消收藏") : tr("Like", "收藏")), onToggleLike)
+        .accessibilityActions {
+            if let onRemove {
+                Button(tr("Remove", "移除"), role: .destructive, action: onRemove)
+            }
+        }
     }
 }

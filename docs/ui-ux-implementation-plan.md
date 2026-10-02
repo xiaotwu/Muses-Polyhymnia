@@ -4,7 +4,7 @@ This is the active implementation contract for the user's completed selections, 
 
 ## Completion accounting
 
-Concept samples and imported choices are complete. The selected production reconstruction is implemented across the areas accounted for below; comprehensive acceptance remains open. Implementation, test/package validation and live-state acceptance are separate milestones. Foundation commit `c1c9dcb` raised the macOS floor and repaired a subset of settings controls. Hero commit `a2e8a6e` implemented H0 structure + H2 center emphasis + H3 optional information. No other area may be marked complete merely because an SVG exists or a unit test passes.
+Concept samples and imported choices are complete. The selected production reconstruction has broad coverage across the areas below. A follow-up exact-choice audit found small omitted branches; these are being completed before the new screenshot repairs. Comprehensive acceptance remains open. Implementation, test/package validation and live-state acceptance are separate milestones. Foundation commit `c1c9dcb` raised the macOS floor and repaired a subset of settings controls. Hero commit `a2e8a6e` implemented H0 structure + H2 center emphasis + H3 optional information. No other area may be marked complete merely because an SVG exists or a unit test passes.
 
 Per-area completion requires production code, proportionate build/tests, rendered runtime evidence, keyboard/pointer/context-menu/focus checks and relevant state/accessibility checks. Record evidence and gaps in its Linear task. Final completion requires reconciliation of all 64 areas; an unverified state remains pending. macOS below 26 is out of scope. Keep existing user data, queue semantics and shared services intact.
 
@@ -83,14 +83,14 @@ Use SwiftUI Expert for state/view invalidation, resizable layout, native control
 | Area | Selected options | Primary task | Current evidence/status |
 | --- | --- | --- | --- |
 | 01 窗口与导航 | A + B | XW-7 | Implemented persistent native glass islands; entire group centered with equal 16pt gaps rendered; full keyboard/VoiceOver matrix open |
-| 02 工具栏与返回语义 | A + B + C | XW-7 | Native window-local Back/Forward and immersive exit retained; main Search shares history; complete keyboard/window-restoration matrix open |
+| 02 工具栏与返回语义 | A + B + C | XW-7 | Native window-local Back/Forward and immersive exit retained; upper-edge immersive toolbar reveal added in the branch completion pass; main Search shares history; complete keyboard/window-restoration matrix open |
 | 03 边栏选中与图标轨道 | A + B | XW-7 | Grouped capsules, semantic selection and combined catalog menu implemented; hover/focus reveal retained; complete AX traversal open |
 | 04 标题、字体与内容宽度 | A + B | XW-7 | Shared 28pt SF page / 20pt section hierarchy and responsive forms implemented; expressive F3 remains; full font/appearance matrix open |
 | 05 玻璃层级与颜色 | C | XW-7 | Native navigation/window glass with adaptive solid PlayerBar capsule implemented; Reduce Transparency rendered on Home/Queue/Now Playing; light/artwork matrix open |
 | 06 浅色、深色和辅助显示 | A | XW-7 | Semantic colors, opaque accessibility path and neutral lyric fallback implemented; Increase Contrast empty lyrics rendered; full appearance matrix open |
 | 07 首页来源与恢复提示 | B | XW-8 | Native source menu, true source/cached-origin filters and shared Account/Home recovery copy implemented; live browser/account recovery unexercised |
 | 08 心情与活动 | A | XW-8 | Native horizontal capsule activities implemented; shared main Search routing retained; complete keyboard/compact traversal open |
-| 09 首页精选与封面货架 | D | XW-8 | Source-labeled landscape Muses Spotlight, type-aware Top Picks and square shelves implemented; no external editorial/release metadata invented |
+| 09 首页精选与封面货架 | D | XW-8 | Source-labeled landscape Muses Spotlight and square shelves implemented; channels without verified person classification use square fallback, not forced portrait crops; no external editorial/release metadata invented |
 | 10 新发现 | A | XW-8 | Truthful library rediscovery / account / subscription-inspired provenance and source menu implemented; account identity/cancellation guards retained; live provider states open |
 | 11 货架卡片及hover播放 | A | XW-8 | True read-only cover Open, separate focus-visible Play and full native More implemented; compact Spotlight More moved to artwork corner; complete focus matrix open |
 | 12 歌曲默认页面 | B | XW-9 | H0/H2/H3 hero retained; bounded 260pt cover stage and reduced vertical clearance implemented; complete compact/state acceptance open |
@@ -106,12 +106,12 @@ Use SwiftUI Expert for state/view invalidation, resizable layout, native control
 | 22 导入链接与进度 | B | XW-16 | Source / occurrence selection / confirmation import sheet implemented; only final confirmation writes, cancellation and occurrence tests passed; live import matrix open |
 | 23 添加YouTube曲目与预览 | A | XW-16 | Native Search/Link preview with explicit Muses-local target and separate saved local revision implemented; actual remote Push remains separate and unexercised |
 | 24 Pull、Push与冲突合并 | B | XW-16 | Side-by-side Muses/YouTube snapshot lists and explicit per-conflict resolution implemented; automatic merge preserves remote-only changes; live Pull/Push unexercised |
-| 25 删除与版本恢复 | B + C | XW-16 | Affected-entry deletion preview implemented; existing revision timeline/diff/pin/restore and Recently Deleted retained; isolated delete/restore matrix open |
+| 25 删除与版本恢复 | B + C | XW-16 | Affected-entry deletion preview implemented; revision selection defaults to the preceding recovery point comparison; existing timeline/diff/pin/restore and Recently Deleted retained; isolated delete/restore matrix open |
 | 26 搜索场景和输入 | C | XW-8 | Local-only Spotlight-style quick entry wired to Cmd-F; full Search remains main-window destination/history; complete shortcut handoff matrix open |
 | 27 来源与类别筛选 | B | XW-8 | Separate native source/category menus implemented and Library/empty states rendered; authenticated/remote category execution matrix open |
 | 28 分组结果与目录详情 | A | XW-8 | Bounded grouped previews and stable-key See all/Show less implemented; full source playback context and main catalog history retained; populated remote matrix open |
 | 29 播客关注与节目详情 | C | XW-8 | Home continuation reads true persisted episode progress and resumes via shared facade; cover preview independent of Play; followed directory/paging retained; populated native episode acceptance open |
-| 30 订阅频道与Shorts | B + C | XW-8 | Discovery menu routes subscribed channels; native Videos/Shorts segments use separately verified tab sources, square channels and 9:16 Shorts; source/fallback tests passed, live channel matrix open |
+| 30 订阅频道与Shorts | B + C | XW-8 | Discovery menu filters actual subscribed channels in-place, with channel activation using main-window history; native Videos/Shorts segments use separately verified tab sources, square channels and 9:16 Shorts; source/fallback tests passed, live channel matrix open |
 | 31 历史概览与热力图 | A | XW-13 | Native range, four quiet metrics and optional heatmap/data table implemented and rendered; complete keyboard/appearance matrix open |
 | 32 历史歌曲、清除与回放 | B | XW-13 | Stored timestamp/listening-duration/optional completion timeline with separate Play/Options implemented; confirmed clear preserved; isolated mutation matrix open |
 | 33 队列面板和三段结构 | A | XW-13 | Full-height trailing queue with pinned current, Up Next, current collection, groups/history and explicit empty copy rendered; row identity/Options separated; broader matrix open |
@@ -135,7 +135,7 @@ Use SwiftUI Expert for state/view invalidation, resizable layout, native control
 | 51 快捷键、手势和媒体权限 | D | XW-17 | Static gesture examples and one media-permission recovery action implemented; shortcuts retained; live permission/conflict matrix open |
 | 52 音质、缓存和预缓存 | B + C + D | XW-17 | Quality profiles, progressive codec/cache categories, retained-scope deletion preview and pre-cache explanation implemented; actual quality reload/cache-clear matrix open |
 | 53 外观、字号和字体popover | A + C | XW-17 | Native theme/text controls, three live font samples and compact scrolling font popover implemented; no family rewrite on open; complete font/appearance acceptance open |
-| 54 账号连接与权限 | A + C | XW-17 | Distinct unconfigured/saved/pending/connected/expired account conclusions with progressive errors and separate permissions implemented; live OAuth/connect/revoke not exercised |
+| 54 账号连接与权限 | A + C | XW-17 | A single unconfigured conclusion and distinct saved/pending/connected/expired account conclusions with progressive errors and separate permissions implemented; live OAuth/connect/revoke not exercised |
 | 55 个性化首页与浏览器同意 | A + B + C + D | XW-18 | Dedicated two-step browser-pinned consent and shared Home/Account recovery implemented; dismissal/reconnect/source-identity tests passed; live cookie/session acceptance unexercised |
 | 56 播放访问、cookies和解析器配置 | A + B + C + D | XW-18 | Purpose-separated native playback browser config, staged current/target/new preview and external-source location implemented; wizard no longer overwrites external config; live Apply unexercised |
 | 57 歌词来源与Intelligence | A + B + C + D | XW-17 | Automatic/default lyric source, progressive provider details, matching availability popover and reading-menu default separation implemented; provider/Intelligence error matrix open |
@@ -144,7 +144,7 @@ Use SwiftUI Expert for state/view invalidation, resizable layout, native control
 | 60 帮助与隐私 | A | XW-17 | Full-row native Help/Privacy disclosures with selected expansion/focus semantics implemented; complete keyboard/VoiceOver wording matrix open |
 | 61 关于与更新 | A + C + D | XW-17 | Native update status/progress/result sheet, retry and unsupported-build explanation implemented; real eligible download/verification/install not exercised |
 | 62 加载、空、失败与过期 | A + B + D | XW-12 | Shared/destination-specific native empty states and retained-content loading/failure/stale branches implemented; complete cross-feature state matrix open |
-| 63 键盘、焦点和VoiceOver | A + C | XW-12 | Native focusable controls and separate track/Options naming implemented; complete keyboard/VoiceOver traversal and permission-window focus matrix open |
+| 63 键盘、焦点和VoiceOver | A + C | XW-12 | Native focusable controls and separate track/Options naming implemented; VoiceOver paged songs now use one primary row button with native auxiliary actions, while native Table selection owns internal-button keyboard focus; complete keyboard/VoiceOver traversal and permission-window focus matrix open |
 | 64 动效、滚动和能耗 | B + D | XW-12 | Restrained activation/hover, Reduce Motion and visible/reduced-visual spectrum/vinyl gates implemented; native deck/vinyl Reduce Motion checks and system preference restoration passed; measured energy/CPU benefit unproven |
 
 ## Exact option text and user notes

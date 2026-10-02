@@ -159,7 +159,9 @@ struct YouTubeSettingsView: View {
                              ? tr("Saved YouTube session", "已保存 YouTube 会话")
                              : tr("Not connected", "未连接")))
                         .font(MusesTypography.headline)
-                    Text(account.isConnected
+                    Text(!account.isOAuthConfigured
+                         ? tr("Guest browsing and playback remain available.", "访客浏览与播放仍可使用。")
+                         : account.isConnected
                          ? (account.account?.channel == nil
                             ? tr("Session saved · channel pending", "会话已保存 · 频道待确认")
                             : tr("YouTube connected", "已连接 YouTube"))
@@ -261,7 +263,6 @@ struct YouTubeSettingsView: View {
     private var primaryAction: some View {
         if !account.isOAuthConfigured {
             HStack(spacing: 6) {
-                SettingsStatus(title: tr("Sign-in unavailable", "登录不可用"), symbol: "exclamationmark.triangle")
                 SettingsInfoButton(title: tr("YouTube sign-in", "YouTube 登录"),
                     message: tr("YouTube sign-in is unavailable in this build. Guest browsing and playback still work.",
                                 "此构建未配置 YouTube 登录；访客浏览与播放仍可正常使用。"))
