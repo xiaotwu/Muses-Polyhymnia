@@ -72,7 +72,12 @@ struct ArtworkView: View {
         Group {
             switch source {
             case .remote(let url):
-                let candidates = YouTubeThumbnail.displayCandidates(for: url, pixelSize: max(targetSize, resolvedHeight) * displayScale)
+                // A square fill of a 16:9 thumbnail needs enough source pixels along
+                // its shorter edge; request larger artwork before center cropping.
+                let sourceWidth = presentation == .fill
+                    ? max(targetSize, resolvedHeight * 16.0 / 9.0)
+                    : max(targetSize, resolvedHeight)
+                let candidates = YouTubeThumbnail.displayCandidates(for: url, pixelSize: sourceWidth * displayScale)
                 CachedAsyncImage(
                     url: candidates.first,
                     lowResURL: candidates.count > 1 ? url : nil,

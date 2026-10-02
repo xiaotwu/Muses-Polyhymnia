@@ -29,10 +29,11 @@ extension HomeView {
                                           title: card.title,
                                           subtitle: webCardSubtitle(card),
                                           artwork: .resolve(remoteURL: card.thumbnailURL, youTubeId: card.playableVideoID),
+                                          informationStyle: .bottomGradient,
                                           onOpen: { openWebCard(card) },
                                           onPlay: { Task { await play(card) } })
                                 .youTubeEntryContextMenu(card: card, showsMenuButton: true,
-                                                        menuButtonAlignment: .bottomLeading) {
+                                                        menuButtonAlignment: .topTrailing, menuButtonTrailingInset: 0) {
                                     Task { await play(card) }
                                 }
                         case .track(let snapshot):
@@ -44,11 +45,12 @@ extension HomeView {
                                           title: snapshot.title,
                                           subtitle: SongCreditCache.shared.artist(snapshot: snapshot),
                                           artwork: .resolve(for: snapshot),
+                                          informationStyle: .bottomGradient,
                                           onOpen: { openPreview(snapshot, context: context.isEmpty ? supportedRecent : context) },
                                           onPlay: { play(snapshot, context: context.isEmpty ? supportedRecent : context) })
                                 .trackContextMenu(snapshot: snapshot,
                                                   onPlay: { play(snapshot, context: context.isEmpty ? supportedRecent : context) },
-                                                  showsMenuButton: true, menuButtonAlignment: .bottomLeading)
+                                                  showsMenuButton: true, menuButtonAlignment: .topTrailing, menuButtonTrailingInset: 0)
                         }
                     }.padding(.horizontal, AppleMusicTokens.contentPaddingX)
                 }
@@ -118,7 +120,7 @@ extension HomeView {
                 onOpen: { openWebCard(card) },
                 onPlay: { Task { await play(card) } }
             )
-            .youTubeEntryContextMenu(card: card, showsMenuButton: true) {
+            .youTubeEntryContextMenu(card: card, showsMenuButton: true, menuButtonTrailingInset: 0) {
                 Task { await play(card) }
             }
         case .track(let snapshot):
@@ -135,7 +137,7 @@ extension HomeView {
             )
             .trackContextMenu(snapshot: snapshot, onPlay: {
                 play(snapshot, context: supportedRecent)
-            }, showsMenuButton: true)
+            }, showsMenuButton: true, menuButtonTrailingInset: 0)
         }
     }
 

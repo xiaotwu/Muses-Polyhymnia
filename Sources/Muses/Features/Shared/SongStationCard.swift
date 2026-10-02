@@ -45,7 +45,6 @@ struct SongStationCard: View {
                 .offset(y: hovering && !reduceMotion ? -3 : 0)
             }
         }
-        .overlay(alignment: .topTrailing) { youTubeBadge }
         .onHover { hovering = $0 }
         .animation(MusesMotion.hoverAnimation(reduceMotion: reduceMotion), value: hovering)
         .accessibilityElement(children: .contain)
@@ -114,7 +113,8 @@ struct SongStationCard: View {
                 cornerRadius: 0,
                 glyphSize: 28,
                 targetSize: SongGridMetrics.maxCard,
-                presentation: .fitOnAmbient
+                targetHeight: SongGridMetrics.maxCard,
+                presentation: .fill
             )
             .overlay(alignment: .bottomLeading) { nowPlayingBadge }
 
@@ -141,14 +141,6 @@ struct SongStationCard: View {
         .clipShape(shape)
         .overlay(shape.stroke(Color.white.opacity(0.10), lineWidth: 1))
         .contentShape(shape)
-    }
-
-    @ViewBuilder
-    private var youTubeBadge: some View {
-        if isYouTube {
-            if let videoEntry { YouTubeVideoButton(entry: videoEntry).padding(4) }
-            else { YouTubeMark(size: 16).padding(10).accessibilityHidden(true) }
-        }
     }
 
     @ViewBuilder
@@ -185,7 +177,7 @@ struct SongStationGrid: View {
             ForEach(snaps) { snap in
                 SongStationCard(
                     title: snap.title,
-                    subtitle: snap.artist,
+                    subtitle: SongCreditCache.shared.artist(snapshot: snap),
                     artwork: ArtworkSource.resolve(for: snap),
                     isYouTube: !snap.youTubeId.isEmpty,
                     nowPlayingID: snap.id,
@@ -196,6 +188,8 @@ struct SongStationGrid: View {
                     snapshot: snap,
                     playlists: playlists,
                     onPlay: { onPlay(snap) },
+                    showsMenuButton: true,
+                    menuButtonTrailingInset: 0,
                     onRemoveFromContainer: onRemove.map { handler in { handler(snap) } }
                 )
             }

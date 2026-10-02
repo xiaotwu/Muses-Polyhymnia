@@ -348,6 +348,11 @@ private struct HistoryTimelineRow: View {
     let isCurrent: Bool
     let onPlay: () -> Void
 
+    @Environment(YouTubeImportService.self) private var importService: YouTubeImportService?
+    private var displayArtist: String {
+        track.map { SongCreditCache.shared.artist(snapshot: $0) } ?? event.artist
+    }
+
     private var isPlayable: Bool { track?.youTubeId != nil }
 
     var body: some View {
@@ -359,7 +364,7 @@ private struct HistoryTimelineRow: View {
                 Text(event.title)
                     .font(MusesTypography.song(size: 13, emphasized: true, text: event.title))
                     .lineLimit(1)
-                Text(event.artist)
+                Text(displayArtist)
                     .font(MusesTypography.caption)
                     .foregroundStyle(BrandColors.textSecondary)
                     .lineLimit(1)
@@ -394,6 +399,12 @@ private struct HistoryTimelineRow: View {
                     in: RoundedRectangle(cornerRadius: 8))
         .accessibilityElement(children: .contain)
         .contextMenu { historyActions }
+        .task(id: track?.youTubeId) {
+            guard let videoID = track?.youTubeId, !videoID.isEmpty, let importService else { return }
+            do { try await Task.sleep(for: .milliseconds(350)) } catch { return }
+            guard !Task.isCancelled else { return }
+            _ = await importService.songMetadata(videoID: videoID)
+        }
     }
 
     @ViewBuilder private var historyActions: some View {

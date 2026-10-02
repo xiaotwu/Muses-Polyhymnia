@@ -4,6 +4,7 @@ import SwiftUI
 struct MusicVideoCollectionView: View {
     let rows: [CollectionTrackRow]
     @Environment(PlaybackService.self) private var playback
+    @Environment(YouTubeImportService.self) private var importService: YouTubeImportService?
     private var snapshots: [TrackSnapshot] { rows.map(\.snapshot) }
 
     var body: some View {
@@ -56,6 +57,11 @@ struct MusicVideoCollectionView: View {
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .trackContextMenu(snapshot: row.snapshot, onPlay: { play(row) }, showsMenuButton: true)
+                            .task(id: row.snapshot.youTubeId) {
+                                do { try await Task.sleep(for: .milliseconds(350)) } catch { return }
+                                guard !Task.isCancelled, let importService else { return }
+                                _ = await importService.songMetadata(videoID: row.snapshot.youTubeId)
+                            }
                         }
                     }
                     .padding(.bottom, OverlayChromeMetrics.scrollBottomInset)

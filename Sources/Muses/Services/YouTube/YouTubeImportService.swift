@@ -64,6 +64,8 @@ final class YouTubeImportService {
     @ObservationIgnored private var songMetadataCache: [String: (date: Date, entry: YTDlpBridge.YTDlpPlaylistEntry?)] = [:]
 
     @ObservationIgnored private var songMetadataRequests: [String: Task<YTDlpBridge.YTDlpPlaylistEntry?, Never>] = [:]
+    @ObservationIgnored private var activeSongMetadataRequests = 0
+    @ObservationIgnored private var songMetadataWaiters: [CheckedContinuation<Void, Never>] = []
 
     /// Presentation-only enrichment; persisted user edits and sync truth are untouched.
     func songMetadata(videoID: String) async -> YTDlpBridge.YTDlpPlaylistEntry? {
@@ -71,7 +73,8 @@ final class YouTubeImportService {
             return cached.entry
         }
         if let request = songMetadataRequests[videoID] { return await request.value }
-        guard songMetadataRequests.count < 8 else { return nil }
+        guard YTDlpBridge.YTDlpPlaylistEntry(id: videoID, title: "").resourceKind == .video,
+              songMetadataRequests.count < 64 else { return nil }
         let presentationContext = ModelContext(modelContainer)
         let items = (try? presentationContext.fetch(FetchDescriptor<YouTubeImportItem>(
             predicate: #Predicate { $0.youTubeId == videoID }
@@ -83,14 +86,19 @@ final class YouTubeImportService {
         }
         let bridge = self.bridge
         let session = self.session
-        let request = Task {
+        let request = Task<YTDlpBridge.YTDlpPlaylistEntry?, Never> {
+            // Visible shelves may request more than eight identities together.
+            // Queue those requests instead of permanently skipping later cards.
+            await acquireSongMetadataSlot()
+            defer { releaseSongMetadataSlot() }
+            guard !Task.isCancelled else { return nil }
             // oEmbed provides the actual video publisher quickly when detailed
             // music extraction is unavailable; it never uses the playlist owner.
             let fallback = await Self.videoPresentation(videoID: videoID, session: session)
             if let fallback { SongCreditCache.shared.store(fallback) }
             let detailed = try? await bridge.fetchSongMetadata(videoId: videoID, timeout: 20)
-            if let detailed { SongCreditCache.shared.store(detailed) }
-            return detailed ?? fallback
+            if let detailed, detailed.id == videoID { SongCreditCache.shared.store(detailed) }
+            return SongCreditCache.shared.entry(videoID: videoID) ?? fallback
         }
         songMetadataRequests[videoID] = request
         let entry = await request.value
@@ -98,6 +106,19 @@ final class YouTubeImportService {
         if songMetadataCache.count >= 96 { songMetadataCache.removeAll() }
         songMetadataCache[videoID] = (Date(), entry)
         return entry
+    }
+
+    private func acquireSongMetadataSlot() async {
+        if activeSongMetadataRequests < 8 {
+            activeSongMetadataRequests += 1
+            return
+        }
+        await withCheckedContinuation { songMetadataWaiters.append($0) }
+    }
+
+    private func releaseSongMetadataSlot() {
+        if songMetadataWaiters.isEmpty { activeSongMetadataRequests -= 1 }
+        else { songMetadataWaiters.removeFirst().resume() }
     }
 
     private static func videoPresentation(videoID: String, session: URLSession) async -> YTDlpBridge.YTDlpPlaylistEntry? {

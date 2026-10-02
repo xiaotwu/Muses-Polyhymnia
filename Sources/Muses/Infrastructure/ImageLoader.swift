@@ -159,12 +159,6 @@ actor ArtworkImageDecoder {
                 kCGImageSourceThumbnailMaxPixelSize: maximumPixelSize,
                 kCGImageSourceShouldCacheImmediately: true
               ] as CFDictionary) else { return nil }
-        guard YouTubeThumbnail.isLetterboxed(url) else { return image }
-        let aspect = Double(image.width) / Double(image.height)
-        guard (1.22...1.48).contains(aspect) else { return image }
-        let bar = Int((Double(image.height) * 0.125).rounded(.down))
-        guard bar > 0, image.height - 2 * bar > 8 else { return image }
-        return image.cropping(to: CGRect(x: 0, y: bar, width: image.width,
-                                         height: image.height - 2 * bar)) ?? image
+        return YouTubeThumbnail.cropLetterboxIfNeeded(image, url: url)
     }
 }

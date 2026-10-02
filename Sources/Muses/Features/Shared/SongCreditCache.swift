@@ -16,10 +16,25 @@ final class SongCreditCache {
     }
 
     func store(_ entry: YTDlpBridge.YTDlpPlaylistEntry) {
-        guard metadata[entry.id]?.artist != entry.artist || metadata[entry.id]?.uploader != entry.uploader
-            || metadata[entry.id]?.title != entry.title else { return }
+        let previous = metadata[entry.id]
+        let resolved = YTDlpBridge.YTDlpPlaylistEntry(
+            id: entry.id, title: entry.title,
+            uploader: nonMissing(entry.uploader) ?? previous?.uploader,
+            duration: entry.duration ?? previous?.duration,
+            playlistTitle: entry.playlistTitle ?? previous?.playlistTitle,
+            channelID: entry.channelID ?? previous?.channelID,
+            track: entry.track ?? previous?.track,
+            album: entry.album ?? previous?.album,
+            releaseYear: entry.releaseYear ?? previous?.releaseYear,
+            artist: nonMissing(entry.artist) ?? previous?.artist)
+        guard previous != resolved else { return }
         if metadata.count >= 512 { metadata.removeAll() }
-        metadata[entry.id] = entry
+        metadata[entry.id] = resolved
+    }
+
+    private func nonMissing(_ value: String?) -> String? {
+        guard let value, !SongDisplayInformation.isMissingCredit(value) else { return nil }
+        return value
     }
 
     func isCollectionOwner(_ name: String, videoID: String) -> Bool {

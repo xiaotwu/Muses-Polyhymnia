@@ -6,6 +6,21 @@ import Foundation
 @MainActor
 struct ChromeLayoutTests {
 
+    @Test("Expanded navigation accepts its full capsule but passes through neighboring content")
+    func expandedNavigationHitRegion() {
+        let viewport = CGRect(x: 0, y: 0, width: 234, height: 800)
+        let expanded = SidebarNavigationHitShape(islandBounds: [CGRect(x: 16, y: 200, width: 218, height: 408)])
+            .path(in: viewport)
+        #expect(expanded.contains(CGPoint(x: 200, y: 260)))
+        #expect(expanded.contains(CGPoint(x: 80, y: 100)))
+        #expect(!expanded.contains(CGPoint(x: 200, y: 180)))
+        #expect(!expanded.contains(CGPoint(x: 200, y: 630)))
+        #expect(!expanded.contains(CGPoint(x: 235, y: 260)))
+        let collapsed = SidebarNavigationHitShape(islandBounds: [CGRect(x: 16, y: 200, width: 56, height: 408)])
+            .path(in: viewport)
+        #expect(!collapsed.contains(CGPoint(x: 120, y: 260)))
+    }
+
     @Test("YouTube hqdefault URLs are treated as letterboxed")
     func letterboxURLDetection() {
         let hq = URL(string: "https://i.ytimg.com/vi/abc/hqdefault.jpg")!
@@ -17,9 +32,9 @@ struct ChromeLayoutTests {
         #expect(YouTubeThumbnail.urlString(videoId: "abc") == "https://i.ytimg.com/vi/abc/hqdefault.jpg")
     }
 
-    @Test("4:3 YouTube thumbs drop the 12.5% letterbox bars")
+    @Test("4:3 YouTube thumbs drop verified paired letterbox bars")
     func cropsFourByThreeLetterbox() {
-        let image = makeSolidImage(width: 480, height: 360)
+        let image = makeSolidImage(width: 480, height: 360, matte: 45)
         let cropped = YouTubeThumbnail.cropLetterboxIfNeeded(
             image,
             url: URL(string: "https://i.ytimg.com/vi/abc/hqdefault.jpg")
@@ -857,7 +872,7 @@ struct ChromeLayoutTests {
         #expect(LyricsService.queryTitles("Song (Official Video)") == ["Song", "Song (Official Video)"])
     }
 
-    private func makeSolidImage(width: Int, height: Int) -> NSImage {
+    private func makeSolidImage(width: Int, height: Int, matte: Int = 0) -> NSImage {
         let rep = NSBitmapImageRep(
             bitmapDataPlanes: nil,
             pixelsWide: width,
@@ -874,6 +889,11 @@ struct ChromeLayoutTests {
         NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
         NSColor.white.setFill()
         NSBezierPath.fill(NSRect(x: 0, y: 0, width: width, height: height))
+        if matte > 0 {
+            NSColor.black.setFill()
+            NSBezierPath.fill(NSRect(x: 0, y: 0, width: width, height: matte))
+            NSBezierPath.fill(NSRect(x: 0, y: height - matte, width: width, height: matte))
+        }
         NSGraphicsContext.restoreGraphicsState()
         let image = NSImage(size: NSSize(width: width, height: height))
         image.addRepresentation(rep)

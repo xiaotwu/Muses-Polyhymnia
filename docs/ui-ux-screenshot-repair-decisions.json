@@ -1,0 +1,16 @@
+{
+  "date": "2026-10-02",
+  "baseline_completion_commit": "0153661",
+  "linear_issue": "XW-19",
+  "spotlight_information": {
+    "selection": "A",
+    "style": "bottomGradient",
+    "decision": "Information inside cover, bottom gradient; selected explicitly after four visual previews.",
+    "concept_preview": "Four visual alternatives were displayed in the task; preview remains in private local generated-image storage."
+  },
+  "navigation": "Independent Back above Search/Home; preserve history, Forward and shortcuts.",
+  "hero": "Preserve H0 + H2 + optional H3. Fill landscape artwork without bands; More at upper right, remove redundant YouTube card affordance.",
+  "playerbar": "Read-only progress; output at volume scale trailing edge; neutral idle state; correct speaker anchor.",
+  "credits": "Never substitute collection owner for video artist/uploader; presentation enrichment must preserve persisted manual metadata.",
+  "acceptance": "In progress; build/test, rendered interactions, authenticated account, complete keyboard/VoiceOver and performance are separate evidence categories."
+}

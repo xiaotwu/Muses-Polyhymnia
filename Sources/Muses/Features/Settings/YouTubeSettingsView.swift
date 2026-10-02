@@ -32,9 +32,51 @@ struct YouTubeSettingsView: View {
     @State private var consentMessage = ""
     @State private var webHomeConfigurationError: String?
     @State private var pendingRemoval: ActionConfirmation?
+    @State private var checkingAccountPlaylists = false
+    @State private var accountPlaylistCompletion: (channelID: String, count: Int)?
 
     private var cookieSource: YTCookieSource {
         YTCookieSource(rawValue: cookieSourceRaw) ?? .none
+    }
+
+    private func checkAccountPlaylists() {
+        guard !checkingAccountPlaylists, !playlistSync.isImportingAccountPlaylists else { return }
+        checkingAccountPlaylists = true
+        accountPlaylistCompletion = nil
+        let originalChannelID = account.activeChannelID
+        Task { @MainActor in
+            defer { checkingAccountPlaylists = false }
+            await account.refresh()
+            guard !Task.isCancelled, account.isConnected, !account.isConnecting,
+                  case .content(let channel) = account.channelState,
+                  originalChannelID == nil || originalChannelID == channel.id,
+                  account.activeChannelID == channel.id,
+                  account.dataAPIClient() != nil else { return }
+            let playlists: [YouTubePlaylist]
+            switch account.playlistsState {
+            case .content(let values): playlists = values
+            case .empty: playlists = []
+            default: return
+            }
+            await playlistSync.importAccountPlaylists()
+            guard !Task.isCancelled, account.isConnected, !account.isConnecting,
+                  account.lastError == nil,
+                  account.activeChannelID == channel.id,
+                  case .content(let currentChannel) = account.channelState,
+                  currentChannel.id == channel.id,
+                  !playlistSync.isImportingAccountPlaylists,
+                  playlistSync.accountImportError == nil,
+                  playlistSync.accountImportCompleted == playlists.count,
+                  playlistSync.accountImportTotal == playlists.count else { return }
+            let currentPlaylists: [YouTubePlaylist]
+            switch account.playlistsState {
+            case .content(let values): currentPlaylists = values
+            case .empty: currentPlaylists = []
+            default: return
+            }
+            guard currentPlaylists.map(\.id) == playlists.map(\.id) else { return }
+            accountPlaylistCompletion = (channel.id, playlists.count)
+        }
     }
 
     private var isWebHomeBusy: Bool {
@@ -86,6 +128,9 @@ struct YouTubeSettingsView: View {
         }
         .onChange(of: homeModeRaw) { _, _ in
             homeDiscovery.recommendationModeDidChange()
+        }
+        .onChange(of: account.activeChannelID) { _, _ in
+            accountPlaylistCompletion = nil
         }
         .fileImporter(
             isPresented: $showFilePicker,
@@ -185,15 +230,28 @@ struct YouTubeSettingsView: View {
             accountDetails
             LabeledContent(tr("Account playlists", "账号歌单")) {
                 HStack(spacing: 8) {
-                    if playlistSync.isImportingAccountPlaylists {
+                    if checkingAccountPlaylists || playlistSync.isImportingAccountPlaylists {
                         ProgressView().controlSize(.small)
-                        Text("\(playlistSync.accountImportCompleted)/\(playlistSync.accountImportTotal)")
-                            .font(MusesTypography.caption.monospacedDigit())
+                        if playlistSync.isImportingAccountPlaylists {
+                            Text("\(playlistSync.accountImportCompleted)/\(playlistSync.accountImportTotal)")
+                                .font(MusesTypography.caption.monospacedDigit())
+                        } else {
+                            Text(tr("Checking playlists…", "正在检查歌单…", zhHant: "正在檢查歌單…"))
+                                .font(MusesTypography.caption)
+                        }
                     }
                     SettingsIconButton(title: tr("Import account playlists", "导入账号歌单"), symbol: "arrow.down.to.line") {
-                        Task { await account.refresh(); await playlistSync.importAccountPlaylists() }
-                    }.disabled(!account.isConnected || account.isConnecting || playlistSync.isImportingAccountPlaylists)
+                        checkAccountPlaylists()
+                    }.disabled(!account.isConnected || account.isConnecting || checkingAccountPlaylists || playlistSync.isImportingAccountPlaylists)
                 }
+            }
+            if let completion = accountPlaylistCompletion,
+               completion.channelID == account.activeChannelID,
+               account.isConnected, playlistSync.accountImportError == nil {
+                Text(tr("Import check complete: \(completion.count) account playlists available.",
+                        "导入检查完成：账号中有 \(completion.count) 个歌单。",
+                        zhHant: "匯入檢查完成：帳號中有 \(completion.count) 個歌單。"))
+                    .font(MusesTypography.caption).foregroundStyle(.secondary)
             }
             if let error = playlistSync.accountImportError {
                 Text(error).font(MusesTypography.caption).foregroundStyle(.red)

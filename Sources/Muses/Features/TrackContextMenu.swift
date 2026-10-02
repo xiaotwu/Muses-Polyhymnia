@@ -13,9 +13,11 @@ struct TrackContextMenu: ViewModifier {
     let onPlay: () -> Void
     var showsMenuButton = false
     var menuButtonAlignment: Alignment = .topTrailing
+    var menuButtonTrailingInset: CGFloat = 40
     var onRemoveFromContainer: (() -> Void)? = nil
     @Environment(LibraryService.self) private var library
     @Environment(PlaylistService.self) private var playlistService
+    @Environment(YouTubeImportService.self) private var importService
     @State private var showEditTrack = false
     @State private var showTrackNotes = false
     @State private var showCreatePlaylist = false
@@ -23,11 +25,15 @@ struct TrackContextMenu: ViewModifier {
     func body(content: Content) -> some View {
         if let snapshot {
             content
+                .task(id: snapshot.youTubeId) {
+                    guard !snapshot.youTubeId.isEmpty else { return }
+                    _ = await importService.songMetadata(videoID: snapshot.youTubeId)
+                }
                 .overlay(alignment: menuButtonAlignment) {
                     if showsMenuButton {
                         ChromeIconMenu(systemName: "ellipsis", title: tr("Options for \(snapshot.title)", "\(snapshot.title) 的选项")) {
                             menu(snapshot)
-                        }.padding(8).padding(.trailing, 40)
+                        }.padding(8).padding(.trailing, menuButtonTrailingInset)
                     }
                 }
                 .contextMenu { menu(snapshot) }
@@ -77,6 +83,7 @@ private struct YouTubeEntryContextMenu: ViewModifier {
     let onPlay: () -> Void
     var showsMenuButton = false
     var menuButtonAlignment: Alignment = .topTrailing
+    var menuButtonTrailingInset: CGFloat = 40
     @State private var saveFailed = false
 
     @Environment(YouTubeSearchService.self) private var search
@@ -92,7 +99,7 @@ private struct YouTubeEntryContextMenu: ViewModifier {
                     menuItems
                 }
                 .padding(6)
-                .padding(.trailing, 40)
+                .padding(.trailing, menuButtonTrailingInset)
             }
         }
         .alert(tr("Could not save to Library", "无法保存到资料库", zhHant: "無法儲存至資料庫"), isPresented: $saveFailed) {
@@ -301,11 +308,13 @@ extension View {
                           onPlay: @escaping () -> Void,
                           showsMenuButton: Bool = false,
                           menuButtonAlignment: Alignment = .topTrailing,
+                          menuButtonTrailingInset: CGFloat = 40,
                           onRemoveFromContainer: (() -> Void)? = nil) -> some View {
         modifier(TrackContextMenu(snapshot: snapshot, track: track,
                                   playlists: playlists, onPlay: onPlay,
                                   showsMenuButton: showsMenuButton,
                                   menuButtonAlignment: menuButtonAlignment,
+                                  menuButtonTrailingInset: menuButtonTrailingInset,
                                   onRemoveFromContainer: onRemoveFromContainer))
     }
 
@@ -316,10 +325,12 @@ extension View {
         mediaKind: TrackMediaKind = .song,
         showsMenuButton: Bool = false,
         menuButtonAlignment: Alignment = .topTrailing,
+        menuButtonTrailingInset: CGFloat = 40,
         onPlay: @escaping () -> Void
     ) -> some View {
         modifier(YouTubeEntryContextMenu(entry: entry, mediaKind: mediaKind, onPlay: onPlay,
-                                        showsMenuButton: showsMenuButton, menuButtonAlignment: menuButtonAlignment))
+                                        showsMenuButton: showsMenuButton, menuButtonAlignment: menuButtonAlignment,
+                                        menuButtonTrailingInset: menuButtonTrailingInset))
     }
 
     @ViewBuilder
@@ -327,6 +338,7 @@ extension View {
         card: YouTubeDiscoveryCard,
         showsMenuButton: Bool = false,
         menuButtonAlignment: Alignment = .topTrailing,
+        menuButtonTrailingInset: CGFloat = 40,
         onPlay: @escaping () -> Void
     ) -> some View {
         if let videoID = card.playableVideoID {
@@ -339,6 +351,7 @@ extension View {
                 ),
                 showsMenuButton: showsMenuButton,
                 menuButtonAlignment: menuButtonAlignment,
+                menuButtonTrailingInset: menuButtonTrailingInset,
                 onPlay: onPlay
             )
         } else {

@@ -43,7 +43,7 @@ struct TrackNotesSheet: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityLabel(track.title)
                         .help(track.title)
-                    Text(track.artist).font(MusesTypography.caption).foregroundStyle(BrandColors.textSecondary)
+                    Text(SongCreditCache.shared.artist(snapshot: TrackSnapshot(from: track))).font(MusesTypography.caption).foregroundStyle(BrandColors.textSecondary)
                         .lineLimit(1)
                 }
                 Spacer()

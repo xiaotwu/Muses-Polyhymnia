@@ -512,6 +512,7 @@ struct CollectionDeckStage<Controls: View>: View {
     private func listPreview(count: Int) -> some View {
         VStack(spacing: 0) {
             ForEach(rows.prefix(count)) { row in
+                let information = SongDisplayInformation(row: row, metadata: songMetadata[row.snapshot.youTubeId])
                 Button { onPlay(row) } label: {
                     HStack(spacing: 12) {
                         Text("\(row.canonicalIndex + 1)")
@@ -521,8 +522,8 @@ struct CollectionDeckStage<Controls: View>: View {
                                     cornerRadius: 5, glyphSize: 16, targetSize: 30,
                                     targetHeight: 30, presentation: .fill)
                             .frame(width: 30, height: 30)
-                        Text(row.title).font(MusesTypography.song(size: 14, emphasized: true, text: row.title)).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
-                        Text(row.displayArtist).font(MusesTypography.song(size: 13, text: row.displayArtist)).foregroundStyle(BrandColors.textSecondary)
+                        Text(information.title).font(MusesTypography.song(size: 14, emphasized: true, text: information.title)).lineLimit(1).frame(maxWidth: .infinity, alignment: .leading)
+                        Text(information.artist).font(MusesTypography.song(size: 13, text: information.artist)).foregroundStyle(BrandColors.textSecondary)
                             .lineLimit(1).frame(width: 180, alignment: .leading)
                         Text(row.duration.isFinite && row.duration > 0
                             ? Duration.seconds(row.duration).formatted(.time(pattern: .minuteSecond)) : "—").monospacedDigit()
@@ -535,13 +536,19 @@ struct CollectionDeckStage<Controls: View>: View {
                 }
                 .buttonStyle(.fullAreaPlain)
                 .disabled(!isInteractionEnabled)
-                .accessibilityLabel(tr("Play \(row.title), \(row.displayArtist)", "播放 \(row.title)，\(row.displayArtist)"))
+                .accessibilityLabel(tr("Play \(information.title), \(information.artist)", "播放 \(information.title)，\(information.artist)"))
                 .contextMenu {
                     TrackContextMenuItems(snapshot: row.snapshot, playlists: playlists,
                         onPlay: { onPlay(row) },
                         onRemoveFromContainer: onRemove.map { handler in { handler(row) } })
                 }
                 .overlay(alignment: .bottom) { BrandColors.hairline.frame(height: 1) }
+                .task(id: row.snapshot.youTubeId + "|\(isInteractionEnabled && environmentIsEnabled)") {
+                    guard isInteractionEnabled, environmentIsEnabled else { return }
+                    do { try await Task.sleep(for: .milliseconds(350)) } catch { return }
+                    guard !Task.isCancelled else { return }
+                    _ = await importService.songMetadata(videoID: row.snapshot.youTubeId)
+                }
             }
         }
         .accessibilityElement(children: .contain)
@@ -657,7 +664,19 @@ struct CollectionDeckStage<Controls: View>: View {
                         .accessibilityValue(
                             index == focusedIndex ? tr("Focused", "当前焦点") : ""
                         )
-                        cardActions(row: row, index: index, visible: true)
+                        .trackContextMenu(
+                            snapshot: row.snapshot,
+                            playlists: playlists,
+                            onPlay: {
+                                guard isInteractionEnabled else { return }
+                                deckFocused = true
+                                setPosition(CGFloat(index), animated: false)
+                                onPlay(row)
+                            },
+                            showsMenuButton: true,
+                            menuButtonTrailingInset: 0,
+                            onRemoveFromContainer: onRemove.map { handler in { handler(row) } }
+                        )
                     }
 
                     Button(tr("Next song", "下一首")) {
@@ -731,10 +750,18 @@ struct CollectionDeckStage<Controls: View>: View {
         .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .focusable(wall)
         .focused($wallFocusedID, equals: row.id)
-        .overlay(alignment: .topTrailing) {
-            cardActions(row: row, index: index, visible: hovered || (wall ? wallFocusedID == row.id : deckFocused && selected))
-                .padding(10)
-        }
+        .trackContextMenu(
+            snapshot: row.snapshot,
+            playlists: playlists,
+            onPlay: {
+                guard isInteractionEnabled else { return }
+                setPosition(CGFloat(index), animated: false)
+                onPlay(row)
+            },
+            showsMenuButton: true,
+            menuButtonTrailingInset: 0,
+            onRemoveFromContainer: onRemove.map { handler in { handler(row) } }
+        )
         .rotationEffect(.degrees(angle))
         .offset(
             x: x,
@@ -745,27 +772,11 @@ struct CollectionDeckStage<Controls: View>: View {
         .zIndex(wall ? 0 : (selected ? 600 : 200 - distance * 10))
         .animation(MusesMotion.collectionCardAnimation(reduceMotion: reduceMotion), value: playing)
         .onHover { inside in hoveredID = inside ? row.id : (hoveredID == row.id ? nil : hoveredID) }
-        .trackContextMenu(
-            snapshot: row.snapshot,
-            playlists: playlists,
-            onPlay: {
-                guard isInteractionEnabled else { return }
-                setPosition(CGFloat(index), animated: false)
-                onPlay(row)
-            },
-            onRemoveFromContainer: onRemove.map { handler in { handler(row) } }
-        )
         .help((selected || wall)
             ? tr("Play or pause \(row.title)", "播放或暂停 \(row.title)")
             : tr("Select \(row.title)", "选中 \(row.title)"))
         .accessibilityLabel(cardAccessibilityLabel(row: row, index: index, playing: playing, wall: wall))
         .accessibilityValue(index == focusedIndex ? tr("Focused", "当前焦点") : "")
-    }
-
-    private func cardActions(row: CollectionTrackRow, index: Int, visible: Bool) -> some View {
-        CollectionDeckCardActions(isVisible: visible, row: row, index: index, playlists: playlists,
-            isInteractionEnabled: isInteractionEnabled, position: $position,
-            focusedID: $focusedID, onPlay: onPlay, onRemove: onRemove)
     }
 
     private func deckChevron(
@@ -944,58 +955,6 @@ struct CollectionDeckStage<Controls: View>: View {
         let playbackText = index != focusedIndex && !wall ? tr("Select", "选中")
             : (row.matches(currentTrack) ? playback.primaryAction.title : tr("Play", "播放"))
         return "\(positionText), \(information.title) — \(information.artist), \(playbackText)"
-    }
-}
-
-/// Native menus do not depend on the fractional deck position. Keep their
-/// view inputs stable while transforms follow the pointer on every event.
-private struct CollectionDeckCardActions: View {
-    let isVisible: Bool
-    @FocusState private var actionsFocused: Bool
-    let row: CollectionTrackRow
-    let index: Int
-    let playlists: [Playlist]
-    let isInteractionEnabled: Bool
-    @Binding var position: CGFloat
-    @Binding var focusedID: UUID?
-    let onPlay: (CollectionTrackRow) -> Void
-    let onRemove: ((CollectionTrackRow) -> Void)?
-
-    var body: some View {
-        HStack(spacing: 6) {
-            if let url = YouTubeContextMenuLink.watchURL(videoID: row.snapshot.youTubeId) {
-                Link(destination: url) {
-                    YouTubeMark(size: 12).chromeActionCircle(diameter: 28)
-                }
-                .buttonStyle(.fullAreaPlain)
-                .focused($actionsFocused)
-                .help(tr("Open on YouTube", "在 YouTube 打开"))
-                .accessibilityLabel(tr("Open on YouTube", "在 YouTube 打开"))
-            }
-            ChromeIconMenu(systemName: "ellipsis",
-                title: tr("Track options for \(row.title)", "\(row.title) 的曲目选项"), diameter: 28, foreground: BrandColors.heading) {
-                TrackContextMenuItems(
-                    snapshot: row.snapshot,
-                    playlists: playlists,
-                    onPlay: {
-                        guard isInteractionEnabled else { return }
-                        var transaction = Transaction(animation: nil)
-                        transaction.disablesAnimations = true
-                        withTransaction(transaction) {
-                            position = CGFloat(index)
-                            focusedID = row.id
-                        }
-                        onPlay(row)
-                    },
-                    onRemoveFromContainer: onRemove.map { handler in { handler(row) } }
-                )
-            }
-            .focused($actionsFocused)
-        }
-        .opacity(isVisible || actionsFocused || NSWorkspace.shared.isVoiceOverEnabled ? 1 : 0)
-        .allowsHitTesting(isVisible || actionsFocused || NSWorkspace.shared.isVoiceOverEnabled)
-        .disabled(!isInteractionEnabled)
-        .environment(\.colorScheme, .dark)
     }
 }
 

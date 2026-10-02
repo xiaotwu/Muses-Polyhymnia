@@ -332,6 +332,7 @@ private struct CollectionTrackTable: View {
     let onPlay: (CollectionTrackRow) -> Void
     let onRemove: ((CollectionTrackRow) -> Void)?
 
+    @Environment(YouTubeImportService.self) private var importService: YouTubeImportService?
     @Environment(LibraryService.self) private var library
     @Environment(PlaylistService.self) private var playlistService
     @Environment(PlaybackService.self) private var playback
@@ -479,6 +480,11 @@ private struct CollectionTrackTable: View {
                             }
                         }
                         .contextMenu { contextMenu(for: [row.id]) }
+                        .task(id: row.snapshot.youTubeId) {
+                            do { try await Task.sleep(for: .milliseconds(350)) } catch { return }
+                            guard !Task.isCancelled, let importService else { return }
+                            _ = await importService.songMetadata(videoID: row.snapshot.youTubeId)
+                        }
                         Divider()
                     }
                 }
@@ -714,6 +720,8 @@ private struct CollectionTrackTitleCell: View {
     let onToggleLike: () -> Void
     let onRemove: (() -> Void)?
 
+    @Environment(YouTubeImportService.self) private var importService: YouTubeImportService?
+
     @State private var hoveringArtwork = false
 
     var body: some View {
@@ -781,6 +789,11 @@ private struct CollectionTrackTitleCell: View {
         .accessibilityValue(row.displayArtist)
         .accessibilityAction(named: Text(tr("Play", "播放")), onPlay)
         .accessibilityAction(named: Text(liked ? tr("Unlike", "取消收藏") : tr("Like", "收藏")), onToggleLike)
+        .task(id: row.snapshot.youTubeId) {
+            do { try await Task.sleep(for: .milliseconds(350)) } catch { return }
+            guard !Task.isCancelled, let importService else { return }
+            _ = await importService.songMetadata(videoID: row.snapshot.youTubeId)
+        }
         .accessibilityActions {
             if let onRemove {
                 Button(tr("Remove", "移除"), role: .destructive, action: onRemove)

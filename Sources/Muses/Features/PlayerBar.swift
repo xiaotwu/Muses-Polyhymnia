@@ -18,7 +18,6 @@ struct PlayerBar: View {
     @State private var presentationRow: CollectionTrackRow?
     @State private var songMetadata: YTDlpBridge.YTDlpPlaylistEntry?
     @Environment(PlaybackService.self) private var playback
-    @Environment(AudioDeviceService.self) private var audioDevices: AudioDeviceService?
     var lyricsActive: Bool = false
     var queueActive: Bool = false
     var onArtworkTap: () -> Void = {}
@@ -27,9 +26,7 @@ struct PlayerBar: View {
     var onVideoTap: () -> Void = {}
 
     @State private var showVolume = false
-    @State private var isDraggingScrubber = false
-    @State private var scrubFraction: Double = 0
-    @State private var scrubTrackID: UUID?
+    @State private var volumeButtonFrame: CGRect = .zero
     @FocusState private var artworkFocused: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -86,51 +83,26 @@ struct PlayerBar: View {
                 .disabled(playback.state.track == nil)
             Button(tr("Queue", "队列")) { onQueueTap() }
         }
-        .onChange(of: playback.state.track?.id) { _, _ in
-            if !isDraggingScrubber {
-                scrubFraction = 0
-                scrubTrackID = nil
-            }
-        }
-        .onDisappear { isDraggingScrubber = false; scrubTrackID = nil }
         .onReceive(NotificationCenter.default.publisher(for: .musesRestorePlayerArtworkFocus)) { _ in
             guard playback.state.track != nil else { return }
             artworkFocused = true
         }
     }
 
+    /// Playback position is display-only in the browsing capsule.
     private var progressTrack: some View {
-        Slider(value: Binding(
-            get: {
-                isDraggingScrubber && scrubTrackID == playback.state.track?.id ? scrubFraction : max(0, min(1, playback.state.duration > 0
-                    ? playback.state.position / playback.state.duration : 0))
-            },
-            set: { value in
-                guard !isDraggingScrubber || scrubTrackID == playback.state.track?.id else { return }
-                scrubFraction = value
-                if !isDraggingScrubber, playback.state.duration > 0 {
-                    playback.seek(to: value * playback.state.duration)
-                }
-            }), in: 0...1, onEditingChanged: { editing in
-                if editing {
-                    scrubTrackID = playback.state.track?.id
-                    scrubFraction = playback.state.duration > 0
-                        ? max(0, min(1, playback.state.position / playback.state.duration)) : 0
-                    isDraggingScrubber = true
-                } else {
-                    if scrubTrackID == playback.state.track?.id, playback.state.duration > 0 {
-                        playback.seek(to: scrubFraction * playback.state.duration)
-                    }
-                    isDraggingScrubber = false
-                    scrubTrackID = nil
-                }
-            })
-            .controlSize(.mini)
-            .tint(BrandColors.playback)
-            .disabled(playback.state.duration <= 0)
-            .frame(height: 12)
-            .accessibilityLabel(tr("Playback position", "播放进度"))
-            .accessibilityValue("\(format(playback.state.position)) / \(format(playback.state.duration))")
+        GeometryReader { geometry in
+            let fraction = playback.state.duration > 0
+                ? max(0, min(1, playback.state.position / playback.state.duration)) : 0
+            ZStack(alignment: .leading) {
+                Capsule().fill(BrandColors.textPrimary.opacity(0.14))
+                Capsule().fill(BrandColors.playback)
+                    .frame(width: geometry.size.width * fraction)
+            }
+        }
+        .frame(height: PlayerDockMetrics.progressHeight)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 
     private var hasTrack: Bool { playback.state.track != nil }
@@ -200,14 +172,13 @@ struct PlayerBar: View {
             .layoutPriority(1)
             .accessibilityElement(children: .combine)
             Spacer(minLength: 8)
-            let currentPos = isDraggingScrubber && scrubTrackID == playback.state.track?.id
-                ? scrubFraction * playback.state.duration : playback.state.position
+            let currentPos = playback.state.position
             Text("\(format(currentPos))  /  −\(format(max(0, playback.state.duration - currentPos)))")
                 .accessibilityLabel(tr("Elapsed and remaining time", "已播放与剩余时间"))
                 .accessibilityValue("\(format(currentPos)) / −\(format(max(0, playback.state.duration - currentPos)))")
                 .font(MusesTypography.caption2.monospacedDigit())
-                .foregroundStyle(isDraggingScrubber ? AnyShapeStyle(BrandColors.accent) : AnyShapeStyle(.primary))
-                .opacity(isDraggingScrubber ? 1 : 0.78)
+                .foregroundStyle(.primary)
+                .opacity(0.78)
                 .fixedSize()
         }
     }
@@ -233,28 +204,14 @@ struct PlayerBar: View {
                 .help(tr("Volume", "音量"))
                 .accessibilityLabel(tr("Volume", "音量"))
                 .accessibilityValue("\(Int((playback.volume * 100).rounded()))%")
-                .overlay(alignment: .bottomTrailing) {
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: {
+                    volumeButtonFrame = $0
+                }
+                .overlay {
                     if showVolume {
-                        FloatingVolumePanel(width: 230, height: 44, showsOutput: false) { showVolume = false }
-                            .offset(y: -44)
+                        FloatingVolumePanel(width: 230, height: 44, anchorsToSpeaker: true, speakerGlobalFrame: volumeButtonFrame) { showVolume = false }
                     }
                 }
-            }
-            if let audioDevices {
-                ChromeIconMenu(systemName: "hifispeaker.and.homepod", title: tr("Audio output", "音频输出")) {
-                    Text(tr("Output for all apps on this Mac", "此 Mac 所有应用的输出设备"))
-                    Divider()
-                    let devices = NowPlayingOutputDevicePolicy.visibleDevices(audioDevices.devices)
-                    if devices.isEmpty { Text(tr("No audio outputs available", "无可用音频输出")) }
-                    ForEach(devices) { device in
-                        Button { _ = audioDevices.setDefault(device.id) } label: {
-                            Label(device.name, systemImage: device.id == audioDevices.defaultDeviceID ? "checkmark" : "hifispeaker")
-                        }
-                    }
-                    if audioDevices.lastError != nil {
-                        Text(tr("Unable to switch output. Try again.", "无法切换输出，请重试。"))
-                    }
-                }.onAppear { audioDevices.refresh() }
             }
             if PlayerIdlePolicy.showsYouTube(hasTrack: hasTrack) {
                 youtubeButton

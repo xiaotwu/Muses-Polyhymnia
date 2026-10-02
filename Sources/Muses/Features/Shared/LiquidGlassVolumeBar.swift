@@ -59,6 +59,7 @@ struct LiquidGlassVolumeBar: View {
         }
         .padding(.horizontal, 10)
         .frame(width: width, height: height)
+        .onAppear { audioDevices?.refresh() }
 
     }
 
@@ -70,6 +71,8 @@ struct LiquidGlassVolumeBar: View {
 
     private var outputMenu: some View {
         Menu {
+            Text(tr("Output for all apps on this Mac", "此 Mac 所有应用的输出设备"))
+            Divider()
             if outputDevices.isEmpty {
                 Text(tr("No audio outputs available", "无可用音频输出"))
             } else {
@@ -90,17 +93,23 @@ struct LiquidGlassVolumeBar: View {
                     }
                 }
             }
+            if audioDevices?.lastError != nil {
+                Divider()
+                Text(tr("Unable to switch output. Try again.", "无法切换输出，请重试。"))
+            }
         } label: {
             Image(systemName: "hifispeaker.and.homepod")
                 .font(MusesTypography.system(size: 13, weight: .semibold))
-                .foregroundStyle(BrandColors.heading)
-                .frame(width: 26, height: 26)
+                .foregroundStyle(BrandColors.textPrimary)
+                .frame(width: 28, height: 28)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(AudioOutputGlyphPolicy.accessibilityLabel(forDeviceName: currentOutputName))
                 .contentShape(Rectangle())
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
-        .frame(width: 26, height: 26)
-        .modifier(CompactChromeSurface())
+        .frame(width: 28, height: 28)
+        .tint(BrandColors.textPrimary)
         .help(AudioOutputGlyphPolicy.accessibilityLabel(forDeviceName: currentOutputName))
         .accessibilityLabel(AudioOutputGlyphPolicy.accessibilityLabel(forDeviceName: currentOutputName))
     }
@@ -187,7 +196,7 @@ struct LiquidGlassVolumeBar: View {
             Image(systemName: volumeIcon)
                 .font(MusesTypography.system(size: 13, weight: .semibold))
                 .foregroundStyle(BrandColors.heading.opacity(0.85))
-                .frame(width: 26, height: 26)
+                .frame(width: 28, height: 28)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.musesCompact)

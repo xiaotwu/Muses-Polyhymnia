@@ -4,6 +4,7 @@ import SwiftUI
 /// with a "show full queue" button at the end (opens QueueDrawerView).
 struct UpNextPreview: View {
     @Environment(PlaybackService.self) private var playback
+    @Environment(YouTubeImportService.self) private var importService
     let onShowQueue: () -> Void
 
     private var items: [QueueItem] { Array(playback.queue.upNext.prefix(5)) }
@@ -38,7 +39,7 @@ struct UpNextPreview: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(item.track.title).font(MusesTypography.callout).lineLimit(1)
                                     .foregroundStyle(BrandColors.textPrimary)
-                                Text(item.track.artist).font(MusesTypography.caption).lineLimit(1)
+                                Text(SongCreditCache.shared.artist(snapshot: item.track)).font(MusesTypography.caption).lineLimit(1)
                                     .foregroundStyle(BrandColors.textSecondary)
                             }
                             Spacer()
@@ -46,6 +47,9 @@ struct UpNextPreview: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.fullAreaPlain)
+                    .task(id: item.track.youTubeId) {
+                        _ = await importService.songMetadata(videoID: item.track.youTubeId)
+                    }
                 }
             }
         }

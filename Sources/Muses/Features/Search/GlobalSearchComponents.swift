@@ -55,7 +55,7 @@ struct GlobalSearchTrackRow: View {
                         .font(MusesTypography.system(size: 14, weight: .medium))
                         .foregroundStyle(isCurrent ? BrandColors.accent : BrandColors.textPrimary)
                         .lineLimit(1)
-                    Text([snapshot.artist, snapshot.albumTitle]
+                    Text([SongCreditCache.shared.artist(snapshot: snapshot), snapshot.albumTitle]
                         .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " — "))
                         .font(MusesTypography.caption)
                         .foregroundStyle(BrandColors.textSecondary)
@@ -77,7 +77,7 @@ struct GlobalSearchTrackRow: View {
         .overlay(alignment: .bottom) {
             Rectangle().fill(BrandColors.hairline).frame(height: 1)
         }
-        .accessibilityLabel("\(snapshot.title), \(snapshot.artist)")
+        .accessibilityLabel("\(snapshot.title), \(SongCreditCache.shared.artist(snapshot: snapshot))")
         .accessibilityValue(formatDuration(snapshot.durationSeconds))
     }
 }

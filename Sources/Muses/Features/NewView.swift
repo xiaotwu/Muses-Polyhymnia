@@ -520,7 +520,7 @@ private struct CompactDiscoveryTrackRow: View {
         .overlay(alignment: .bottom) {
             Rectangle().fill(BrandColors.hairline).frame(height: 1)
         }
-        .accessibilityLabel("\(snapshot.title), \(snapshot.artist)")
+        .accessibilityLabel("\(snapshot.title), \(SongCreditCache.shared.artist(snapshot: snapshot))")
         .accessibilityHint(tr("Play", "播放"))
     }
 }

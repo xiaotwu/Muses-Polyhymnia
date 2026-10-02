@@ -73,6 +73,7 @@ struct RootView: View {
     var body: some View {
         notificationWired
             .toolbar { windowNavigationToolbar }
+            .focusedSceneValue(\.musesBrowseNavigation, windowBrowseNavigationCommands)
             .toolbarVisibility(showNowPlaying && !immersiveToolbarRevealed ? .hidden : .visible,
                                for: .windowToolbar)
             .onContinuousHover { phase in
@@ -168,25 +169,14 @@ struct RootView: View {
 
     @ToolbarContentBuilder
     private var windowNavigationToolbar: some ToolbarContent {
-        ToolbarItemGroup(placement: .navigation) {
-            Button {
-                if showNowPlaying { returnFromNowPlaying() }
-                else { navigateHistory(back: true) }
-            } label: {
-                Label(tr("Back", "后退", zhHant: "返回"), systemImage: "arrow.left")
-            }
-            .buttonStyle(.automatic)
-            .help(tr("Back", "后退", zhHant: "返回"))
-            .keyboardShortcut("[", modifiers: .command)
-            .disabled((!showNowPlaying && !canNavigateBack) || showYouTubeVideo)
-            Button { navigateHistory(back: false) } label: {
-                Label(tr("Forward", "前进", zhHant: "前進"), systemImage: "arrow.right")
-            }
-            .buttonStyle(.automatic)
-            .help(tr("Forward", "前进", zhHant: "前進"))
-            .keyboardShortcut("]", modifiers: .command)
-            .disabled(!canNavigateForward || showNowPlaying || showYouTubeVideo)
+        // Keep a native toolbar attached so hiddenTitleBar retains AppKit's window controls.
+        ToolbarItem(placement: .principal) {
+            Color.clear
+                .frame(width: 1, height: 1)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
         }
+        .sharedBackgroundVisibility(.hidden)
         if showNowPlaying {
             if #available(macOS 26.0, *) {
                 ToolbarSpacer(.flexible, placement: .automatic)
@@ -201,6 +191,18 @@ struct RootView: View {
                 .help(tr("Close Now Playing", "关闭正在播放"))
             }
         }
+    }
+
+    private var windowBrowseNavigationCommands: BrowseNavigationCommands {
+        BrowseNavigationCommands(
+            canGoBack: (showNowPlaying || canNavigateBack) && !showYouTubeVideo,
+            canGoForward: canNavigateForward && !showNowPlaying && !showYouTubeVideo,
+            back: {
+                if showNowPlaying { returnFromNowPlaying() }
+                else { navigateHistory(back: true) }
+            },
+            forward: { navigateHistory(back: false) }
+        )
     }
 
     private var canNavigateBack: Bool {
@@ -506,11 +508,10 @@ struct RootView: View {
     }
     private var splitView: some View {
         HStack(spacing: 0) {
-            SidebarView(onSettingsCategoryChange: { settingsPath = [] },
-                        selection: $section,
-                        selectedPlaylist: $selectedPlaylist,
-                        selectedYouTubeImport: $selectedYouTubeImport)
-                .zIndex(10)
+            Color.clear
+                .frame(width: AppleMusicTokens.sidebarCollapsedWidth)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
             ZStack(alignment: .bottom) {
                 detailStack
                     .environment(\.collectionPresentation, collectionMemory.entry(for: browseRoute))
@@ -548,6 +549,16 @@ struct RootView: View {
             }
         }
         .background(BrandColors.background)
+        .overlay(alignment: .leading) {
+            SidebarView(onSettingsCategoryChange: { settingsPath = [] },
+                        canGoBack: canNavigateBack && !showYouTubeVideo,
+                        canGoForward: canNavigateForward && !showNowPlaying && !showYouTubeVideo,
+                        onBack: { navigateHistory(back: true) },
+                        onForward: { navigateHistory(back: false) },
+                        selection: $section,
+                        selectedPlaylist: $selectedPlaylist,
+                        selectedYouTubeImport: $selectedYouTubeImport)
+        }
         .background {
             MainWindowConfigurator()
                 .frame(width: 0, height: 0)
@@ -739,13 +750,16 @@ struct RootView: View {
                             returnFromNowPlaying()
                         },
                         onKeyboardFocusChange: { immersiveNavigationFocused = $0 },
+                        onPointerHoverChange: { immersiveNavigationHovered = $0 },
+                        canGoBack: !showYouTubeVideo,
+                        canGoForward: false,
+                        onBack: returnFromNowPlaying,
+                        onForward: { navigateHistory(back: false) },
                         selection: $section,
                         selectedPlaylist: $selectedPlaylist,
                         selectedYouTubeImport: $selectedYouTubeImport
                     )
                     .opacity(immersiveNavigationHovered || immersiveNavigationFocused ? 1 : 0)
-                    .contentShape(Rectangle())
-                    .onHover { immersiveNavigationHovered = $0 }
                     .onChange(of: section) { _, _ in returnFromNowPlaying() }
                     .onAppear {
                         immersiveNavigationHovered = false
@@ -770,6 +784,8 @@ struct RootView: View {
         .accessibilityHidden(!NowPlayingPresentationPolicy.isAccessibilityVisible(
             isPresented: showNowPlaying
         ))
+        // Publish from the active focus branch while the browsing branch is disabled.
+        .focusedSceneValue(\.musesBrowseNavigation, showNowPlaying ? windowBrowseNavigationCommands : nil)
     }
 
     @ViewBuilder

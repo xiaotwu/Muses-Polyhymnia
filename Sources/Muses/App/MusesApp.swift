@@ -530,6 +530,7 @@ private struct MusesAppCommands: Commands {
     let sleepTimer: SleepTimerService
     let updater: UpdateService
     @Environment(\.openWindow) private var openWindow
+    @FocusedValue(\.musesBrowseNavigation) private var browseNavigation
     @AppStorage(PrefKey.ffMiniPlayer) private var miniEnabled = false
     @AppStorage(PrefKey.language) private var languageRaw = AppLanguage.system.rawValue
 
@@ -573,6 +574,15 @@ private struct MusesAppCommands: Commands {
         }
 
         CommandGroup(replacing: .sidebar) {
+            Button(tr("Back", "后退", zhHant: "返回")) { browseNavigation?.back() }
+                .keyboardShortcut("[", modifiers: .command)
+                .disabled(browseNavigation?.canGoBack != true)
+            Button(tr("Forward", "前进", zhHant: "前進")) { browseNavigation?.forward() }
+                .keyboardShortcut("]", modifiers: .command)
+                .disabled(browseNavigation?.canGoForward != true)
+
+            Divider()
+
             Button(tr("Focus Navigation", "聚焦导航", zhHant: "聚焦導覽")) {
                 NotificationCenter.default.post(name: .musesFocusNavigation, object: nil)
             }
