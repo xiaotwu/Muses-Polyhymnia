@@ -18,14 +18,13 @@ struct PerfCacheTests {
     // MARK: - SWRCache
 
     @Test("SWRCache: set then get hits, preserving fetchedAt and age")
-    func swrSetGet() {
+    func swrSetGet() throws {
         let cache = SWRCache<[String]>(directory: tmpDir())
         cache.set("k", value: ["a", "b"])
-        let cached = cache.get("k")
-        #expect(cached != nil)
-        #expect(cached?.value == ["a", "b"])
-        #expect(cached?.age ?? 1 >= 0)
-        #expect((cached?.age ?? 1) < 1)
+        let cached = try #require(cache.get("k"))
+        #expect(cached.value == ["a", "b"])
+        #expect(cached.age >= 0)
+        #expect(cached.age < 1)
     }
 
     @Test("SWRCache: unwritten key returns nil")
@@ -35,13 +34,57 @@ struct PerfCacheTests {
     }
 
     @Test("SWRCache: isFresh is true within window and false after expiration")
-    func swrFreshness() {
+    func swrFreshness() throws {
         let cache = SWRCache<[String]>(directory: tmpDir())
         let old = Date().addingTimeInterval(-120)
         cache.set("k", value: ["x"], fetchedAt: old)
-        let cached = cache.get("k")
-        #expect(cache.isFresh(cached!, freshWindow: 180) == true)
-        #expect(cache.isFresh(cached!, freshWindow: 60) == false)
+        let cached = try #require(cache.get("k"))
+        #expect(cache.isFresh(cached, freshWindow: 180) == true)
+        #expect(cache.isFresh(cached, freshWindow: 60) == false)
+    }
+
+    @Test("SWRCache retains a just-set value when its evictable memory is cleared before persistence")
+    func swrEvictionBeforePersistence() throws {
+        let memory = NSCache<NSString, SWRCache<[String]>.CacheBox>()
+        let cache = SWRCache<[String]>(directory: tmpDir(), memory: memory)
+        let now = Date()
+        // Keep the actor occupied until get: detached persistence is not an
+        // authority for the synchronous set-then-get contract.
+        for index in 0..<64 {
+            let key = "evicted-\(index)"
+            cache.set(key, value: [key], fetchedAt: now)
+            memory.removeAllObjects()
+            let cached = try #require(cache.get(key))
+            #expect(cached.value == [key])
+            #expect(cached.fetchedAt == now)
+        }
+    }
+
+    @Test("SWRCache pending replacement, invalidate and clear remain synchronous without disk fallback")
+    func swrPendingReplacementAndInvalidation() throws {
+        let root = tmpDir()
+        let blockedParent = root.appendingPathComponent("regular-file")
+        try Data().write(to: blockedParent)
+        // A regular-file parent prevents persistence, including clearAll's
+        // directory recreation. This isolates pending values from disk timing.
+        let memory = NSCache<NSString, SWRCache<[String]>.CacheBox>()
+        let cache = SWRCache<[String]>(
+            directory: blockedParent.appendingPathComponent("cache"), memory: memory)
+        cache.set("k", value: ["old"])
+        cache.set("k", value: ["replacement"])
+        memory.removeAllObjects()
+        #expect(try #require(cache.get("k")).value == ["replacement"])
+        cache.invalidate("k")
+        #expect(cache.get("k") == nil)
+
+        cache.set("a", value: ["first"])
+        cache.set("b", value: ["second"])
+        memory.removeAllObjects()
+        #expect(try #require(cache.get("a")).value == ["first"])
+        #expect(try #require(cache.get("b")).value == ["second"])
+        cache.clearAll()
+        #expect(cache.get("a") == nil)
+        #expect(cache.get("b") == nil)
     }
 
     @Test("SWRCache: disk persistence across instances simulates cold start")

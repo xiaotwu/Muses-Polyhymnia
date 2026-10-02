@@ -27,8 +27,11 @@ final class SWRCache<T: Codable & Sendable> {
         let fetchedAt: Date
     }
 
-    private let memory: NSCache<NSString, CacheBox> = .init()
+    private let memory: NSCache<NSString, CacheBox>
     private let directory: URL
+    // NSCache may evict at any time. Retain new values until their detached
+    // persistence completes so synchronous readers cannot fall into that gap.
+    private var pendingWrites: [String: (id: UUID, cached: Cached)] = [:]
 
     /// Box for the in-memory value (NSCache stores reference types).
     final class CacheBox {
@@ -36,14 +39,16 @@ final class SWRCache<T: Codable & Sendable> {
         init(_ cached: Cached) { self.cached = cached }
     }
 
-    init(directory: URL) {
+    init(directory: URL, memory: NSCache<NSString, CacheBox> = .init()) {
         self.directory = directory
+        self.memory = memory
         try? FileManager.default.createDirectory(at: directory,
                                                   withIntermediateDirectories: true)
     }
 
     /// Reads the cached value (memory first, falling back to disk). nil if not cached.
     func get(_ key: String) -> Cached? {
+        if let pending = pendingWrites[key] { return pending.cached }
         let nsKey = key as NSString
         if let box = memory.object(forKey: nsKey) {
             return box.cached
@@ -62,25 +67,33 @@ final class SWRCache<T: Codable & Sendable> {
     /// Writes to memory and persists to disk asynchronously.
     func set(_ key: String, value: T, fetchedAt: Date = .init()) {
         let cached = Cached(value: value, fetchedAt: fetchedAt)
+        let writeID = UUID()
+        pendingWrites[key] = (writeID, cached)
         memory.setObject(CacheBox(cached), forKey: key as NSString)
         let envelope = DiskEnvelope(value: value, fetchedAt: fetchedAt)
         let url = fileURL(for: key)
-        Task.detached(priority: .utility) {
+        Task.detached(priority: .utility) { [weak self] in
             let encoder = JSONEncoder()
             if let data = try? encoder.encode(envelope) {
                 try? data.write(to: url, options: .atomic)
+            }
+            await MainActor.run {
+                guard self?.pendingWrites[key]?.id == writeID else { return }
+                self?.pendingWrites.removeValue(forKey: key)
             }
         }
     }
 
     /// Invalidates a key (memory + disk).
     func invalidate(_ key: String) {
+        pendingWrites.removeValue(forKey: key)
         memory.removeObject(forKey: key as NSString)
         try? FileManager.default.removeItem(at: fileURL(for: key))
     }
 
     /// Clears everything (memory; disk files are removed as needed).
     func clearAll() {
+        pendingWrites.removeAll()
         memory.removeAllObjects()
         try? FileManager.default.removeItem(at: directory)
         try? FileManager.default.createDirectory(at: directory,
