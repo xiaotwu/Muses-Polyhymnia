@@ -29,14 +29,15 @@ struct SidebarView: View {
                         settingsIsland(Array(SettingsCategory.allCases.prefix(5)), key: "settings-primary")
                         settingsIsland(Array(SettingsCategory.allCases.dropFirst(5)), key: "settings-secondary")
                     } else {
-                        island(key: "primary", focusKeys: ["search", "home"]) { expanded in
-                            destination(.search, icon: "magnifyingglass", expanded: expanded)
+                        island(key: "primary", focusKeys: ["home", "search"]) { expanded in
                             destination(.home, icon: "house.fill", expanded: expanded)
+                            destination(.search, icon: "magnifyingglass", expanded: expanded)
                         }
-                        island(key: "library", focusKeys: ["new", "songs", "catalog", "liked", "musicVideos", "podcasts", "subscriptions", "history", "playlists"]) { expanded in
+                        island(key: "library", focusKeys: ["new", "songs", "albums", "artists", "liked", "musicVideos", "podcasts", "subscriptions", "history", "playlists"]) { expanded in
                             destination(.new, icon: "square.grid.2x2.fill", expanded: expanded)
                             destination(.songs, icon: "music.note", expanded: expanded)
-                            catalogDestination(expanded: expanded)
+                            destination(.albums, icon: "square.stack.fill", expanded: expanded)
+                            destination(.artists, icon: "person.2.fill", expanded: expanded)
                             destination(.liked, icon: "heart.fill", expanded: expanded)
                             destination(.musicVideos, icon: "play.rectangle.fill", expanded: expanded)
                             destination(.podcasts, icon: "mic.fill", expanded: expanded)
@@ -73,8 +74,8 @@ struct SidebarView: View {
             if selection == .settings {
                 focusedItem = (SettingsCategory(rawValue: settingsPane) ?? .general).destination.rawValue
             } else {
-                let key = selection == .albums || selection == .artists ? "catalog" : selection.rawValue
-                let destinations = ["search", "home", "new", "songs", "catalog", "liked", "musicVideos", "podcasts", "subscriptions", "history", "playlists"]
+                let key = selection.rawValue
+                let destinations = ["home", "search", "new", "songs", "albums", "artists", "liked", "musicVideos", "podcasts", "subscriptions", "history", "playlists"]
                 focusedItem = destinations.contains(key) ? key : SidebarSection.home.rawValue
             }
         }
@@ -176,29 +177,6 @@ struct SidebarView: View {
         .accessibilityAddTraits(selection == section ? .isSelected : [])
     }
 
-    private func catalogDestination(expanded: Bool) -> some View {
-        let selected = selection == .albums || selection == .artists
-        let title = tr("Albums & Artists", "专辑与艺术家")
-        return Menu {
-            Button(SidebarSection.albums.title, systemImage: "square.stack.fill") { navigate(.albums) }
-            Button(SidebarSection.artists.title, systemImage: "person.2.fill") { navigate(.artists) }
-        } label: {
-            islandLabel(title, icon: "square.stack.fill", selected: selected, expanded: expanded)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(title)
-        }
-        .menuStyle(.button)
-        .buttonStyle(.fullAreaPlain)
-        .menuIndicator(.hidden)
-        .frame(width: expanded ? 206 : 44, height: 44, alignment: .leading)
-        .focused($focusedItem, equals: "catalog")
-        .overlay(RoundedRectangle(cornerRadius: 22).stroke(BrandColors.accent, lineWidth: focusedItem == "catalog" ? 2 : 0))
-        .help(title)
-        .accessibilityLabel(title)
-        .accessibilityValue(selected ? selection.title : "")
-        .accessibilityAddTraits(selected ? .isSelected : [])
-    }
-
     private func settingsIsland(_ categories: [SettingsCategory], key: String) -> some View {
         island(key: key, focusKeys: categories.map(\.rawValue)) { expanded in
             ForEach(categories) { category in
@@ -240,9 +218,19 @@ struct SidebarView: View {
     }
 
     private func navigate(_ section: SidebarSection) {
+        if section == .settings {
+            onSettingsCategoryChange()
+            settingsPane = SettingsCategory.general.rawValue
+        }
         selectedPlaylist = nil
         selectedYouTubeImport = nil
         selection = section
+        if section == .home {
+            NotificationCenter.default.post(name: .musesHomeScrollToTop, object: nil)
+        } else if section == .albums || section == .artists {
+            NotificationCenter.default.post(name: .musesNavigateFromSearch,
+                                            object: GlobalSearchRoute.section(section))
+        }
     }
 }
 

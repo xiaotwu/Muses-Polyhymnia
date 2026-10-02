@@ -239,7 +239,7 @@ private struct YouTubeChannelVideosView: View {
             }.padding(28).padding(.bottom, 100)
         }
         .task(id: refreshID) { await load() }
-        .sheet(item: $galleryPreview) { GalleryMediaPreviewSheet(preview: $0) }
+        .galleryMediaPreview(item: $galleryPreview)
         .alert(
             tr("Unsubscribe from \(channel.title) (\(channel.channelId)) using \(account.account?.channel?.title ?? "YouTube")?",
                "使用 \(account.account?.channel?.title ?? "YouTube") 账号取消订阅 \(channel.title)（\(channel.channelId)）？",

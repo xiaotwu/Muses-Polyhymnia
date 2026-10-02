@@ -52,7 +52,7 @@ struct PodcastContinueShelf: View {
                 }
             }
         }
-        .sheet(item: $galleryPreview) { GalleryMediaPreviewSheet(preview: $0) }
+        .galleryMediaPreview(item: $galleryPreview)
         .task(id: podcasts.revision) {
             let shows = podcasts.followedShows()
             showTitles = Dictionary(uniqueKeysWithValues: shows.map { ($0.catalogID, $0.title) })

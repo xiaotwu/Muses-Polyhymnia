@@ -53,80 +53,88 @@ struct HomeView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: AppleMusicSpacing.section) {
-                Text(tr("Home", "首页"))
-                    .font(MusesTypography.pageTitle)
-                    .foregroundStyle(BrandColors.heading)
-                    .padding(.horizontal, AppleMusicTokens.contentPaddingX)
+        ScrollViewReader { reader in
+            ScrollView {
+                VStack(alignment: .leading, spacing: AppleMusicSpacing.section) {
+                    Text(tr("Home", "首页"))
+                        .font(MusesTypography.pageTitle)
+                        .foregroundStyle(BrandColors.heading)
+                        .padding(.horizontal, AppleMusicTokens.contentPaddingX)
 
-                homeSourceStatus
+                    homeSourceStatus
 
-                moodChips
+                    moodChips
 
-                if discovery.isShowingStale {
-                    staleBanner
-                }
-
-                if shouldShowWebRecovery {
-                    webRecoveryBanner
-                }
-
-                if let interactionError {
-                    DiscoveryFailureStrip(
-                        message: interactionError,
-                        onRetry: {
-                            self.interactionError = nil
-                            discovery.reload()
-                        }
-                    )
-                    .padding(.horizontal, AppleMusicTokens.contentPaddingX)
-                }
-
-                if homeSourceSelection != .imports {
-                    if visibleDiscoverySections.isEmpty,
-                       homeSourceSelection == .account || homeSourceSelection == .publicDiscovery,
-                       !discovery.isRefreshing {
-                        ContentUnavailableView {
-                            Label(homeSourceSelection.title, systemImage: homeSourceSelection == .account ? "person.crop.circle" : "globe")
-                        } description: {
-                            Text(homeSourceSelection == .account
-                                 ? tr("No account recommendations are available. Personalized Web Home requires its own browser consent.",
-                                      "暂无可用的账号推荐。个性化 Web 首页需要独立的浏览器同意。")
-                                 : tr("No public recommendations are available right now.", "暂时没有可用的公共推荐。"))
-                        } actions: {
-                            Button(homeSourceSelection == .account ? tr("Account Settings", "账号设置") : tr("Retry", "重试")) {
-                                if homeSourceSelection == .account { openHomeAccountSettings() }
-                                else { discovery.reload() }
-                            }
-                        }
-                    } else {
-                        homeSpotlight
-                        topPicks
-                        discoveryShelves
+                    if discovery.isShowingStale {
+                        staleBanner
                     }
-                    PodcastContinueShelf()
-                }
 
-                if homeSourceSelection == .imports || (homeSourceSelection == .recommended && !activeImports.isEmpty) {
-                    if activeImports.isEmpty {
-                        ContentUnavailableView {
-                            Label(tr("No imported playlists", "暂无已导入歌单"), systemImage: "music.note.list")
-                        } description: {
-                            Text(tr("Import a YouTube playlist from All Playlists.", "从全部歌单导入 YouTube 歌单。"))
-                        } actions: {
-                            Button(tr("Open Playlists", "打开歌单")) {
-                                NotificationCenter.default.post(name: .musesNavigateFromSearch, object: GlobalSearchRoute.section(.playlists))
+                    if shouldShowWebRecovery {
+                        webRecoveryBanner
+                    }
+
+                    if let interactionError {
+                        DiscoveryFailureStrip(
+                            message: interactionError,
+                            onRetry: {
+                                self.interactionError = nil
+                                discovery.reload()
                             }
+                        )
+                        .padding(.horizontal, AppleMusicTokens.contentPaddingX)
+                    }
+
+                    if homeSourceSelection != .imports {
+                        if visibleDiscoverySections.isEmpty,
+                           homeSourceSelection == .account || homeSourceSelection == .publicDiscovery,
+                           !discovery.isRefreshing {
+                            ContentUnavailableView {
+                                Label(homeSourceSelection.title, systemImage: homeSourceSelection == .account ? "person.crop.circle" : "globe")
+                            } description: {
+                                Text(homeSourceSelection == .account
+                                     ? tr("No account recommendations are available. Personalized Web Home requires its own browser consent.",
+                                          "暂无可用的账号推荐。个性化 Web 首页需要独立的浏览器同意。")
+                                     : tr("No public recommendations are available right now.", "暂时没有可用的公共推荐。"))
+                            } actions: {
+                                Button(homeSourceSelection == .account ? tr("Account Settings", "账号设置") : tr("Retry", "重试")) {
+                                    if homeSourceSelection == .account { openHomeAccountSettings() }
+                                    else { discovery.reload() }
+                                }
+                            }
+                        } else {
+                            homeSpotlight
+                            topPicks
+                            discoveryShelves
                         }
-                    } else { importedPlaylistsShelf }
+                        PodcastContinueShelf()
+                    }
+
+                    if homeSourceSelection == .imports || (homeSourceSelection == .recommended && !activeImports.isEmpty) {
+                        if activeImports.isEmpty {
+                            ContentUnavailableView {
+                                Label(tr("No imported playlists", "暂无已导入歌单"), systemImage: "music.note.list")
+                            } description: {
+                                Text(tr("Import a YouTube playlist from All Playlists.", "从全部歌单导入 YouTube 歌单。"))
+                            } actions: {
+                                Button(tr("Open Playlists", "打开歌单")) {
+                                    NotificationCenter.default.post(name: .musesNavigateFromSearch, object: GlobalSearchRoute.section(.playlists))
+                                }
+                            }
+                        } else { importedPlaylistsShelf }
+                    }
                 }
+                .padding(.top, AppleMusicSpacing.browseTitleTop)
+                .padding(.bottom, AppleMusicTokens.scrollBottomInset)
+                .id("home-top")
             }
-            .padding(.top, AppleMusicSpacing.browseTitleTop)
-            .padding(.bottom, AppleMusicTokens.scrollBottomInset)
+            .defaultScrollAnchor(.top)
+            .onAppear { reader.scrollTo("home-top", anchor: .top) }
+            .onReceive(NotificationCenter.default.publisher(for: .musesHomeScrollToTop)) { _ in
+                reader.scrollTo("home-top", anchor: .top)
+            }
         }
         .background(BrowseBackground())
-        .sheet(item: $galleryPreview) { GalleryMediaPreviewSheet(preview: $0) }
+        .galleryMediaPreview(item: $galleryPreview)
         .onAppear {
             if discovery.recommendationMode == .youtubeMusic {
                 homeSourceSelection = .publicDiscovery

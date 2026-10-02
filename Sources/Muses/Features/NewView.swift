@@ -119,7 +119,7 @@ struct NewView: View {
             .padding(.bottom, AppleMusicTokens.scrollBottomInset)
         }
         .background(BrowseBackground())
-        .sheet(item: $galleryPreview) { GalleryMediaPreviewSheet(preview: $0) }
+        .galleryMediaPreview(item: $galleryPreview)
         .onAppear {
             loadRecommendations()
             loadPersonalDiscovery()

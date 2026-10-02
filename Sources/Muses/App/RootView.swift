@@ -27,6 +27,7 @@ struct RootView: View {
     @State private var selectedYouTubeImport: YouTubeImport?
     @State private var selectedCatalogRelease: CatalogReleaseProjection?
     @State private var selectedCatalogArtist: CatalogArtistProjection?
+    @State private var galleryPresentation = GalleryPreviewPresentation()
     @State private var showQuickSearch = false
     @State private var showYouTubeLink = false
     @State private var droppedYouTubeLink = ""
@@ -72,6 +73,16 @@ struct RootView: View {
 
     var body: some View {
         notificationWired
+            .disabled(galleryPresentation.preview != nil)
+            .accessibilityHidden(galleryPresentation.preview != nil)
+            .overlay {
+                if let preview = galleryPresentation.preview {
+                    GalleryMediaPreviewOverlay(preview: preview,
+                                               onDismiss: galleryPresentation.dismiss,
+                                               onPlay: galleryPresentation.play)
+                }
+            }
+            .environment(galleryPresentation)
             .toolbar { windowNavigationToolbar }
             .focusedSceneValue(\.musesBrowseNavigation, windowBrowseNavigationCommands)
             .toolbarVisibility(showNowPlaying && !immersiveToolbarRevealed ? .hidden : .visible,
@@ -109,6 +120,7 @@ struct RootView: View {
                 if failed { showPodcastSaveAlert = true }
             }
             .onChange(of: browseRoute) { _, route in
+                galleryPresentation.dismiss()
                 navigationHistory.visit(route)
                 pendingAccountRestoration = nil
                 if !libraryStoreFallback {
@@ -914,6 +926,7 @@ extension Notification.Name {
     static let musesNavigateYouTubeImport = Notification.Name("muses.navigateYouTubeImport")
     static let musesCloseYouTubeAlbum = Notification.Name("muses.closeYouTubeAlbum")
     static let musesShowPlaylistsOverview = Notification.Name("muses.showPlaylistsOverview")
+    static let musesHomeScrollToTop = Notification.Name("muses.homeScrollToTop")
     static let musesOpenSettings = Notification.Name("muses.openSettings")
     static let musesToggleLyrics = Notification.Name("muses.toggleLyrics")
     static let musesShowYouTubeVideo = Notification.Name("muses.showYouTubeVideo")

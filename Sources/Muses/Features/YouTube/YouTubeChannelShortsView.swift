@@ -62,7 +62,7 @@ struct YouTubeChannelShortsView: View {
             .padding(.bottom, 100)
         }
         .task(id: refreshID) { await load() }
-        .sheet(item: $galleryPreview) { GalleryMediaPreviewSheet(preview: $0) }
+        .galleryMediaPreview(item: $galleryPreview)
         .task(id: playRequest?.id) {
             guard let entry = playRequest else { return }
             let identity = account.activeChannelID

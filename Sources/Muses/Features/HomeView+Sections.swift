@@ -406,6 +406,7 @@ extension HomeView {
                     guard let id = sibling.playableVideoID else { return nil }
                     return .init(id: id, title: sibling.title, uploader: sibling.uploader, duration: sibling.duration)
                 },
+                sourceBadgeTrailingInset: 40,
                 isYouTube: true,
                 showsHoverPlay: canPlay,
                 onSelect: { openWebCard(card) },
@@ -417,7 +418,8 @@ extension HomeView {
                     }
                 }
             )
-            .youTubeEntryContextMenu(card: card, videoContext: remoteCards(in: sectionItems), showsMenuButton: true) {
+            .youTubeEntryContextMenu(card: card, videoContext: remoteCards(in: sectionItems), showsMenuButton: true,
+                                    menuButtonTrailingInset: 0) {
                 Task { await play(card, siblings: sectionItems) }
             }
         case .track(let snapshot):
@@ -438,7 +440,7 @@ extension HomeView {
                 onPlay: { play(snapshot, context: context) }
             )
             .trackContextMenu(snapshot: snapshot, onPlay: { play(snapshot, context: context) },
-                              videoContext: context, showsMenuButton: true)
+                              videoContext: context, showsMenuButton: true, menuButtonTrailingInset: 0)
         }
     }
 

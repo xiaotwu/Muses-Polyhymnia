@@ -29,6 +29,7 @@ struct AlbumObjectView: View {
     var videoEntries: [YTDlpBridge.YTDlpPlaylistEntry] = []
     var videoSource: QueueSource = .search
     var videoResumeAtMs: Double? = nil
+    var sourceBadgeTrailingInset: CGFloat = 0
     var isYouTube = false
     var isNowPlaying: Bool = false
     /// Snap-level identity for `.play` rails. Compared inside `NowPlayingMark`,
@@ -303,6 +304,7 @@ struct AlbumObjectView: View {
                 .background(ContentBadgeStyle.fill, in: shape)
                 .overlay(shape.stroke(ContentBadgeStyle.stroke, lineWidth: ContentBadgeStyle.lineWidth))
                 .padding(8)
+                .padding(.trailing, sourceBadgeTrailingInset)
                 .help(videoEntry == nil ? tr("YouTube playlist", "YouTube 歌单") : tr("Floating video", "悬浮视频"))
         }
     }
