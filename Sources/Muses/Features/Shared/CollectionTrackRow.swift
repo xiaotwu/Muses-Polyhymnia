@@ -16,15 +16,18 @@ struct CollectionTrackRow: Identifiable, Equatable, Sendable {
     let collectionItemID: UUID?
     let collectionOwner: String?
     let collectionTitle: String?
+    /// Table-only resolved credit, shared by display and its nonisolated comparator.
+    let presentationArtist: String?
 
     var id: UUID { collectionItemID ?? snapshot.id }
     var title: String { snapshot.title }
     var artist: String {
-        SongDisplayInformation.isMissingCredit(snapshot.artist) || snapshot.artist == collectionOwner
+        if let presentationArtist { return presentationArtist }
+        return SongDisplayInformation.isMissingCredit(snapshot.artist) || snapshot.artist == collectionOwner
             ? tr("Artist unavailable", "艺人信息暂缺") : snapshot.artist
     }
     @MainActor var displayArtist: String {
-        SongCreditCache.shared.artist(snapshot: snapshot, owner: collectionOwner)
+        presentationArtist ?? SongCreditCache.shared.artist(snapshot: snapshot, owner: collectionOwner)
     }
     var album: String {
         snapshot.albumTitle == collectionTitle ? "" : (snapshot.albumTitle ?? "")
@@ -54,7 +57,8 @@ struct CollectionTrackRow: Identifiable, Equatable, Sendable {
         discNumber: Int? = nil,
         collectionItemID: UUID? = nil,
         collectionOwner: String? = nil,
-        collectionTitle: String? = nil
+        collectionTitle: String? = nil,
+        presentationArtist: String? = nil
     ) {
         self.snapshot = snapshot
         self.canonicalIndex = canonicalIndex
@@ -67,6 +71,15 @@ struct CollectionTrackRow: Identifiable, Equatable, Sendable {
         self.collectionItemID = collectionItemID
         self.collectionOwner = collectionOwner
         self.collectionTitle = collectionTitle
+        self.presentationArtist = presentationArtist
+    }
+
+    func resolvingPresentationArtist(_ artist: String) -> Self {
+        Self(snapshot: snapshot, canonicalIndex: canonicalIndex, year: year,
+             genre: genre, addedAt: addedAt, playCount: playCount,
+             trackNumber: trackNumber, discNumber: discNumber,
+             collectionItemID: collectionItemID, collectionOwner: collectionOwner,
+             collectionTitle: collectionTitle, presentationArtist: artist)
     }
 
     @MainActor
@@ -184,6 +197,19 @@ enum CollectionTableDefaultSort: Equatable, Sendable {
 }
 
 enum CollectionTrackSort {
+    @MainActor
+    static func presentationRows(
+        _ rows: [CollectionTrackRow],
+        using comparators: [KeyPathComparator<CollectionTrackRow>],
+        credits: SongCreditCache = .shared
+    ) -> [CollectionTrackRow] {
+        let resolved = rows.map { row in
+            row.resolvingPresentationArtist(credits.artist(snapshot: row.snapshot,
+                                                          owner: row.collectionOwner))
+        }
+        return Self.rows(resolved, using: comparators)
+    }
+
     static func rows(
         _ rows: [CollectionTrackRow],
         using comparators: [KeyPathComparator<CollectionTrackRow>]

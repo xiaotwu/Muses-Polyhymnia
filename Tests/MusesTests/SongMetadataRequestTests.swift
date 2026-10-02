@@ -6,6 +6,27 @@ import Testing
 @MainActor
 @Suite("Song metadata requests and display ownership", .serialized)
 struct SongMetadataRequestTests {
+    @Test("Credit presentation invalidates only when metadata or owner knowledge changes")
+    func creditRevisionTracksRealChanges() {
+        let cache = SongCreditCache()
+        let entry = YTDlpBridge.YTDlpPlaylistEntry(id: "creditRev01", title: "Song", uploader: "Publisher")
+        #expect(cache.revision == 0)
+        cache.store(entry)
+        let metadataRevision = cache.revision
+        cache.store(entry)
+        #expect(cache.revision == metadataRevision)
+        cache.recordOwner("", videoID: entry.id)
+        #expect(cache.revision == metadataRevision)
+        cache.recordOwner("Playlist owner", videoID: entry.id)
+        #expect(cache.revision > metadataRevision)
+        let ownerRevision = cache.revision
+        cache.recordOwner("Playlist owner", videoID: entry.id)
+        #expect(cache.revision == ownerRevision)
+        cache.store(.init(id: entry.id, title: "Song", artist: "Verified performer"))
+        #expect(cache.revision > ownerRevision)
+        #expect(cache.entry(videoID: entry.id)?.uploader == "Publisher")
+    }
+
     @Test("Incomplete detailed metadata retains verified publisher and adds release fields")
     func incompleteMetadataRetainsCredits() {
         let cache = SongCreditCache()

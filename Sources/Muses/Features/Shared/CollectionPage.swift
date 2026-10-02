@@ -619,17 +619,23 @@ private struct CollectionTrackTable: View {
         .onChange(of: sortOrder) { _, value in
             accessiblePage = 0
             presentation?.sortOrder = value
-            displayedRows = CollectionTrackSort.rows(rows, using: value)
+            displayedRows = CollectionTrackSort.presentationRows(rows, using: value)
         }
         .onChange(of: usesAccessiblePages) { _, _ in
             accessiblePage = 0
             selection = []
         }
         .onChange(of: rows, initial: true) { _, value in
-            displayedRows = CollectionTrackSort.rows(value, using: sortOrder)
+            displayedRows = CollectionTrackSort.presentationRows(value, using: sortOrder)
             accessiblePage = min(accessiblePage, accessiblePageCount - 1)
         }
         .onChange(of: columnCustomization) { _, value in presentation?.columns = value }
+        .onChange(of: SongCreditCache.shared.revision) { _, _ in
+            displayedRows = CollectionTrackSort.presentationRows(rows, using: sortOrder)
+        }
+        .onChange(of: LanguagePreferences.shared.rawValue) { _, _ in
+            displayedRows = CollectionTrackSort.presentationRows(rows, using: sortOrder)
+        }
         .task(id: rows.map(\.id)) { refreshLikedIDs() }
         .onChange(of: library.likedRevision) { _, _ in refreshLikedIDs() }
         .onChange(of: defaultSort) { _, newValue in

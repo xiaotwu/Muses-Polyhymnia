@@ -111,6 +111,34 @@ struct CollectionPresentationTests {
         #expect(CollectionTrackSort.rows(rows, using: playlistComparator).map(\.title) == ["B", "A"])
     }
 
+    @Test("Artist sorting follows verified displayed credits without changing collection truth")
+    func enrichedArtistSortPreservesCollection() {
+        let cache = SongCreditCache()
+        let originals = [
+            makeRow(title: "First", artist: "Playlist owner", canonicalIndex: 0),
+            makeRow(title: "Second", artist: "Playlist owner", canonicalIndex: 1)
+        ]
+        for row in originals { cache.recordOwner("Playlist owner", videoID: row.snapshot.youTubeId) }
+        cache.store(.init(id: originals[0].snapshot.youTubeId, title: "First",
+                          uploader: "Publisher", artist: "Zulu"))
+        cache.store(.init(id: originals[1].snapshot.youTubeId, title: "Second",
+                          uploader: "Alpha publisher"))
+        let comparator = [KeyPathComparator(\CollectionTrackRow.artist, comparator: .localizedStandard)]
+        let displayed = CollectionTrackSort.presentationRows(originals, using: comparator, credits: cache)
+        #expect(displayed.map(\.title) == ["Second", "First"])
+        #expect(displayed.map(\.artist) == ["Alpha publisher", "Zulu"])
+        #expect(displayed.map(\.artist) == displayed.map(\.displayArtist))
+        #expect(displayed.map(\.canonicalIndex) == [1, 0])
+        #expect(originals.map(\.snapshot.artist) == ["Playlist owner", "Playlist owner"])
+        #expect(originals.map(\.canonicalIndex) == [0, 1])
+        #expect(displayed.map(\.snapshot) == [originals[1].snapshot, originals[0].snapshot])
+
+        cache.store(.init(id: originals[0].snapshot.youTubeId, title: "First", artist: "Aardvark"))
+        let updated = CollectionTrackSort.presentationRows(originals, using: comparator, credits: cache)
+        #expect(updated.map(\.title) == ["First", "Second"])
+        #expect(displayed.map(\.artist) == ["Alpha publisher", "Zulu"])
+    }
+
     @Test("Overlapping strip reserves tilt clearance and mounts only nearby covers")
     func responsiveDeckGeometry() {
         let roomy = CollectionDeckGeometry.resolve(containerWidth: 980, containerHeight: 760)

@@ -9,10 +9,12 @@ final class SongCreditCache {
     static let shared = SongCreditCache()
     private var metadata: [String: YTDlpBridge.YTDlpPlaylistEntry] = [:]
     private var collectionOwners: [String: Set<String>] = [:]
+    private(set) var revision: UInt64 = 0
 
     func recordOwner(_ owner: String, videoID: String) {
         guard !owner.isEmpty, collectionOwners[videoID]?.contains(owner) != true else { return }
         collectionOwners[videoID, default: []].insert(owner)
+        revision &+= 1
     }
 
     func store(_ entry: YTDlpBridge.YTDlpPlaylistEntry) {
@@ -30,6 +32,7 @@ final class SongCreditCache {
         guard previous != resolved else { return }
         if metadata.count >= 512 { metadata.removeAll() }
         metadata[entry.id] = resolved
+        revision &+= 1
     }
 
     private func nonMissing(_ value: String?) -> String? {
