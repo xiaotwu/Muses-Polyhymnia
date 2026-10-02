@@ -273,6 +273,7 @@ Do not opportunistically refactor these systems during unrelated visual tasks.
 
 ## Change Discipline
 
+- After each implementation, test or verification session, close task-created windows and isolated processes, and remove obsolete temporary builds and caches. Verify ownership and exact paths before cleanup; preserve the user's normal applications, browser windows, library data, current build and any material still needed for active validation. Restore temporary test settings before closing their applications.
 - Prefer incremental, independently reviewable changes.
 - Keep refactors targeted to the task and explain why an established subsystem must change before modifying it.
 - Preserve user changes and unrelated work in a dirty worktree.
