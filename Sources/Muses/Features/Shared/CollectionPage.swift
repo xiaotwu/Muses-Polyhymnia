@@ -88,50 +88,70 @@ struct CollectionPage<Controls: View>: View {
             )
             .background(BrandColors.background)
         } else {
-            ZStack {
-                RetainedCollectionSurface(isVisible: mode == .stage) {
-                    CollectionDeckStage(
-                        title: title,
-                        subtitle: subtitle,
-                        youTubeURL: youTubeURL,
-                        rows: rows,
-                        source: source,
-                        currentTrack: currentTrack,
-                        playlists: playlists,
-                        isInteractionEnabled: mode == .stage,
-                        locateRequest: locateRequest,
-                        onPlay: onPlay,
-                        onRemove: confirmedRemoval,
-                        onExpand: { transition(to: .list) },
-                        controls: controls
-                    )
-                    .opacity(mode == .stage ? 1 : 0)
-                    .offset(y: mode == .stage ? 0 : -22)
-                    .allowsHitTesting(mode == .stage)
-                    .disabled(mode != .stage)
-                    .accessibilityHidden(mode != .stage)
-                }
+            GeometryReader { pageGeometry in
+                VStack(spacing: 0) {
+                    // Keep page controls in the owning SwiftUI hosting tree;
+                    // only stateful deck/table content crosses the retained host.
+                    CollectionPageHeader(title: title, youTubeURL: youTubeURL) {
+                        controls
+                    }
+                    .padding(.horizontal, AppleMusicTokens.contentPaddingX)
+                    .padding(.top, AppleMusicSpacing.browseTitleTop)
+                    .padding(.bottom, mode == .stage ? 16 : 0)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .layoutPriority(2)
 
-                RetainedCollectionSurface(isVisible: mode == .list) {
-                    CollectionListPanel(
-                        title: title,
-                        subtitle: subtitle,
-                        youTubeURL: youTubeURL,
-                        rows: rows,
-                        source: source,
-                        defaultSort: defaultSort,
-                        currentTrack: currentTrack,
-                        playlists: playlists,
-                        onPlay: onPlay,
-                        onRemove: confirmedRemoval,
-                        onCollapse: { transition(to: .stage) },
-                        controls: controls
-                    )
-                    .opacity(mode == .list ? 1 : 0)
-                    .offset(y: mode == .list ? 0 : 26)
-                    .allowsHitTesting(mode == .list)
-                    .disabled(mode != .list)
-                    .accessibilityHidden(mode != .list)
+                    if mode == .list {
+                        CollectionExpansionHandle(
+                            direction: .down,
+                            accessibilityLabel: tr("Return to song card deck", "返回歌曲卡片牌组"),
+                            help: tr("Return to song card deck", "返回歌曲卡片牌组"),
+                            action: { transition(to: .stage) }
+                        )
+                        .padding(.top, AppleMusicSpacing.headerToPrimary)
+                        .padding(.bottom, AppleMusicSpacing.related)
+                    }
+
+                    ZStack {
+                        RetainedCollectionSurface(isVisible: mode == .stage) {
+                            CollectionDeckStage(
+                                subtitle: subtitle,
+                                collectionHeight: pageGeometry.size.height,
+                                rows: rows,
+                                source: source,
+                                currentTrack: currentTrack,
+                                playlists: playlists,
+                                isInteractionEnabled: mode == .stage,
+                                locateRequest: locateRequest,
+                                onPlay: onPlay,
+                                onRemove: confirmedRemoval,
+                                onExpand: { transition(to: .list) }
+                            )
+                            .opacity(mode == .stage ? 1 : 0)
+                            .offset(y: mode == .stage ? 0 : -22)
+                            .allowsHitTesting(mode == .stage)
+                            .disabled(mode != .stage)
+                            .accessibilityHidden(mode != .stage)
+                        }
+
+                        RetainedCollectionSurface(isVisible: mode == .list) {
+                            CollectionListPanel(
+                                rows: rows,
+                                source: source,
+                                defaultSort: defaultSort,
+                                currentTrack: currentTrack,
+                                playlists: playlists,
+                                onPlay: onPlay,
+                                onRemove: confirmedRemoval
+                            )
+                            .opacity(mode == .list ? 1 : 0)
+                            .offset(y: mode == .list ? 0 : 26)
+                            .allowsHitTesting(mode == .list)
+                            .disabled(mode != .list)
+                            .accessibilityHidden(mode != .list)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -281,10 +301,7 @@ struct CollectionPageHeader<Controls: View>: View {
     }
 }
 
-private struct CollectionListPanel<Controls: View>: View {
-    let title: String
-    let subtitle: String
-    let youTubeURL: URL?
+private struct CollectionListPanel: View {
     let rows: [CollectionTrackRow]
     let source: QueueSource
     let defaultSort: CollectionTableDefaultSort
@@ -292,26 +309,9 @@ private struct CollectionListPanel<Controls: View>: View {
     let playlists: [Playlist]
     let onPlay: (CollectionTrackRow) -> Void
     let onRemove: ((CollectionTrackRow) -> Void)?
-    let onCollapse: () -> Void
-    let controls: Controls
 
     var body: some View {
         VStack(spacing: 0) {
-            CollectionPageHeader(title: title, youTubeURL: youTubeURL) {
-                controls
-            }
-            .padding(.horizontal, AppleMusicTokens.contentPaddingX)
-            .padding(.top, AppleMusicSpacing.browseTitleTop)
-
-            CollectionExpansionHandle(
-                direction: .down,
-                accessibilityLabel: tr("Return to song card deck", "返回歌曲卡片牌组"),
-                help: tr("Return to song card deck", "返回歌曲卡片牌组"),
-                action: onCollapse
-            )
-            .padding(.top, AppleMusicSpacing.headerToPrimary)
-            .padding(.bottom, AppleMusicSpacing.related)
-
             Rectangle()
                 .fill(BrandColors.hairline)
                 .frame(height: 1)

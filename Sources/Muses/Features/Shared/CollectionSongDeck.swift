@@ -170,12 +170,12 @@ enum CollectionDeckInputPolicy {
     }
 }
 
-struct CollectionDeckStage<Controls: View>: View {
+struct CollectionDeckStage: View {
     @Environment(PlaybackService.self) private var playback
     @Environment(YouTubeImportService.self) private var importService
-    let title: String
     let subtitle: String
-    let youTubeURL: URL?
+    /// Preserve stage sizing against the original complete collection pane.
+    let collectionHeight: CGFloat
     let rows: [CollectionTrackRow]
     let source: QueueSource
     let currentTrack: TrackSnapshot?
@@ -185,7 +185,6 @@ struct CollectionDeckStage<Controls: View>: View {
     let onPlay: (CollectionTrackRow) -> Void
     let onRemove: ((CollectionTrackRow) -> Void)?
     let onExpand: () -> Void
-    let controls: Controls
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.isEnabled) private var environmentIsEnabled
@@ -227,19 +226,10 @@ struct CollectionDeckStage<Controls: View>: View {
             let deckWidth = availableWidth - (informationBesideDeck ? informationWidth + 24 : 0)
             let geometry = CollectionDeckGeometry.resolve(
                 containerWidth: deckWidth,
-                containerHeight: proxy.size.height
+                containerHeight: collectionHeight
             )
 
             VStack(spacing: 0) {
-                CollectionPageHeader(title: title, youTubeURL: youTubeURL) {
-                    controls
-                }
-                    .padding(.horizontal, AppleMusicTokens.contentPaddingX)
-                    .padding(.top, AppleMusicSpacing.browseTitleTop)
-                    .padding(.bottom, 16)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .layoutPriority(2)
-
                 HStack {
                     Text(subtitle)
                         .font(MusesTypography.subheadline)
@@ -266,7 +256,7 @@ struct CollectionDeckStage<Controls: View>: View {
                                     .frame(width: informationWidth, height: geometry.viewportHeight)
                                 }
                             }
-                            .padding(.top, CollectionStageSpacing.topInset(height: proxy.size.height))
+                            .padding(.top, CollectionStageSpacing.topInset(height: collectionHeight))
 
                             if showsFocusedInformation && !informationBesideDeck {
                                 focusedInformation
@@ -294,7 +284,7 @@ struct CollectionDeckStage<Controls: View>: View {
                             .disabled(!isInteractionEnabled)
 
                             let previewCount = CollectionStageSpacing.previewCount(
-                                height: proxy.size.height, geometry: geometry, itemCount: rows.count
+                                height: collectionHeight, geometry: geometry, itemCount: rows.count
                             )
                             if previewCount > 0 {
                                 listPreview(count: previewCount)
