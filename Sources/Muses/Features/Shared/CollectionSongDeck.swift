@@ -196,6 +196,7 @@ struct CollectionDeckStage<Controls: View>: View {
     @State private var hoveredID: UUID?
     @State private var dragOrigin: CGFloat?
     @State private var horizontalDragActive = false
+    @State private var showsFocusedInformation = false
     @State private var activationTask: Task<Void, Never>?
     @State private var activationID: UUID?
     @State private var activationProgress: CGFloat = 0
@@ -220,8 +221,11 @@ struct CollectionDeckStage<Controls: View>: View {
         GeometryReader { proxy in
             let horizontalPadding: CGFloat = proxy.size.width < 760 ? 24 : AppleMusicTokens.contentPaddingX
             let availableWidth = max(0, proxy.size.width - horizontalPadding * 2)
+            let informationBesideDeck = showsFocusedInformation && availableWidth >= 900
+            let informationWidth: CGFloat = informationBesideDeck ? 280 : 0
+            let deckWidth = availableWidth - (informationBesideDeck ? informationWidth + 24 : 0)
             let geometry = CollectionDeckGeometry.resolve(
-                containerWidth: availableWidth,
+                containerWidth: deckWidth,
                 containerHeight: proxy.size.height
             )
 
@@ -251,9 +255,23 @@ struct CollectionDeckStage<Controls: View>: View {
                 } else {
                     ScrollView {
                         VStack(spacing: 0) {
-                            deck(geometry: geometry)
-                                .frame(width: availableWidth, height: geometry.viewportHeight)
-                                .padding(.top, CollectionStageSpacing.topInset(height: proxy.size.height))
+                            HStack(alignment: .top, spacing: 24) {
+                                deck(geometry: geometry)
+                                    .frame(width: deckWidth, height: geometry.viewportHeight)
+                                if informationBesideDeck {
+                                    ScrollView {
+                                        focusedInformation
+                                    }
+                                    .frame(width: informationWidth, height: geometry.viewportHeight)
+                                }
+                            }
+                            .padding(.top, CollectionStageSpacing.topInset(height: proxy.size.height))
+
+                            if showsFocusedInformation && !informationBesideDeck {
+                                focusedInformation
+                                    .frame(width: availableWidth, alignment: .leading)
+                                    .padding(.top, 16)
+                            }
 
                             CollectionDeckScrubber(
                                 position: position,
@@ -365,6 +383,22 @@ struct CollectionDeckStage<Controls: View>: View {
                     .accessibilityValue(artworkLayout == layout ? tr("Selected", "已选中") : "")
                     .disabled(!isInteractionEnabled)
                 }
+                if artworkLayout == .focusStrip {
+                    Button {
+                        showsFocusedInformation.toggle()
+                    } label: {
+                        Image(systemName: "sidebar.right")
+                            .font(MusesTypography.system(size: 14, weight: .semibold))
+                            .frame(width: 36, height: 30)
+                    }
+                    .buttonStyle(.musesSegment(selected: showsFocusedInformation))
+                    .help(tr("Focused song information", "焦点歌曲信息"))
+                    .accessibilityLabel(showsFocusedInformation
+                        ? tr("Hide song information", "隐藏歌曲信息")
+                        : tr("Show song information", "展开歌曲信息"))
+                    .accessibilityValue(showsFocusedInformation ? tr("Expanded", "已展开") : tr("Collapsed", "已收起"))
+                    .disabled(!isInteractionEnabled || rows.isEmpty)
+                }
                 Divider().frame(height: 16).padding(.horizontal, 2)
                 Button(action: onExpand) {
                     Image(systemName: "list.bullet")
@@ -378,6 +412,67 @@ struct CollectionDeckStage<Controls: View>: View {
             }
             .padding(4)
             .musesGlass(in: Capsule(), role: .compactControl)
+        }
+    }
+
+    @ViewBuilder
+    private var focusedInformation: some View {
+        if rows.indices.contains(focusedIndex) {
+            let row = rows[focusedIndex]
+            let information = SongDisplayInformation(row: row, metadata: songMetadata[row.snapshot.youTubeId])
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text(tr("Focused song", "焦点歌曲"))
+                        .font(MusesTypography.subheadline)
+                        .foregroundStyle(BrandColors.textSecondary)
+                    Spacer()
+                    Button {
+                        showsFocusedInformation = false
+                    } label: {
+                        Image(systemName: "xmark")
+                            .frame(width: 28, height: 28)
+                    }
+                    .buttonStyle(.musesCompact)
+                    .help(tr("Hide song information", "隐藏歌曲信息"))
+                    .accessibilityLabel(tr("Hide song information", "隐藏歌曲信息"))
+                }
+                Text(information.title)
+                    .font(MusesTypography.song(size: 22, emphasized: true, text: information.title))
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(information.artist)
+                    .font(MusesTypography.song(size: 16, text: information.artist))
+                    .foregroundStyle(BrandColors.textSecondary)
+                    .textSelection(.enabled)
+                if !information.album.isEmpty {
+                    Text(information.album)
+                        .font(MusesTypography.subheadline)
+                        .foregroundStyle(BrandColors.textSecondary)
+                        .textSelection(.enabled)
+                }
+                Text(row.duration.isFinite && row.duration > 0
+                    ? Duration.seconds(row.duration).formatted(.time(pattern: .minuteSecond)) : "—")
+                    .font(MusesTypography.callout)
+                    .foregroundStyle(BrandColors.textSecondary)
+                Button {
+                    if row.matches(playback.state.track) { playback.toggle() }
+                    else { onPlay(row) }
+                } label: {
+                    Label(row.matches(playback.state.track) && playback.primaryAction == .pause
+                        ? tr("Pause", "暂停") : tr("Play", "播放"),
+                          systemImage: row.matches(playback.state.track) && playback.primaryAction == .pause
+                        ? "pause.fill" : "play.fill")
+                }
+                .musesAction(prominent: true)
+                .disabled(!isInteractionEnabled)
+                .trackContextMenu(snapshot: row.snapshot, playlists: playlists,
+                    onPlay: { onPlay(row) },
+                    onRemoveFromContainer: onRemove.map { handler in { handler(row) } })
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(BrandColors.surface, in: RoundedRectangle(cornerRadius: 16))
+            .accessibilityElement(children: .contain)
         }
     }
 
@@ -595,7 +690,7 @@ struct CollectionDeckStage<Controls: View>: View {
         let x = wall ? 0 : relative * geometry.spread
         let y: CGFloat = wall || index == focusedIndex ? 0 : 12 + CGFloat(index % 3) * 4
         let angle: Double = wall || index == focusedIndex ? 0 : (index.isMultiple(of: 2) ? -4 : 3)
-        let scale: CGFloat = 1
+        let scale: CGFloat = wall || index == focusedIndex ? 1 : 0.86
         let selected = index == focusedIndex
 
         return Button {
