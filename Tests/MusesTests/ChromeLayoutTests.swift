@@ -468,21 +468,6 @@ struct ChromeLayoutTests {
         #expect(PlaylistListPolicy.minListHeight(rowCount: 500, rowHeight: 56) == nil)
     }
 
-    @Test("All Playlists uses the measured hero-card grid")
-    func playlistOverviewHeroMetrics() {
-        #expect(PlaylistOverviewMetrics.minimumColumnWidth == 250)
-        #expect(PlaylistOverviewMetrics.maximumColumnWidth == 280)
-        #expect(PlaylistOverviewMetrics.cardWidth == 260)
-        #expect(PlaylistOverviewMetrics.artworkHeight == 230)
-        #expect(PlaylistOverviewMetrics.footerHeight == 100)
-        #expect(PlaylistOverviewMetrics.cardHeight == 330)
-        #expect(PlaylistOverviewMetrics.cornerRadius == 20)
-        #expect(PlaylistOverviewMetrics.columnSpacing == 24)
-        #expect(PlaylistOverviewMetrics.rowSpacing == 30)
-        #expect(PlaylistOverviewMetrics.hoverLift == 5)
-        #expect(PlaylistOverviewMetrics.pressedScale == 0.992)
-    }
-
     @Test("sidebar rows use the full row as the hit target")
     func sidebarFullRowHit() {
         #expect(SidebarRowHitPolicy.usesFullRowHitTarget)

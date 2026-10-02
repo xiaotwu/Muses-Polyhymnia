@@ -2,6 +2,7 @@ import SwiftUI
 
 /// 16:9 Apple Music Web editorial tile: eyebrow + title + subtitle above a landscape image.
 struct EditorialCard: View {
+    private enum Control: Hashable { case artwork, play }
     let eyebrow: String
     let title: String
     let subtitle: String
@@ -12,6 +13,7 @@ struct EditorialCard: View {
     var onPlay: () -> Void
 
     @State private var hovering = false
+    @FocusState private var focusedControl: Control?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -41,9 +43,14 @@ struct EditorialCard: View {
                 .clipShape(RoundedRectangle(cornerRadius: AppleMusicTokens.cardCorner, style: .continuous))
             }
             .buttonStyle(.fullAreaPlain)
+            .focused($focusedControl, equals: .artwork)
+            .help(tr("Open \(title)", "打开 \(title)"))
+            .accessibilityLabel(tr("Open \(title)", "打开 \(title)"))
             .overlay(alignment: .bottomTrailing) {
-                if hovering {
+                if hovering || focusedControl != nil {
                     HoverPlayButton(onPlay: onPlay)
+                        .focused($focusedControl, equals: .play)
+                        .accessibilityLabel(tr("Play \(title)", "播放 \(title)"))
                         .padding(10)
                 }
             }
@@ -51,7 +58,6 @@ struct EditorialCard: View {
             .animation(MusesMotion.hoverAnimation(reduceMotion: reduceMotion), value: hovering)
         }
         .frame(width: width, alignment: .leading)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(eyebrow), \(title), \(subtitle)")
+        .accessibilityElement(children: .contain)
     }
 }

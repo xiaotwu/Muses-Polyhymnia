@@ -10,6 +10,8 @@ struct PlaylistsView: View {
     @Environment(YouTubePlaylistSyncService.self) private var playlistSync
     @Binding var selectedPlaylist: Playlist?
     @Query(sort: \YouTubeImport.importedAt, order: .reverse) private var ytImports: [YouTubeImport]
+    @AppStorage("playlistOverviewLayout") private var overviewLayout = "list"
+    private var gridLayout: Bool { overviewLayout == "grid" }
     @State private var playlists: [Playlist] = []
     @State private var showCreateSheet = false
     @State private var showAddChoice = false
@@ -38,6 +40,13 @@ struct PlaylistsView: View {
                     .font(MusesTypography.pageTitle)
                     .foregroundStyle(BrandColors.heading)
                 Spacer(minLength: 16)
+                Picker(tr("Playlist layout", "歌单布局"), selection: $overviewLayout) {
+                    Label(tr("List", "列表"), systemImage: "list.bullet").tag("list")
+                    Label(tr("Grid", "网格"), systemImage: "square.grid.2x2").tag("grid")
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 150)
                 ChromeIconButton(
                     systemName: "plus",
                     help: tr("New Playlist", "新建歌单"),
@@ -126,126 +135,12 @@ struct PlaylistsView: View {
                     playlistEmptyState
                         .padding(16)
                 } else {
-                    LazyVGrid(columns: [
-                        GridItem(
-                            .adaptive(
-                                minimum: PlaylistOverviewMetrics.minimumColumnWidth,
-                                maximum: PlaylistOverviewMetrics.maximumColumnWidth
-                            ),
-                            spacing: PlaylistOverviewMetrics.columnSpacing
-                        )
-                    ], alignment: .leading, spacing: PlaylistOverviewMetrics.rowSpacing) {
-                        ForEach(playlists, id: \.id) { playlist in
-                            let snapshots = playlistSnapshots(playlist)
-                            AlbumObjectView(
-                                title: playlist.name,
-                                subtitle: playlistSubtitle(playlist),
-                                artwork: playlistArtwork(playlist),
-                                size: PlaylistOverviewMetrics.cardWidth,
-                                cornerRadius: PlaylistOverviewMetrics.cornerRadius,
-                                role: .browse,
-                                style: .heroCard(tag: tr("PLAYLIST", "歌单")),
-                                artworkHeight: PlaylistOverviewMetrics.artworkHeight,
-                                footerHeight: PlaylistOverviewMetrics.footerHeight,
-                                homeCornerRadius: PlaylistOverviewMetrics.cornerRadius,
-                                hoverLift: PlaylistOverviewMetrics.hoverLift,
-                                pressedScale: PlaylistOverviewMetrics.pressedScale,
-                                showsHoverPlay: !snapshots.isEmpty,
-                                onSelect: { selectedPlaylist = playlist },
-                                onPlay: { playPlaylist(playlist) }
-                            )
-                            .contextMenu {
-                                Button(tr("Open Playlist", "打开歌单"), systemImage: "arrow.forward.circle") {
-                                    selectedPlaylist = playlist
-                                }
-                                if !playlistSnapshots(playlist).isEmpty {
-                                    Button(tr("Play", "播放"), systemImage: "play.fill") {
-                                        playPlaylist(playlist)
-                                    }
-                                }
-                                Button(
-                                    playlist.pinned ? tr("Unpin", "取消钉选") : tr("Pin", "钉选"),
-                                    systemImage: playlist.pinned ? "pin.slash" : "pin"
-                                ) {
-                                    playlistService.togglePin(playlist)
-                                    refresh()
-                                }
-                                Divider()
-                                Button(tr("Delete Playlist", "删除歌单"), systemImage: "trash",
-                                       role: .destructive) {
-                                    pendingDeletion = .playlist(playlist)
-                                }
-                            }
-                        }
-                        ForEach(activeYouTubeImports, id: \.id) { imp in
-                            let snapshots = importSnapshots(imp)
-                            AlbumObjectView(
-                                title: imp.title,
-                                subtitle: importSubtitle(imp),
-                                artwork: youtubeArtwork(imp),
-                                size: PlaylistOverviewMetrics.cardWidth,
-                                cornerRadius: PlaylistOverviewMetrics.cornerRadius,
-                                role: .browse,
-                                style: .heroCard(tag: tr("YOUTUBE", "YouTube")),
-                                artworkHeight: PlaylistOverviewMetrics.artworkHeight,
-                                footerHeight: PlaylistOverviewMetrics.footerHeight,
-                                homeCornerRadius: PlaylistOverviewMetrics.cornerRadius,
-                                hoverLift: PlaylistOverviewMetrics.hoverLift,
-                                pressedScale: PlaylistOverviewMetrics.pressedScale,
-                                isYouTube: true,
-                                showsHoverPlay: !snapshots.isEmpty,
-                                onSelect: {
-                                    NotificationCenter.default.post(
-                                        name: .musesNavigateYouTubeImport, object: imp)
-                                },
-                                onPlay: { playYouTubeImport(imp) }
-                            )
-                            .overlay(alignment: .topLeading) {
-                                if let status = syncStatuses[imp.id] {
-                                    syncStatusBadge(status)
-                                        .padding(8)
-                                }
-                            }
-                            .contextMenu {
-                                Button(tr("Open Playlist", "打开歌单"), systemImage: "arrow.forward.circle") {
-                                    NotificationCenter.default.post(
-                                        name: .musesNavigateYouTubeImport, object: imp)
-                                }
-                                if !importSnapshots(imp).isEmpty {
-                                    Button(tr("Play", "播放"), systemImage: "play.fill") {
-                                        playYouTubeImport(imp)
-                                    }
-                                }
-                                Button(syncMenuLabel(imp), systemImage: "arrow.left.arrow.right") {
-                                    NotificationCenter.default.post(
-                                        name: .musesNavigateYouTubeImport, object: imp)
-                                }
-                                Button(tr("Version History…", "版本历史…"), systemImage: "clock.arrow.circlepath") {
-                                    revisionImport = imp
-                                }
-                                if let url = URL(string: imp.url) {
-                                    if let target = YouTubeShareTarget(url: url) {
-                                        YouTubeShareMenu(target: target)
-                                    }
-                                    Button {
-                                        let context = (imp.items ?? []).sorted { $0.order < $1.order }.compactMap(\.track).map(TrackSnapshot.init(from:))
-                            if let first = context.first { PlaybackPresentation.video(first, context: context, playback: playback) }
-                                    } label: {
-                                        Label {
-                                            Text(tr("Floating video", "悬浮视频"))
-                                        } icon: {
-                                            YouTubeMark(size: 12)
-                                                .accessibilityHidden(true)
-                                        }
-                                    }
-                                    .accessibilityLabel(tr("Floating video", "悬浮视频"))
-                                }
-                                Divider()
-                                Button(tr("Delete Import", "删除导入"), systemImage: "trash",
-                                       role: .destructive) {
-                                    pendingDeletion = .youTubeImport(imp)
-                                }
-                            }
+                    Group {
+                        if gridLayout {
+                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 190, maximum: 230), spacing: 24)],
+                                      alignment: .leading, spacing: 24) { overviewEntries }
+                        } else {
+                            LazyVStack(spacing: 0) { overviewEntries }
                         }
                     }
                     .padding(.horizontal, AppleMusicTokens.contentPaddingX)
@@ -346,6 +241,94 @@ struct PlaylistsView: View {
         .onAppear { refresh() }
         .onReceive(NotificationCenter.default.publisher(for: .musesPlaylistsChanged)) { _ in
             refresh()
+        }
+    }
+
+    @ViewBuilder
+    private var overviewEntries: some View {
+        ForEach(playlists, id: \.id) { playlist in
+            let snapshots = playlistSnapshots(playlist)
+            PlaylistOverviewEntry(
+                title: playlist.name, subtitle: playlistSubtitle(playlist),
+                artwork: playlistArtwork(playlist), grid: gridLayout,
+                canPlay: !snapshots.isEmpty,
+                onOpen: { selectedPlaylist = playlist },
+                onPlay: { playPlaylist(playlist) }
+            )
+            .playlistOverviewActions(grid: gridLayout, title: playlist.name) {
+                Button(tr("Open Playlist", "打开歌单"), systemImage: "arrow.forward.circle") {
+                    selectedPlaylist = playlist
+                }
+                if !playlistSnapshots(playlist).isEmpty {
+                    Button(tr("Play", "播放"), systemImage: "play.fill") {
+                        playPlaylist(playlist)
+                    }
+                }
+                Button(
+                    playlist.pinned ? tr("Unpin", "取消钉选") : tr("Pin", "钉选"),
+                    systemImage: playlist.pinned ? "pin.slash" : "pin"
+                ) {
+                    playlistService.togglePin(playlist)
+                    refresh()
+                }
+                Divider()
+                Button(tr("Delete Playlist", "删除歌单"), systemImage: "trash",
+                       role: .destructive) {
+                    pendingDeletion = .playlist(playlist)
+                }
+            }
+        }
+        ForEach(activeYouTubeImports, id: \.id) { imp in
+            let snapshots = importSnapshots(imp)
+            PlaylistOverviewEntry(
+                title: imp.title, subtitle: importSubtitle(imp),
+                artwork: youtubeArtwork(imp), grid: gridLayout,
+                isYouTube: true, status: syncStatuses[imp.id].map { syncBadgeAppearance($0).help },
+                needsReview: syncStatuses[imp.id].map { $0.needsReview || $0.conflictCount > 0 || $0.errorMessage != nil } ?? false,
+                canPlay: !snapshots.isEmpty,
+                onOpen: { NotificationCenter.default.post(name: .musesNavigateYouTubeImport, object: imp) },
+                onPlay: { playYouTubeImport(imp) }
+            )
+            .playlistOverviewActions(grid: gridLayout, title: imp.title) {
+                Button(tr("Open Playlist", "打开歌单"), systemImage: "arrow.forward.circle") {
+                    NotificationCenter.default.post(
+                        name: .musesNavigateYouTubeImport, object: imp)
+                }
+                if !importSnapshots(imp).isEmpty {
+                    Button(tr("Play", "播放"), systemImage: "play.fill") {
+                        playYouTubeImport(imp)
+                    }
+                }
+                Button(syncMenuLabel(imp), systemImage: "arrow.left.arrow.right") {
+                    NotificationCenter.default.post(
+                        name: .musesNavigateYouTubeImport, object: imp)
+                }
+                Button(tr("Version History…", "版本历史…"), systemImage: "clock.arrow.circlepath") {
+                    revisionImport = imp
+                }
+                if let url = URL(string: imp.url) {
+                    if let target = YouTubeShareTarget(url: url) {
+                        YouTubeShareMenu(target: target)
+                    }
+                    Button {
+                        let context = (imp.items ?? []).sorted { $0.order < $1.order }.compactMap(\.track).map(TrackSnapshot.init(from:))
+            if let first = context.first { PlaybackPresentation.video(first, context: context, playback: playback) }
+                    } label: {
+                        Label {
+                            Text(tr("Floating video", "悬浮视频"))
+                        } icon: {
+                            YouTubeMark(size: 12)
+                                .accessibilityHidden(true)
+                        }
+                    }
+                    .accessibilityLabel(tr("Floating video", "悬浮视频"))
+                }
+                Divider()
+                Button(tr("Delete Import", "删除导入"), systemImage: "trash",
+                       role: .destructive) {
+                    pendingDeletion = .youTubeImport(imp)
+                }
+            }
         }
     }
 
@@ -458,13 +441,7 @@ struct PlaylistsView: View {
         let count = (imported.items ?? []).filter { !$0.youTubeId.isEmpty }.count
         let owner = imported.channel.isEmpty
             ? tr("Unknown owner", "未知所有者") : imported.channel
-        guard let status = syncStatuses[imported.id] else {
-            return tr("YouTube • \(count) songs • \(owner)",
-                      "YouTube • \(count) 首歌曲 • \(owner)", zhHant: "YouTube • \(count) 首歌曲 • \(owner)")
-        }
-        let activity = syncActivitySummary(status)
-        return tr("YouTube • \(count) songs • \(owner)\n\(activity)",
-                  "YouTube • \(count) 首歌曲 • \(owner)\n\(activity)", zhHant: "YouTube • \(count) 首歌曲 • \(owner)\n\(activity)")
+        return tr("\(owner) • \(count) songs", "\(owner) • \(count) 首歌曲")
     }
 
     private var playlistEmptyState: some View {
@@ -521,23 +498,6 @@ struct PlaylistsView: View {
                             "\(status.pendingLocalChangeCount) 项待推送", zhHant: "\(status.pendingLocalChangeCount) 項待推送"))
         }
         return parts.joined(separator: " • ")
-    }
-
-    private func syncStatusBadge(_ status: YouTubePlaylistOverviewStatus) -> some View {
-        let appearance = syncBadgeAppearance(status)
-        return Label(appearance.text, systemImage: appearance.icon)
-            .font(MusesTypography.caption2.weight(.semibold))
-            .foregroundStyle(appearance.color)
-            .padding(.horizontal, 8)
-            .frame(height: 24)
-            .background(BrandColors.surface.opacity(0.94),
-                        in: Capsule())
-            .overlay {
-                Capsule()
-                    .stroke(BrandColors.hairline, lineWidth: 1)
-            }
-            .help(appearance.help)
-            .accessibilityLabel(appearance.help)
     }
 
     private func syncBadgeAppearance(_ status: YouTubePlaylistOverviewStatus)

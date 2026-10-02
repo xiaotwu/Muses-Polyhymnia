@@ -60,14 +60,6 @@ struct StructuredCatalogSearchView: View {
                     }
                 }
             }
-            if browser.detail == nil {
-                Picker(tr("Category", "类别", zhHant: "類別"), selection: Binding(get: { browser.kind }, set: { browser.search(search.query, kind: $0) })) {
-                    Text(tr("All", "全部")).tag(MusicCatalogKind?.none)
-                    ForEach(MusicCatalogKind.searchableCases, id: \.self) { kind in
-                        Text(kind.title).tag(Optional(kind))
-                    }
-                }.pickerStyle(.menu).fixedSize()
-            }
             if browser.failed {
                 HStack {
                     Text(browser.isStale

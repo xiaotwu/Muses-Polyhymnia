@@ -107,21 +107,6 @@ enum SearchPagePolicy {
     static let resultRowHeight: CGFloat = 68
 }
 
-/// Open Design measurements for the All Playlists hero-card overview.
-enum PlaylistOverviewMetrics {
-    static let minimumColumnWidth: CGFloat = 250
-    static let maximumColumnWidth: CGFloat = 280
-    static let cardWidth: CGFloat = 260
-    static let artworkHeight: CGFloat = 230
-    static let footerHeight: CGFloat = 100
-    static let cardHeight: CGFloat = artworkHeight + footerHeight
-    static let cornerRadius: CGFloat = 20
-    static let columnSpacing: CGFloat = 24
-    static let rowSpacing: CGFloat = 30
-    static let hoverLift: CGFloat = 5
-    static let pressedScale: CGFloat = 0.992
-}
-
 enum DockLyricsPolicy {
     enum Action: Equatable {
         case toggleDrawer

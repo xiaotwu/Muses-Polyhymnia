@@ -30,6 +30,16 @@ Additional isolated native verification confirmed idle transport disabling, acti
 
 Remaining: compact/light/accessibility matrices; full keyboard traversal, queue menu/reorder/group mutations and clear/replay recovery in an isolated acceptance store. These areas remain In Progress, not complete. Native queue rows currently expose their menu label as the row name in AX, although the track identity is present in the value; include this in XW-12 acceptance.
 
+### Phase 3 overview and filter increment — 2026-10-01
+
+All Playlists now defaults to a lazy native list with an optional adaptive square cover grid. Layout choice persists through relaunch. Titles/owner/count sit outside artwork; one source/status mark carries sync detail, with visible review warnings. Open, Play and the per-playlist options menu are separate native controls. Existing pin/delete/undo, import synchronization, versions, sharing, video and recently-deleted flows retain their service calls. Empty collection Play is disabled. The approved detail hero remains unchanged.
+
+Search source is now a native menu beside a separately named YouTube Music category menu. The existing category provider and main-window history remain authoritative; the remote category is disabled for Library scope or an empty query. The duplicate category picker inside remote results was removed. Editorial cards now expose separate Open/Play accessibility actions, and keyboard focus keeps the Play affordance visible.
+
+Validation: 765 tests in 106 suites passed; the signed final release package passed app/helper signature checks and both bundled yt-dlp launches. One obsolete test enforcing the superseded 260×330 overview hero-card dimensions was removed together with its unused metrics. This does not alter the H0/H2/H3 detail hero guardrails. Populated rendered acceptance used a read-only SQLite backup into the existing isolated acceptance namespace, with separate credentials and preferences. Native inspection confirmed default list, square grid, relaunch persistence, per-playlist menu naming after menu dismissal, disabled empty Play, preserved sync/version/share/delete menu entries, detail hero/navigation, and Library search/empty-result state. A disposable local Muses playlist was created only in that copy to inspect its source/empty branch. Screenshots remain local under `~/.muses/acceptance/discovery-20261001`.
+
+Remaining phase 3 work: Home source/recovery menu and content-type artwork; New provenance and shared shelves; broader catalog/video/favorites states; Spotlight quick entry; grouped-result expansion and catalog details; podcast continuation and subscription/Shorts segmentation; reduced hero stage/table/cover-wall/detail heading acceptance. Remote category execution, editorial keyboard traversal, compact/light/high-contrast/Reduce Transparency and actual VoiceOver remain unverified. XW-8/XW-9 remain In Progress.
+
 ## Delivery order and dependencies
 
 | Phase | Linear task | Deliverable | Dependency |
@@ -74,7 +84,7 @@ Use SwiftUI Expert for state/view invalidation, resizable layout, native control
 | 08 心情与活动 | A | XW-8 | Pending production redesign |
 | 09 首页精选与封面货架 | D | XW-8 | Pending production redesign |
 | 10 新发现 | A | XW-8 | Pending production redesign |
-| 11 货架卡片及hover播放 | A | XW-8 | Pending production redesign |
+| 11 货架卡片及hover播放 | A | XW-8 | Editorial Open/Play semantics and focus visibility implemented; shared shelf/native acceptance pending |
 | 12 歌曲默认页面 | B | XW-9 | Hero first implementation a2e8a6e; remaining layout/accessibility acceptance pending |
 | 13 焦点带、定位与播放仪式 | A | XW-9 | Hero first implementation a2e8a6e; remaining layout/accessibility acceptance pending |
 | 14 完整表格、分页和排序 | A | XW-9 | Pending production redesign |
@@ -82,7 +92,7 @@ Use SwiftUI Expert for state/view invalidation, resizable layout, native control
 | 16 专辑与艺术家 | A | XW-8 | Pending production redesign |
 | 17 音乐视频 | A | XW-8 | Pending production redesign |
 | 18 收藏、固定与空态 | A | XW-8 | Pending production redesign |
-| 19 全部歌单卡片 | A + B | XW-9 | Pending production redesign |
+| 19 全部歌单卡片 | A + B | XW-9 | Default lazy list, optional square grid, layout persistence and named controls rendered; broader state/accessibility acceptance pending |
 | 20 歌单详情标题与动作 | A | XW-9 | Pending production redesign |
 | 21 创建与导入入口 | B | XW-16 | Pending production redesign |
 | 22 导入链接与进度 | B | XW-16 | Pending production redesign |
@@ -90,7 +100,7 @@ Use SwiftUI Expert for state/view invalidation, resizable layout, native control
 | 24 Pull、Push与冲突合并 | B | XW-16 | Pending production redesign |
 | 25 删除与版本恢复 | B + C | XW-16 | Pending production redesign |
 | 26 搜索场景和输入 | C | XW-8 | Pending production redesign |
-| 27 来源与类别筛选 | B | XW-8 | Pending production redesign |
+| 27 来源与类别筛选 | B | XW-8 | Two native menus implemented; Library/empty states rendered; remote filtering/compact acceptance pending |
 | 28 分组结果与目录详情 | A | XW-8 | Pending production redesign |
 | 29 播客关注与节目详情 | C | XW-8 | Pending production redesign |
 | 30 订阅频道与Shorts | B + C | XW-8 | Pending production redesign |

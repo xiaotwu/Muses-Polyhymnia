@@ -146,30 +146,35 @@ struct GlobalSearchView: View {
                 .accessibilityLabel(tr("Add YouTube music", "添加 YouTube 音乐"))
             }
 
-            HStack(spacing: 6) {
-                sourceButton(.all, title: tr("All", "全部"))
-                sourceButton(.library, title: tr("Library", "资料库"))
-                sourceButton(.youtube, title: "YouTube")
+            HStack(spacing: 14) {
+                Picker(tr("Source", "来源"), selection: Binding(get: { search.scope }, set: { search.scope = $0 })) {
+                    Text(tr("All sources", "全部来源")).tag(GlobalSearchScope.all)
+                    Text(tr("Library", "资料库")).tag(GlobalSearchScope.library)
+                    Text("YouTube").tag(GlobalSearchScope.youtube)
+                }
+                .pickerStyle(.menu)
+                .fixedSize()
+                .accessibilityLabel(tr("Search Source", "搜索来源"))
+
+                if search.musicCatalog.detail == nil {
+                    Picker(tr("YouTube Music category", "YouTube Music 类别"), selection: Binding(
+                        get: { search.musicCatalog.kind },
+                        set: { search.musicCatalog.search(search.query, kind: $0) }
+                    )) {
+                        Text(tr("All categories", "全部类别")).tag(MusicCatalogKind?.none)
+                        ForEach(MusicCatalogKind.searchableCases, id: \.self) { kind in
+                            Text(kind.title).tag(Optional(kind))
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .fixedSize()
+                    .disabled(!search.scope.searchesYouTube || trimmedQuery.isEmpty)
+                }
+                Spacer(minLength: 0)
             }
-            .padding(5)
-            .musesGlass(in: Capsule(), role: .compactControl)
-            .accessibilityElement(children: .contain)
-            .accessibilityLabel(tr("Search Source", "搜索来源"))
+            .controlSize(.regular)
         }
         .padding(.top, SearchPagePolicy.contentInset)
-    }
-
-    private func sourceButton(_ scope: GlobalSearchScope, title: String) -> some View {
-        Button { search.scope = scope } label: {
-            Text(title)
-                .font(MusesTypography.subheadline.weight(search.scope == scope ? .semibold : .regular))
-                .foregroundStyle(search.scope == scope ? BrandColors.accent : BrandColors.textPrimary)
-                .padding(.horizontal, 18)
-                .frame(minHeight: SearchPagePolicy.sourceSegmentHeight)
-        }
-        .buttonStyle(.musesSegment(selected: search.scope == scope))
-        .accessibilityAddTraits(search.scope == scope ? .isSelected : [])
-        .help(title)
     }
 
     private var searchLanding: some View {
