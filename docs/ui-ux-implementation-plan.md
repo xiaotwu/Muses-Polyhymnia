@@ -82,9 +82,9 @@ Use SwiftUI Expert for state/view invalidation, resizable layout, native control
 
 | Area | Selected options | Primary task | Current evidence/status |
 | --- | --- | --- | --- |
-| 01 窗口与导航 | A + B | XW-7 | Implemented persistent native glass islands; entire group centered with equal 16pt gaps rendered; full keyboard/VoiceOver matrix open |
-| 02 工具栏与返回语义 | A + B + C | XW-7 | Native window-local Back/Forward and immersive exit retained; upper-edge immersive toolbar reveal added in the branch completion pass; main Search shares history; complete keyboard/window-restoration matrix open |
-| 03 边栏选中与图标轨道 | A + B | XW-7 | Grouped capsules, semantic selection and combined catalog menu implemented; hover/focus reveal retained; complete AX traversal open |
+| 01 窗口与导航 | A + B | XW-7 | Permanent native glass islands reserve an 88pt rail; Back, capsules and Settings/Home circle form one centered group with equal 16pt gaps and compact-window scrolling; full keyboard/VoiceOver matrix open |
+| 02 工具栏与返回语义 | A + B + C | XW-7 | Native toolbar retains AppKit window controls; independent island Back, Forward context menu and native View-menu Command-[ / Command-] share window-local history and immersive exit; Focus Navigation replaces hiding the sidebar; complete keyboard/window-restoration matrix open |
+| 03 边栏选中与图标轨道 | A + B | XW-7 | Home precedes Search; Albums and Artists are independent native destination buttons with separate selection/focus; Home reselect restores scroll zero; hover/focus reveal retained; complete AX traversal open |
 | 04 标题、字体与内容宽度 | A + B | XW-7 | Shared 28pt SF page / 20pt section hierarchy and responsive forms implemented; expressive F3 remains; full font/appearance matrix open |
 | 05 玻璃层级与颜色 | C | XW-7 | Native navigation/window glass with adaptive solid PlayerBar capsule implemented; Reduce Transparency rendered on Home/Queue/Now Playing; light/artwork matrix open |
 | 06 浅色、深色和辅助显示 | A | XW-7 | Semantic colors, opaque accessibility path and neutral lyric fallback implemented; Increase Contrast empty lyrics rendered; full appearance matrix open |
@@ -130,7 +130,7 @@ Use SwiftUI Expert for state/view invalidation, resizable layout, native control
 | 46 迷你播放器、菜单栏和桌面歌词 | A | XW-15 | Single mini capsule and one native menu-bar popover surface retained; desktop lyrics reuse shared document/timing; full auxiliary-window/show-hide matrix open |
 | 47 歌曲上下文菜单、分享和更多 | A + C | XW-16 | Shared full track menus expose separate native More and semantic action groups; remote and snapshot video actions retain canonical collection/source and real podcast progress; real share/external targets retained; complete per-surface keyboard/action matrix open |
 | 48 编辑元数据、笔记与书签 | A | XW-16 | Native metadata Form retained; notes/bookmarks use value drafts and one atomic Save with cancellation/failure handling; draft persistence tests passed; isolated native Save/Cancel matrix open |
-| 49 设置结构、标题与按钮 | A + B | XW-7 | Native responsive grouped Forms, SF titles and role-specific actions implemented with existing adaptive category islands; complete focus/window matrix open |
+| 49 设置结构、标题与按钮 | A + B | XW-7 | Native responsive grouped Forms and adaptive islands expose ten categories, General first and Shortcuts & Gestures included; ordinary Settings entry resets General/path while deep links and history retain their destinations; complete focus/window matrix open |
 | 50 通用、语言和通知 | A | XW-17 | Native language/notification controls with current permission status and one recovery action implemented; real OS permission transitions unexercised |
 | 51 快捷键、手势和媒体权限 | D | XW-17 | Static gesture examples and one media-permission recovery action implemented; shortcuts retained; live permission/conflict matrix open |
 | 52 音质、缓存和预缓存 | B + C + D | XW-17 | Quality profiles, progressive codec/cache categories, retained-scope deletion preview and pre-cache explanation implemented; actual quality reload/cache-clear matrix open |
@@ -148,6 +148,8 @@ Use SwiftUI Expert for state/view invalidation, resizable layout, native control
 | 64 动效、滚动和能耗 | B + D | XW-12 | Restrained activation/hover, Reduce Motion and visible/reduced-visual spectrum/vinyl gates implemented; native deck/vinyl Reduce Motion checks and system preference restoration passed; measured energy/CPU benefit unproven |
 
 ## Exact option text and user notes
+
+Current navigation decisions (2026-10-02) supersede conflicting original options below: permanent centered native floating islands, independent Back with window-local native menu history, Home before Search, separate Albums and Artists buttons, and ten Settings categories beginning with General and including Shortcuts & Gestures. Ordinary Settings entry resets General; Home reselect returns to the title at scroll zero. The original option text, verbatim notes and earlier verification sections remain historical decision evidence.
 
 ### 01 · 窗口与导航 (XW-7)
 
