@@ -8,6 +8,14 @@ Concept samples and imported choices are complete. Production redesign is not co
 
 Per-area completion requires production code, proportionate build/tests, rendered runtime evidence, keyboard/pointer/context-menu/focus checks and relevant state/accessibility checks. Record evidence and gaps in its Linear task. Final completion requires reconciliation of all 64 areas; an unverified state remains pending. macOS below 26 is out of scope. Keep existing user data, queue semantics and shared services intact.
 
+### Phase 1 first implementation — 2026-10-01
+
+Persistent native glass navigation islands now replace the expandable playlist sidebar. Search/Home and library destinations form separate capsules, with an independent Settings circle. Settings uses two category islands including the approved shortcuts category. Hover expands labels over content without changing its width. Albums/Artists share a native menu. Immersive playback reveals the same navigation on pointer entry and fades it on exit; a view focus callback supports keyboard reveal.
+
+Verification: all 765 tests in 106 suites passed; the release acceptance bundle built and signed successfully. Rendered native inspection confirmed Settings hover expansion, separate catalog menu navigation, Settings PlayerBar hiding and browsing restoration, immersive pointer reveal/fade, and toolbar Back closing immersive playback. Playback remained paused at the same position. Private screenshots remain in the local acceptance directory and are not uploaded to Linear.
+
+Remaining phase 1 acceptance: compact windows, full keyboard traversal/focus reveal, VoiceOver naming (including the native catalog menu), light/high-contrast/Reduce Transparency, and the approved shared typography/content-width treatment. This increment does not complete XW-7 or all 64 areas.
+
 ## Delivery order and dependencies
 
 | Phase | Linear task | Deliverable | Dependency |
@@ -42,9 +50,9 @@ Use SwiftUI Expert for state/view invalidation, resizable layout, native control
 
 | Area | Selected options | Primary task | Current evidence/status |
 | --- | --- | --- | --- |
-| 01 窗口与导航 | A + B | XW-7 | Pending production redesign |
-| 02 工具栏与返回语义 | A + B + C | XW-7 | Pending production redesign |
-| 03 边栏选中与图标轨道 | A + B | XW-7 | Pending production redesign |
+| 01 窗口与导航 | A + B | XW-7 | Persistent navigation islands implemented; broader acceptance pending |
+| 02 工具栏与返回语义 | A + B + C | XW-7 | Native history retained; sidebar collapse removed; broader acceptance pending |
+| 03 边栏选中与图标轨道 | A + B | XW-7 | Capsule groups and selection implemented; keyboard/VoiceOver acceptance pending |
 | 04 标题、字体与内容宽度 | A + B | XW-7 | Pending production redesign |
 | 05 玻璃层级与颜色 | C | XW-7 | Pending production redesign |
 | 06 浅色、深色和辅助显示 | A | XW-7 | Existing foundation; full accessibility matrix pending |
@@ -90,7 +98,7 @@ Use SwiftUI Expert for state/view invalidation, resizable layout, native control
 | 46 迷你播放器、菜单栏和桌面歌词 | A | XW-15 | Pending production redesign |
 | 47 歌曲上下文菜单、分享和更多 | A + C | XW-16 | Pending production redesign |
 | 48 编辑元数据、笔记与书签 | A | XW-16 | Pending production redesign |
-| 49 设置结构、标题与按钮 | A + B | XW-7 | Some foundation repairs; approved full combination pending |
+| 49 设置结构、标题与按钮 | A + B | XW-7 | Category islands and native form foundation implemented; remaining combination/acceptance pending |
 | 50 通用、语言和通知 | A | XW-17 | Pending production redesign |
 | 51 快捷键、手势和媒体权限 | D | XW-17 | Pending production redesign |
 | 52 音质、缓存和预缓存 | B + C + D | XW-17 | Pending production redesign |
@@ -412,4 +420,3 @@ User note (verbatim decision data): 自适应左侧栏，改变左侧栏岛组�
 
 - 64B: 封面舞台按需动效，浏览默认静态
 - 64D: 提供省电播放视觉模式，频谱/黑胶按可见性订阅；需实测收益
-

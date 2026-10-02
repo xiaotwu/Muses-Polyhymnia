@@ -556,10 +556,11 @@ struct ChromeLayoutTests {
         #expect(!root.contains("showSettings"))
 
         let sidebar = try readSource("Sources/Muses/Features/SidebarView.swift")
-        #expect(sidebar.contains("SidebarSection.new.title"))
+        #expect(sidebar.contains("destination(.new,"))
         #expect(!sidebar.contains("Discover"))
-        #expect(sidebar.contains("SidebarNavPolicy.settingsFooterTitle"))
-        #expect(sidebar.contains("musesOpenSettings"))
+        #expect(sidebar.contains("SidebarSection.settings.title"))
+        #expect(sidebar.contains(".navigationIsland"))
+        #expect(!sidebar.contains("@Query"))
 
         let settings = try readSource("Sources/Muses/Features/Settings/SettingsSheet.swift")
         #expect(settings.contains("GPUSettingsView()"))

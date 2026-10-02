@@ -30,6 +30,8 @@ struct RootView: View {
     @State private var showYouTubeLink = false
     @State private var droppedYouTubeLink = ""
     @State private var showNowPlaying = false
+    @State private var immersiveNavigationHovered = false
+    @State private var immersiveNavigationFocused = false
     @State private var lyricsSearchRequest: LyricsSearchRequest?
     private struct LyricsSearchRequest: Identifiable {
         let id = UUID()
@@ -54,7 +56,6 @@ struct RootView: View {
     @State private var showPodcastSaveAlert = false
     @State private var showYouTubeVideo = false
     @AppStorage(PrefKey.nowPlayingMode) private var nowPlayingModeRaw: String = NowPlayingMode.cover.rawValue
-    @AppStorage(PrefKey.sidebarCollapsed) private var isSidebarCollapsed = false
 
     private var lyricsFullscreen: Bool {
         (NowPlayingLyricsMode(rawValue: lyricsModeRaw) ?? .inline) != .inline
@@ -154,15 +155,6 @@ struct RootView: View {
     @ToolbarContentBuilder
     private var windowNavigationToolbar: some ToolbarContent {
         ToolbarItemGroup(placement: .navigation) {
-            Button {
-                withAnimation(MusesMotion.drawerAnimation(reduceMotion: reduceMotion)) {
-                    isSidebarCollapsed.toggle()
-                }
-            } label: {
-                Label(tr("Toggle Sidebar", "切换边栏", zhHant: "切換側邊欄"), systemImage: "sidebar.leading")
-            }
-            .buttonStyle(.automatic)
-            .help(tr("Toggle Sidebar", "切换边栏", zhHant: "切換側邊欄"))
             Button {
                 if showNowPlaying { returnFromNowPlaying() }
                 else { navigateHistory(back: true) }
@@ -483,11 +475,11 @@ struct RootView: View {
     }
     private var splitView: some View {
         HStack(spacing: 0) {
-            SidebarView(selection: $section,
+            SidebarView(onSettingsCategoryChange: { settingsPath = [] },
+                        selection: $section,
                         selectedPlaylist: $selectedPlaylist,
-                        selectedYouTubeImport: $selectedYouTubeImport,
-                        isCollapsed: $isSidebarCollapsed,
-                        onSettingsCategoryChange: { settingsPath = [] })
+                        selectedYouTubeImport: $selectedYouTubeImport)
+                .zIndex(10)
             ZStack(alignment: .bottom) {
                 detailStack
                     .environment(\.collectionPresentation, collectionMemory.entry(for: browseRoute))
@@ -639,7 +631,6 @@ struct RootView: View {
                     .tint(BrandColors.accent)
                 }
             }
-            .animation(MusesMotion.drawerAnimation(reduceMotion: reduceMotion), value: isSidebarCollapsed)
             .animation(MusesMotion.drawerAnimation(reduceMotion: reduceMotion), value: showQueue)
             .animation(MusesMotion.drawerAnimation(reduceMotion: reduceMotion), value: showLyricsDrawer)
             .animation(MusesMotion.overlayAnimation(reduceMotion: reduceMotion), value: showYouTubeVideo)
@@ -707,6 +698,30 @@ struct RootView: View {
                                    coverHostedExternally: nowPlayingOverlayMounted && !skipArtworkMorph,
                                    onReturn: returnFromNowPlaying)
                         .zIndex(1)
+                }
+            }
+            .overlay(alignment: .leading) {
+                if showNowPlaying {
+                    SidebarView(
+                        onSettingsCategoryChange: {
+                            settingsPath = []
+                            returnFromNowPlaying()
+                        },
+                        onKeyboardFocusChange: { immersiveNavigationFocused = $0 },
+                        selection: $section,
+                        selectedPlaylist: $selectedPlaylist,
+                        selectedYouTubeImport: $selectedYouTubeImport
+                    )
+                    .opacity(immersiveNavigationHovered || immersiveNavigationFocused ? 1 : 0)
+                    .contentShape(Rectangle())
+                    .onHover { immersiveNavigationHovered = $0 }
+                    .onChange(of: section) { _, _ in returnFromNowPlaying() }
+                    .onAppear {
+                        immersiveNavigationHovered = false
+                        immersiveNavigationFocused = false
+                    }
+                    .animation(MusesMotion.hoverAnimation(reduceMotion: reduceMotion), value: immersiveNavigationHovered)
+                    .animation(MusesMotion.hoverAnimation(reduceMotion: reduceMotion), value: immersiveNavigationFocused)
                 }
             }
             .overlayPreferenceValue(CoverSlotPreferenceKey.self) { anchor in

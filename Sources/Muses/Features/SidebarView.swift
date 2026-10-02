@@ -1,149 +1,75 @@
 import SwiftUI
-import AppKit
 import SwiftData
 
-/// Apple Music Web left nav: Search / Home / New, then Library + playlists, profile at the bottom.
+/// Persistent navigation islands; expanded labels never resize browsing content.
 struct SidebarView: View {
     var onSettingsCategoryChange: () -> Void = {}
+    var onKeyboardFocusChange: (Bool) -> Void = { _ in }
     @Binding var selection: SidebarSection
     @Binding var selectedPlaylist: Playlist?
     @Binding var selectedYouTubeImport: YouTubeImport?
-    @Binding var isCollapsed: Bool
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(PlaylistService.self) private var playlistService
-    @Environment(YouTubeImportService.self) private var importService
-    @Environment(YouTubePlaylistSyncService.self) private var playlistSync
     @AppStorage(PrefKey.settingsLastPane) private var settingsPane = SettingsCategory.general.rawValue
-    @State private var playlists: [Playlist] = []
-    @Query(sort: \YouTubeImport.importedAt, order: .reverse) private var ytImports: [YouTubeImport]
-    @State private var showCreatePlaylist = false
-    @State private var showPlaylistChoice = false
-    @State private var showImportPlaylist = false
-    @State private var pendingRemoval: ActionConfirmation?
-    @State private var operationError: String?
-    @FocusState private var focusedDestination: SidebarSection?
-
-    init(
-        selection: Binding<SidebarSection>,
-        selectedPlaylist: Binding<Playlist?>,
-        selectedYouTubeImport: Binding<YouTubeImport?>,
-        isCollapsed: Binding<Bool> = .constant(false),
-        onSettingsCategoryChange: @escaping () -> Void = {}
-    ) {
-        self.onSettingsCategoryChange = onSettingsCategoryChange
-        _selection = selection
-        _selectedPlaylist = selectedPlaylist
-        _selectedYouTubeImport = selectedYouTubeImport
-        _isCollapsed = isCollapsed
-    }
-
-    private var settingsNavigation: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 2) {
-                    ForEach(SettingsCategory.allCases) { category in
-                        if !isCollapsed, category == .youtube { sectionLabel(tr("Content", "内容", zhHant: "內容")) }
-                        if !isCollapsed, category == .diagnostics { sectionLabel(tr("Maintenance & Help", "维护与帮助", zhHant: "維護與說明")) }
-                        let selected = (SettingsCategory(rawValue: settingsPane) ?? .general).destination == category
-                        Button { onSettingsCategoryChange(); settingsPane = category.rawValue } label: {
-                            HStack(spacing: 10) {
-                                Image(systemName: category.toolbarIcon).frame(width: 18)
-                                if !isCollapsed { Text(category.sidebarLabel) }
-                                Spacer(minLength: 0)
-                            }
-                            .font(MusesTypography.system(size: 13, weight: selected ? .semibold : .regular))
-                            .padding(.horizontal, 10)
-                            .frame(maxWidth: .infinity, minHeight: AppleMusicTokens.navItemHeight, alignment: .leading)
-                            .settingsSelection(selected)
-                            .foregroundStyle(selected ? BrandColors.selectionText : BrandColors.textPrimary)
-                        }
-                        .buttonStyle(.fullAreaPlain)
-                        .help(category.label)
-                        .accessibilityLabel(category.label)
-                        .accessibilityAddTraits(selected ? .isSelected : [])
-                    }
-                }
-            }
-            Spacer(minLength: 8)
-            if isCollapsed {
-                collapsedNavRow("house.fill", SidebarSection.home.title, .home)
-                    .frame(maxWidth: .infinity)
-            } else {
-                navRow("house.fill", SidebarSection.home.title, .home)
-            }
-        }
-    }
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var hoveredIsland: String?
+    @FocusState private var focusedItem: String?
 
     var body: some View {
-        Group {
-            if selection == .settings {
-                settingsNavigation
-            } else if isCollapsed {
-                collapsedBody
-            } else {
-                expandedBody
-            }
-        }
-        .padding(.horizontal, 8)
-        .padding(.bottom, 10)
-        .frame(width: isCollapsed ? AppleMusicTokens.sidebarCollapsedWidth : AppleMusicTokens.sidebarWidth)
-        .frame(maxHeight: .infinity, alignment: .top)
-        .background {
-            Color.clear
-                .musesGlass(in: SidebarPaneShape.shape, tint: BrandColors.sidebar.opacity(0.35), role: .persistentChrome)
-                .ignoresSafeArea(.container, edges: .top)
-                .allowsHitTesting(false)
-        }
-        .sheet(isPresented: $showCreatePlaylist) {
-            NewPlaylistSheet(isPresented: $showCreatePlaylist) { name in
-                playlistService.create(name: name)
-                refreshPlaylists()
-            }
-        }
-        .sheet(isPresented: $showPlaylistChoice) {
-            PlaylistAddChoiceSheet {
-                showPlaylistChoice = false
-                DispatchQueue.main.async { showCreatePlaylist = true }
-            } onImport: {
-                showPlaylistChoice = false
-                DispatchQueue.main.async { showImportPlaylist = true }
-            }
-        }
-        .sheet(isPresented: $showImportPlaylist) {
-            YouTubeImportSheet { url in
-                Task {
-                    do {
-                        _ = try await importService.importPlaylist(url: url)
-                        showImportPlaylist = false
-                    } catch {
-                        operationError = error.localizedDescription
+        VStack(spacing: 16) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    if selection == .settings {
+                        settingsIsland(Array(SettingsCategory.allCases.prefix(5)), key: "settings-primary")
+                        settingsIsland(Array(SettingsCategory.allCases.dropFirst(5)), key: "settings-secondary")
+                    } else {
+                        island(key: "primary", focusKeys: ["search", "home"]) { expanded in
+                            destination(.search, icon: "magnifyingglass", expanded: expanded)
+                            destination(.home, icon: "house.fill", expanded: expanded)
+                        }
+                        island(key: "library", focusKeys: ["new", "songs", "catalog", "liked", "musicVideos", "podcasts", "subscriptions", "history", "playlists"]) { expanded in
+                            destination(.new, icon: "square.grid.2x2.fill", expanded: expanded)
+                            destination(.songs, icon: "music.note", expanded: expanded)
+                            catalogDestination(expanded: expanded)
+                            destination(.liked, icon: "heart.fill", expanded: expanded)
+                            destination(.musicVideos, icon: "play.rectangle.fill", expanded: expanded)
+                            destination(.podcasts, icon: "mic.fill", expanded: expanded)
+                            destination(.subscriptions, icon: "person.crop.rectangle.stack", expanded: expanded)
+                            destination(.history, icon: "clock.arrow.circlepath", expanded: expanded)
+                            destination(.playlists, icon: "rectangle.stack.fill", expanded: expanded)
+                        }
                     }
                 }
+                .padding(.vertical, 8)
+                .padding(.horizontal, 16)
             }
+            .scrollIndicators(.hidden)
+            .scrollClipDisabled()
+
+            Button {
+                navigate(selection == .settings ? .home : .settings)
+            } label: {
+                Image(systemName: selection == .settings ? "house.fill" : "gearshape.fill")
+                    .font(MusesTypography.system(size: 18, weight: .semibold))
+                    .foregroundStyle(BrandColors.textPrimary)
+                    .frame(width: 56, height: 56)
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.fullAreaPlain)
+            .musesGlass(in: Circle(), role: .navigationIsland)
+            .focused($focusedItem, equals: "footer")
+            .overlay(Circle().stroke(BrandColors.accent, lineWidth: focusedItem == "footer" ? 2 : 0))
+            .help(selection == .settings ? SidebarSection.home.title : SidebarSection.settings.title)
+            .accessibilityLabel(selection == .settings ? SidebarSection.home.title : SidebarSection.settings.title)
         }
-        .alert(tr("Playlist Error", "歌单错误"), isPresented: Binding(
-            get: { operationError != nil },
-            set: { if !$0 { operationError = nil } }
-        )) {
-            Button(tr("OK", "确定")) { operationError = nil }
-        } message: {
-            Text(operationError ?? "")
-        }
-        .actionConfirmation($pendingRemoval)
-        .onAppear { refreshPlaylists() }
-        .onReceive(NotificationCenter.default.publisher(for: .musesPlaylistsChanged)) { _ in
-            refreshPlaylists()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .musesSelectPlaylist)) { _ in
-            selection = .playlists
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .musesNavigateYouTubeImport)) { _ in
-            selection = .playlists
-        }
-        .onChange(of: isCollapsed) { _, _ in
-            focusedDestination = selection
+        .padding(.top, 12)
+        .padding(.bottom, 16)
+        .frame(width: AppleMusicTokens.sidebarCollapsedWidth)
+        .frame(maxHeight: .infinity, alignment: .top)
+        .onChange(of: focusedItem) { _, item in
+            onKeyboardFocusChange(item != nil)
         }
         .onChange(of: selection) { _, new in
+            hoveredIsland = nil
+            focusedItem = nil
             if new != .playlists {
                 selectedPlaylist = nil
                 selectedYouTubeImport = nil
@@ -151,269 +77,95 @@ struct SidebarView: View {
         }
     }
 
-    private var expandedBody: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            ScrollView {
-            VStack(alignment: .leading, spacing: 2) {
-            navRow("magnifyingglass", SidebarSection.search.title, .search)
-            navRow("house.fill", SidebarSection.home.title, .home)
-            navRow("square.grid.2x2.fill", SidebarSection.new.title, .new)
-
-            sectionLabel(tr("Library", "资料库"))
-            navRow("music.note", SidebarSection.songs.title, .songs)
-            navRow("square.stack", SidebarSection.albums.title, .albums)
-            navRow("person.2", SidebarSection.artists.title, .artists)
-            navRow("heart.fill", SidebarSection.liked.title, .liked)
-            navRow("play.rectangle.fill", SidebarSection.musicVideos.title, .musicVideos)
-            navRow("mic.fill", SidebarSection.podcasts.title, .podcasts)
-            navRow("person.crop.rectangle.stack", SidebarSection.subscriptions.title, .subscriptions)
-            navRow("clock.arrow.circlepath", SidebarSection.history.title, .history)
-
-            sectionLabel(tr("Playlists", "歌单"))
-            HStack(spacing: 3) {
-                navRow("music.note.list", tr("All Playlists", "全部歌单"), .playlists) {
-                    selectedPlaylist = nil
-                    selectedYouTubeImport = nil
-                    NotificationCenter.default.post(name: .musesShowPlaylistsOverview, object: nil)
-                }
-                Button { showPlaylistChoice = true } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 14, weight: .semibold))
-                        .frame(width: 28, height: 28)
-                }
-                .buttonStyle(.plain)
-                .help(tr("Add Playlist", "添加歌单"))
-                .accessibilityLabel(tr("Add Playlist", "添加歌单"))
-            }
-            VStack(spacing: 1) {
-                    ForEach(orderedItems) { item in
-                        PlaylistSidebarRow(
-                            item: item,
-                            isSelected: isPlaylistSelected(item)
-                        ) { handlePlaylistTap(item) }
-                        .contextMenu {
-                            Button(tr("Open", "打开")) { handlePlaylistTap(item) }
-                            if let importID = item.youTubeImportId,
-                               let imported = ytImports.first(where: { $0.id == importID }),
-                               let url = URL(string: imported.url),
-                               let target = YouTubeShareTarget(url: url) {
-                                YouTubeShareMenu(target: target)
-                            }
-                            Button(tr("Remove", "移除"), role: .destructive) {
-                                pendingRemoval = ActionConfirmation(
-                                    title: tr("Delete ‘\(item.name)’?", "删除“\(item.name)”？"),
-                                    message: tr("This deletes the local playlist. YTM is unchanged.",
-                                                "将删除本机歌单，不会更改 YTM 云端。")) {
-                                        removeSidebarItem(item)
-                                    }
-                            }
-                        }
-                    }
-                }
-            }
-            }
-
-            Spacer(minLength: 8)
-            profileRow
+    private func island<Content: View>(key: String, focusKeys: [String], @ViewBuilder content: (Bool) -> Content) -> some View {
+        let expanded = hoveredIsland == key || focusKeys.contains(focusedItem ?? "")
+        return VStack(spacing: 0) {
+            content(expanded)
         }
+        .padding(6)
+        .frame(width: expanded ? 218 : 56, alignment: .leading)
+        .musesGlass(in: RoundedRectangle(cornerRadius: 28), role: .navigationIsland)
+        .frame(width: 56, alignment: .leading)
+        .onHover { inside in
+            if inside { hoveredIsland = key }
+            else if hoveredIsland == key { hoveredIsland = nil }
+        }
+        .animation(MusesMotion.hoverAnimation(reduceMotion: reduceMotion), value: expanded)
     }
 
-    private var collapsedBody: some View {
-        VStack(spacing: 6) {
-            ScrollView {
-            VStack(spacing: 6) {
-            collapsedNavRow("magnifyingglass", SidebarSection.search.title, .search)
-            collapsedNavRow("house.fill", SidebarSection.home.title, .home)
-            collapsedNavRow("square.grid.2x2.fill", SidebarSection.new.title, .new)
-
-            Divider()
-                .padding(.horizontal, 16)
-                .padding(.vertical, 4)
-
-            collapsedNavRow("music.note", SidebarSection.songs.title, .songs)
-            collapsedNavRow("square.stack", SidebarSection.albums.title, .albums)
-            collapsedNavRow("person.2", SidebarSection.artists.title, .artists)
-            collapsedNavRow("heart.fill", SidebarSection.liked.title, .liked)
-            collapsedNavRow("play.rectangle.fill", SidebarSection.musicVideos.title, .musicVideos)
-            collapsedNavRow("mic.fill", SidebarSection.podcasts.title, .podcasts)
-            collapsedNavRow("person.crop.rectangle.stack", SidebarSection.subscriptions.title, .subscriptions)
-            collapsedNavRow("clock.arrow.circlepath", SidebarSection.history.title, .history)
-            collapsedNavRow("music.note.list", SidebarSection.playlists.title, .playlists) {
-                selectedPlaylist = nil
-                selectedYouTubeImport = nil
-                NotificationCenter.default.post(name: .musesShowPlaylistsOverview, object: nil)
-            }
-
-            }
-            }
-            Spacer(minLength: 8)
-            collapsedProfileRow
-        }
-    }
-
-    private func collapsedNavRow(
-        _ icon: String,
-        _ title: String,
-        _ tag: SidebarSection,
-        extra: (() -> Void)? = nil
-    ) -> some View {
-        let on = isNavSelected(tag)
-        return Button {
-            selectedPlaylist = nil
-            selectedYouTubeImport = nil
-            selection = tag
-            extra?()
-        } label: {
-            Image(systemName: icon)
-                .font(MusesTypography.system(size: 15, weight: .semibold))
-                .foregroundStyle(on && AppleMusicChrome.selectedNavUsesAccent
-                                 ? BrandColors.selectionText : BrandColors.textPrimary.opacity(on ? 1 : 0.85))
-                .frame(width: 36, height: 36)
-                .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(on ? BrandColors.selectionFill : Color.clear)
-                        .selectionHalo(on)
-                )
+    private func destination(_ section: SidebarSection, icon: String, expanded: Bool) -> some View {
+        Button { navigate(section) } label: {
+            islandLabel(section.title, icon: icon, selected: selection == section, expanded: expanded)
         }
         .buttonStyle(.fullAreaPlain)
-        .focused($focusedDestination, equals: tag)
-        .accessibilityAddTraits(on ? .isSelected : [])
-        .accessibilityLabel(title)
+        .focused($focusedItem, equals: section.rawValue)
+        .overlay(RoundedRectangle(cornerRadius: 22).stroke(BrandColors.accent, lineWidth: focusedItem == section.rawValue ? 2 : 0))
+        .help(section.title)
+        .accessibilityLabel(section.title)
+        .accessibilityAddTraits(selection == section ? .isSelected : [])
+    }
+
+    private func catalogDestination(expanded: Bool) -> some View {
+        let selected = selection == .albums || selection == .artists
+        let title = tr("Albums & Artists", "专辑与艺术家")
+        return Menu {
+            Button(SidebarSection.albums.title, systemImage: "square.stack.fill") { navigate(.albums) }
+            Button(SidebarSection.artists.title, systemImage: "person.2.fill") { navigate(.artists) }
+        } label: {
+            islandLabel(title, icon: "square.stack.fill", selected: selected, expanded: expanded)
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .focused($focusedItem, equals: "catalog")
+        .overlay(RoundedRectangle(cornerRadius: 22).stroke(BrandColors.accent, lineWidth: focusedItem == "catalog" ? 2 : 0))
         .help(title)
+        .accessibilityLabel(title)
+        .accessibilityValue(selected ? selection.title : "")
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
-    private var collapsedProfileRow: some View {
-        Button {
-            NotificationCenter.default.post(name: .musesOpenSettings, object: nil)
-        } label: {
-            Image(systemName: "gearshape")
-                .font(MusesTypography.system(size: 16, weight: .semibold))
-                .foregroundStyle(selection == .settings ? BrandColors.accent : BrandColors.textSecondary)
-                .frame(width: 72, height: 48)
-                .contentShape(Rectangle())
+    private func settingsIsland(_ categories: [SettingsCategory], key: String) -> some View {
+        island(key: key, focusKeys: categories.map(\.rawValue)) { expanded in
+            ForEach(categories) { category in
+                let selected = (SettingsCategory(rawValue: settingsPane) ?? .general).destination == category
+                Button {
+                    onSettingsCategoryChange()
+                    settingsPane = category.rawValue
+                } label: {
+                    islandLabel(category.sidebarLabel, icon: category.toolbarIcon, selected: selected, expanded: expanded)
+                }
+                .buttonStyle(.fullAreaPlain)
+                .focused($focusedItem, equals: category.rawValue)
+                .overlay(RoundedRectangle(cornerRadius: 22).stroke(BrandColors.accent, lineWidth: focusedItem == category.rawValue ? 2 : 0))
+                .help(category.label)
+                .accessibilityLabel(category.label)
+                .accessibilityAddTraits(selected ? .isSelected : [])
+            }
         }
-        .buttonStyle(.fullAreaPlain)
-        .accessibilityAddTraits(selection == .settings ? .isSelected : [])
-        .help(SidebarNavPolicy.settingsFooterTitle())
-        .accessibilityLabel(tr("Open Settings", "打开设置", zhHant: "開啟設定"))
     }
 
-    private func sectionLabel(_ title: String) -> some View {
-        Text(title)
-            .font(MusesTypography.system(size: 11, weight: .semibold))
-            .foregroundStyle(BrandColors.textSecondary)
-            .padding(.horizontal, 12)
-            .padding(.top, 14)
-            .padding(.bottom, 4)
-    }
-
-    private func isNavSelected(_ tag: SidebarSection) -> Bool {
-        if tag == .playlists {
-            return selection == .playlists && selectedPlaylist == nil && selectedYouTubeImport == nil
-        }
-        return selection == tag
-    }
-
-    private func navRow(_ icon: String, _ title: String, _ tag: SidebarSection,
-                        extra: (() -> Void)? = nil) -> some View {
-        let on = isNavSelected(tag)
-        return Button {
-            selectedPlaylist = nil
-            selectedYouTubeImport = nil
-            selection = tag
-            extra?()
-        } label: {
-            HStack(spacing: 10) {
-                Image(systemName: icon)
-                    .font(MusesTypography.system(size: 13, weight: .semibold))
-                    .frame(width: 18)
+    private func islandLabel(_ title: String, icon: String, selected: Bool, expanded: Bool) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(MusesTypography.system(size: 17, weight: .semibold))
+                .frame(width: 44, height: 44)
+            if expanded {
                 Text(title)
-                    .font(MusesTypography.system(size: 13, weight: on ? .semibold : .regular))
+                    .font(MusesTypography.system(size: 13, weight: selected ? .semibold : .regular))
+                    .lineLimit(1)
                 Spacer(minLength: 0)
             }
-            .foregroundStyle(on && AppleMusicChrome.selectedNavUsesAccent
-                             ? BrandColors.selectionText : BrandColors.textPrimary.opacity(on ? 1 : 0.85))
-            .padding(.horizontal, 10)
-            .frame(maxWidth: .infinity, minHeight: AppleMusicTokens.navItemHeight, alignment: .leading)
-            .settingsSelection(on)
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.fullAreaPlain)
-        .focused($focusedDestination, equals: tag)
-        .accessibilityAddTraits(on ? .isSelected : [])
-        .accessibilityLabel(title)
+        .foregroundStyle(selected ? BrandColors.accent : BrandColors.textPrimary)
+        .background(selected ? BrandColors.accent.opacity(0.16) : Color.clear,
+                    in: RoundedRectangle(cornerRadius: 22))
+        .contentShape(RoundedRectangle(cornerRadius: 22))
     }
 
-    private var profileRow: some View {
-        navRow("gearshape", tr("Settings", "设置", zhHant: "設定"), .settings) {
-            NotificationCenter.default.post(name: .musesOpenSettings, object: nil)
-        }
-        .help(SidebarNavPolicy.settingsFooterTitle())
-        .accessibilityLabel(tr("Open Settings", "打开设置", zhHant: "開啟設定"))
-    }
-
-    private var mergedItems: [SidebarPlaylistItem] {
-        PlaylistSidebarAdapter.merged(
-            local: playlists,
-            youTube: ytImports.filter { $0.deletedAt == nil }
-        )
-    }
-
-    private var orderedItems: [SidebarPlaylistItem] {
-        SidebarPlaylistOrder.apply(mergedItems)
-    }
-
-    private func removeSidebarItem(_ item: SidebarPlaylistItem) {
-        switch item.origin {
-        case .local:
-            if let pid = item.playlistId, let pl = playlists.first(where: { $0.id == pid }) {
-                playlistService.delete(pl)
-                if selectedPlaylist?.id == pid { selectedPlaylist = nil }
-            }
-        case .youtube:
-            if let yid = item.youTubeImportId {
-                do {
-                    try playlistSync.moveToRecentlyDeleted(importID: yid)
-                    if selectedYouTubeImport?.id == yid { selectedYouTubeImport = nil }
-                } catch {
-                    operationError = error.localizedDescription
-                }
-            }
-        }
-        refreshPlaylists()
-    }
-
-    private func handlePlaylistTap(_ item: SidebarPlaylistItem) {
-        selection = .playlists
-        switch item.origin {
-        case .local:
-            if let pid = item.playlistId,
-               let playlist = playlists.first(where: { $0.id == pid }) {
-                selectedYouTubeImport = nil
-                selectedPlaylist = playlist
-                NotificationCenter.default.post(name: .musesSelectPlaylist, object: playlist)
-            }
-        case .youtube:
-            if let yid = item.youTubeImportId,
-               let imp = ytImports.first(where: { $0.id == yid && $0.deletedAt == nil }) {
-                selectedPlaylist = nil
-                selectedYouTubeImport = imp
-                NotificationCenter.default.post(name: .musesNavigateYouTubeImport, object: imp)
-            }
-        }
-    }
-
-    private func isPlaylistSelected(_ item: SidebarPlaylistItem) -> Bool {
-        switch item.origin {
-        case .local:
-            return selectedPlaylist?.id == item.playlistId
-        case .youtube:
-            return selectedYouTubeImport?.id == item.youTubeImportId
-        }
-    }
-
-    private func refreshPlaylists() {
-        playlists = playlistService.fetchAll()
+    private func navigate(_ section: SidebarSection) {
+        selectedPlaylist = nil
+        selectedYouTubeImport = nil
+        selection = section
     }
 }
 

@@ -5,6 +5,7 @@ import AppKit
 /// scattering material choices through feature views.
 enum MusesGlassRole: Equatable {
     case persistentChrome
+    case navigationIsland
     case player
     case browsingPlayer
     case floatingPanel
@@ -47,7 +48,7 @@ struct MusesGlass<S: Shape>: ViewModifier {
 
     @available(macOS 26.0, *)
     private var glassVariant: Glass {
-        let material: Glass = (role == .artworkControl || role == .player) ? .clear : .regular
+        let material: Glass = (role == .artworkControl || role == .player || role == .navigationIsland) ? .clear : .regular
         let base = tint.map { material.tint($0) } ?? material
         return role.isInteractive ? base.interactive(!reduceMotion) : base
     }
