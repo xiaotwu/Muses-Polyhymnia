@@ -8,6 +8,49 @@ import MusesWebHomeProtocol
 struct WebHomeSessionCoreTests {
     private let channelID = "UC1234567890123456789012"
 
+    @Test("Cookie failure stages preserve the error code without exposing exporter data")
+    func cookieFailureStages() async throws {
+        let stages: [WebHomeCookieFailureStage] = [.exportExecutable, .exportLaunch, .exportNoOutput, .jarRead, .noAllowedDomain]
+        for stage in stages {
+            let root = temporaryRoot()
+            defer { try? FileManager.default.removeItem(at: root) }
+            let manager = try WebHomeCookieJarManager(rootDirectory: root, exporter: StageCookieExporter(stage: stage))
+            let transport = QueueWebHomeTransport(responses: [])
+            let result = await WebHomeCommand(cookieManager: manager,
+                sessionClient: WebHomeSessionClient(transport: transport)).execute(request(expectedChannelID: channelID))
+            #expect(result.error?.code == .cookieSourceUnavailable)
+            #expect(result.error?.cookieFailureStage == stage)
+            #expect(result.error?.identityPhase == nil)
+            #expect(result.error?.message == nil)
+            #expect(result.channelID == nil)
+            #expect(result.sections.isEmpty)
+            #expect(await transport.requests.isEmpty)
+            #expect(try FileManager.default.contentsOfDirectory(atPath: root.path).isEmpty)
+        }
+        let occupied = temporaryRoot()
+        defer { try? FileManager.default.removeItem(at: occupied) }
+        try Data().write(to: occupied)
+        do {
+            _ = try WebHomeCookieJarManager(rootDirectory: occupied, exporter: StageCookieExporter(stage: .jarRead))
+            Issue.record("An occupied workspace must fail before export")
+        } catch let error as WebHomeCookieFailure {
+            #expect(error.stage == .workspaceSetup)
+        }
+    }
+
+    @Test("Cookie diagnostic IPC remains compatible with legacy and unknown stages")
+    func cookieStageCompatibility() throws {
+        let decoder = JSONDecoder()
+        let legacy = try decoder.decode(WebHomeError.self, from: Data(#"{"code":"cookieSourceUnavailable"}"#.utf8))
+        #expect(legacy.cookieFailureStage == nil)
+        let future = try decoder.decode(WebHomeError.self, from: Data(#"{"code":"cookieSourceUnavailable","cookieFailureStage":"futureStage"}"#.utf8))
+        #expect(future.cookieFailureStage == nil)
+        #expect(future.code == .cookieSourceUnavailable)
+        let error = WebHomeError(code: .cookieSourceUnavailable, cookieFailureStage: .exportNoOutput)
+        #expect(try decoder.decode(WebHomeError.self, from: JSONEncoder().encode(error)) == error)
+        #expect(WebHomeProtocolVersion.current == 2)
+    }
+
     @Test("identity stage metadata is additive and unknown stages do not break error decoding")
     func identityStageCompatibility() throws {
         let decoder = JSONDecoder()
@@ -500,12 +543,25 @@ struct WebHomeSessionCoreTests {
         do {
             _ = try await operation()
             Issue.record("Expected \(code.rawValue)")
+        } catch is WebHomeCookieFailure {
+            #expect(code == .cookieSourceUnavailable)
         } catch let error as WebHomeIdentityFailure {
             #expect(error.code == code)
         } catch let error as WebHomeCoreError {
             #expect(error == .code(code))
         } catch {
             Issue.record("Unexpected error: \(type(of: error))")
+        }
+    }
+}
+
+private struct StageCookieExporter: YTDlpCookieExporting {
+    let stage: WebHomeCookieFailureStage
+    func export(browserSpecification: String, to destination: URL) async throws {
+        switch stage {
+        case .jarRead: try Data([0xff]).write(to: destination)
+        case .noAllowedDomain: try Data(WebHomeCookieJarManager.netscapeCookieHeader.utf8).write(to: destination)
+        default: throw WebHomeCookieFailure(stage: stage)
         }
     }
 }

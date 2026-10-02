@@ -96,8 +96,8 @@ struct YouTubeSettingsView: View {
     private var browserSessionHelpRow: some View {
         HStack(spacing: 6) {
             Label(
-                tr("Grant Full Disk Access to Muses in System Settings → Privacy & Security → Full Disk Access.",
-                   "请在 系统设置 → 隐私与安全性 → 完全磁盘访问 中授权 Muses。"),
+                tr("If macOS browser access is needed, review Muses in Privacy & Security → Full Disk Access. This failure does not confirm a permission problem.",
+                   "若浏览器访问需要 macOS 权限，请检查“隐私与安全性 → 完全磁盘访问”中的 Muses；此失败不能确认是权限问题。"),
                 systemImage: "lock.shield")
                 .font(MusesTypography.caption)
                 .foregroundStyle(BrandColors.textSecondary)
@@ -499,7 +499,25 @@ struct YouTubeSettingsView: View {
                     .font(MusesTypography.caption)
                     .foregroundStyle(BrandColors.textSecondary)
             }
+            if let stage = webHome.lastCookieFailureStage {
+                Text(cookieStageExplanation(stage))
+                    .font(MusesTypography.caption)
+                    .foregroundStyle(BrandColors.textSecondary)
+            }
         }
+    }
+
+    private func cookieStageExplanation(_ stage: WebHomeCookieFailureStage) -> String {
+        let step = switch stage {
+        case .workspaceSetup: tr("temporary workspace setup", "临时工作目录准备")
+        case .exportExecutable: tr("bundled export tool availability", "内置导出工具可用性检查")
+        case .exportLaunch: tr("export tool launch", "导出工具启动")
+        case .exportNoOutput: tr("export completion", "导出结果检查")
+        case .jarRead: tr("temporary session file validation", "临时会话文件验证")
+        case .noAllowedDomain: tr("supported session filtering", "支持的会话内容筛选")
+        }
+        return tr("Browser session preparation stopped at: \(step). The step does not confirm a permission or sign-in cause. This diagnostic contains no session contents or process output.",
+                  "浏览器会话准备停止于：\(step)。此步骤不能确认是否由权限或登录状态导致；此诊断不包含会话内容或进程输出。")
     }
 
     private func identityPhaseExplanation(_ phase: WebHomeIdentityPhase) -> String {

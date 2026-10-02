@@ -41,6 +41,7 @@ final class WebHomeSessionController: HomeDiscoveryProvider {
     private(set) var status: WebHomeSessionStatus
     private(set) var lastCheckedAt: Date?
     private(set) var lastIdentityFailurePhase: WebHomeIdentityPhase?
+    private(set) var lastCookieFailureStage: WebHomeCookieFailureStage?
     private(set) var defaultBrowserResolution: DefaultBrowserCookieSourceResolution
 
     private let defaults: UserDefaults
@@ -211,6 +212,7 @@ final class WebHomeSessionController: HomeDiscoveryProvider {
         status = buildEnabled ? .closed : .disabledByBuild
         lastCheckedAt = nil
         lastIdentityFailurePhase = nil
+        lastCookieFailureStage = nil
     }
 
     func accountDidChange() async {
@@ -230,6 +232,7 @@ final class WebHomeSessionController: HomeDiscoveryProvider {
         }
         lastCheckedAt = nil
         lastIdentityFailurePhase = nil
+        lastCookieFailureStage = nil
     }
 
     func probeSession() async {
@@ -245,7 +248,9 @@ final class WebHomeSessionController: HomeDiscoveryProvider {
         }
         let statusBeforeCheck = status
         let phaseBeforeCheck = lastIdentityFailurePhase
+        let cookieStageBeforeCheck = lastCookieFailureStage
         lastIdentityFailurePhase = nil
+        lastCookieFailureStage = nil
         status = .checking
         let interval = PerfTrace.begin("home.web.probe")
         defer { PerfTrace.end(interval) }
@@ -262,6 +267,7 @@ final class WebHomeSessionController: HomeDiscoveryProvider {
             // pre-check status so a transient label never suggests re-authorization is needed.
             status = statusBeforeCheck == .checking ? .closed : statusBeforeCheck
             lastIdentityFailurePhase = phaseBeforeCheck
+            lastCookieFailureStage = cookieStageBeforeCheck
         } catch {
             guard requestIsCurrent() else { return }
             status = .unavailable(.helperCrashed)
@@ -273,12 +279,14 @@ final class WebHomeSessionController: HomeDiscoveryProvider {
             .baselineSnapshot
         guard case .account(let expectedChannelID) = input.scope else {
             lastIdentityFailurePhase = nil
+            lastCookieFailureStage = nil
             return failureResult(
                 baseline: emptyBaseline, code: .oauthRequired,
                 capability: .signedOut)
         }
         guard expectedChannelID == normalizedChannelID() else {
             lastIdentityFailurePhase = nil
+            lastCookieFailureStage = nil
             status = .accountMismatch
             return failureResult(
                 baseline: emptyBaseline, code: .accountMismatch,
@@ -298,6 +306,7 @@ final class WebHomeSessionController: HomeDiscoveryProvider {
         continuationTokensBySectionID.removeAll(keepingCapacity: false)
         globalContinuationToken = nil
         lastIdentityFailurePhase = nil
+        lastCookieFailureStage = nil
         status = .refreshing
         let interval = PerfTrace.begin("home.web.fetch")
         defer { PerfTrace.end(interval) }
@@ -310,7 +319,7 @@ final class WebHomeSessionController: HomeDiscoveryProvider {
             }
             if let error = response.error {
                 let code = map(error.code)
-                applyFailureStatus(code, identityPhase: error.identityPhase)
+                applyFailureStatus(code, identityPhase: error.identityPhase, cookieStage: error.cookieFailureStage)
                 return failureResult(
                     baseline: emptyBaseline, code: code,
                     message: error.message,
@@ -410,6 +419,7 @@ final class WebHomeSessionController: HomeDiscoveryProvider {
         }
         let generation = continuationGeneration
         lastIdentityFailurePhase = nil
+        lastCookieFailureStage = nil
         status = .refreshing
         let interval = PerfTrace.begin("home.web.globalContinuation")
         defer { PerfTrace.end(interval) }
@@ -420,7 +430,7 @@ final class WebHomeSessionController: HomeDiscoveryProvider {
             }
             if let error = response.error {
                 let code = map(error.code)
-                applyFailureStatus(code, identityPhase: error.identityPhase)
+                applyFailureStatus(code, identityPhase: error.identityPhase, cookieStage: error.cookieFailureStage)
                 throw WebHomeContinuationError(code: code)
             }
             guard !Task.isCancelled, generation == continuationGeneration,
@@ -487,6 +497,7 @@ final class WebHomeSessionController: HomeDiscoveryProvider {
         }
         let generation = continuationGeneration
         lastIdentityFailurePhase = nil
+        lastCookieFailureStage = nil
         status = .refreshing
         let interval = PerfTrace.begin("home.web.continuation")
         defer { PerfTrace.end(interval) }
@@ -497,7 +508,7 @@ final class WebHomeSessionController: HomeDiscoveryProvider {
             }
             if let error = response.error {
                 let code = map(error.code)
-                applyFailureStatus(code, identityPhase: error.identityPhase)
+                applyFailureStatus(code, identityPhase: error.identityPhase, cookieStage: error.cookieFailureStage)
                 throw WebHomeContinuationError(code: code)
             }
             guard response.channelID == normalizedChannelID() else {
@@ -648,7 +659,7 @@ final class WebHomeSessionController: HomeDiscoveryProvider {
 
     private func apply(response: WebHomeResponse) {
         if let error = response.error {
-            applyFailureStatus(map(error.code), identityPhase: error.identityPhase)
+            applyFailureStatus(map(error.code), identityPhase: error.identityPhase, cookieStage: error.cookieFailureStage)
             return
         }
         guard response.capability == .available,
@@ -657,6 +668,7 @@ final class WebHomeSessionController: HomeDiscoveryProvider {
             return
         }
         lastIdentityFailurePhase = nil
+        lastCookieFailureStage = nil
         let checkedAt = response.fetchedAt ?? Date()
         lastCheckedAt = checkedAt
         status = .available(checkedAt: checkedAt)
@@ -664,6 +676,7 @@ final class WebHomeSessionController: HomeDiscoveryProvider {
 
     private func applyPreflightStatus() {
         lastIdentityFailurePhase = nil
+        lastCookieFailureStage = nil
         let code = preflightFailureCode()
         if !buildEnabled { status = .disabledByBuild }
         else if !hasCurrentConsent { status = .pendingConsent }
@@ -677,7 +690,9 @@ final class WebHomeSessionController: HomeDiscoveryProvider {
         return .disabled
     }
 
-    private func applyFailureStatus(_ code: HomeFetchFailureCode, identityPhase: WebHomeIdentityPhase? = nil) {
+    private func applyFailureStatus(_ code: HomeFetchFailureCode, identityPhase: WebHomeIdentityPhase? = nil,
+                                    cookieStage: WebHomeCookieFailureStage? = nil) {
+        lastCookieFailureStage = code == .cookieSourceUnavailable ? cookieStage : nil
         lastIdentityFailurePhase = (code == .identityUnavailable || code == .accountMismatch) ? identityPhase : nil
         PerfTrace.event("home.web.failure.\(code.rawValue)")
         switch code {

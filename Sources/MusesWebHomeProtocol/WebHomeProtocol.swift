@@ -95,20 +95,33 @@ public enum WebHomeIdentityPhase: String, Codable, Sendable, Equatable {
     case resolveURL
 }
 
+/// Fixed local failure step, without process output, paths or session data.
+public enum WebHomeCookieFailureStage: String, Codable, Sendable, Equatable {
+    case workspaceSetup
+    case exportExecutable
+    case exportLaunch
+    case exportNoOutput
+    case jarRead
+    case noAllowedDomain
+}
+
 public struct WebHomeError: Codable, Sendable, Equatable {
     public let code: WebHomeErrorCode
     /// A bounded, credential-free diagnostic intended for local UI only.
     public let message: String?
     public let identityPhase: WebHomeIdentityPhase?
+    public let cookieFailureStage: WebHomeCookieFailureStage?
 
     public init(code: WebHomeErrorCode, message: String? = nil,
-                identityPhase: WebHomeIdentityPhase? = nil) {
+                identityPhase: WebHomeIdentityPhase? = nil,
+                cookieFailureStage: WebHomeCookieFailureStage? = nil) {
         self.code = code
         self.message = message
         self.identityPhase = identityPhase
+        self.cookieFailureStage = cookieFailureStage
     }
 
-    private enum CodingKeys: String, CodingKey { case code, message, identityPhase }
+    private enum CodingKeys: String, CodingKey { case code, message, identityPhase, cookieFailureStage }
 
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -116,6 +129,7 @@ public struct WebHomeError: Codable, Sendable, Equatable {
         message = try container.decodeIfPresent(String.self, forKey: .message)
         // A missing or future stage must not invalidate an otherwise valid error.
         identityPhase = try? container.decode(WebHomeIdentityPhase.self, forKey: .identityPhase)
+        cookieFailureStage = try? container.decode(WebHomeCookieFailureStage.self, forKey: .cookieFailureStage)
     }
 }
 

@@ -6,6 +6,71 @@ import MusesWebHomeProtocol
 @Suite("Web Home opt-in control plane")
 @MainActor
 struct WebHomeSessionControllerTests {
+    @Test("Cookie stage stays volatile and clears on success, unrelated errors and invalidations")
+    func cookieStageLifecycle() async throws {
+        let defaults = makeDefaults()
+        let failure = WebHomeResponse(capability: .unavailable,
+            error: WebHomeError(code: .cookieSourceUnavailable, cookieFailureStage: .exportNoOutput))
+        let unrelated = WebHomeResponse(capability: .unavailable,
+            error: WebHomeError(code: .offline, cookieFailureStage: .jarRead))
+        let recorder = WebHomeRequestRecorder(responses: [failure, probeResponse(), failure, unrelated, failure, failure, failure])
+        let controller = makeController(defaults: defaults, recorder: recorder)
+        try controller.prepareDefaultBrowserConsent()
+        try controller.enableUsingDefaultBrowser()
+        await controller.probeSession()
+        #expect(controller.status == .unavailable(.cookieSourceUnavailable))
+        #expect(controller.lastCookieFailureStage == .exportNoOutput)
+        #expect(controller.lastIdentityFailurePhase == nil)
+        #expect(!defaults.dictionaryRepresentation().values.contains { ($0 as? String) == "exportNoOutput" })
+        await controller.probeSession()
+        #expect(controller.lastCookieFailureStage == nil)
+        await controller.probeSession()
+        await controller.probeSession()
+        #expect(controller.status == .unavailable(.offline))
+        #expect(controller.lastCookieFailureStage == nil)
+        await controller.probeSession()
+        await controller.accountDidChange()
+        #expect(controller.lastCookieFailureStage == nil)
+        await controller.probeSession()
+        await controller.disableAndClearTemporarySession()
+        #expect(controller.lastCookieFailureStage == nil)
+        try controller.prepareDefaultBrowserConsent()
+        try controller.enableUsingDefaultBrowser()
+        await controller.probeSession()
+        #expect(controller.lastCookieFailureStage == .exportNoOutput)
+        _ = await controller.fetch(for: HomeDiscoveryInput(
+            topArtistNames: [], recentlyPlayedArtistNames: [], likedArtistNames: [],
+            timeBand: .morning, hour: 8, scope: .guest))
+        #expect(controller.lastCookieFailureStage == nil)
+    }
+
+    @Test("Cookie retry cancellation restores its stage only while the authorization remains current")
+    func cookieStageCancellation() async throws {
+        for invalidate in [false, true] {
+            let defaults = makeDefaults()
+            let gate = SuspendedWebHomeProbe()
+            let counter = CallCounter()
+            let failure = WebHomeResponse(capability: .unavailable,
+                error: WebHomeError(code: .cookieSourceUnavailable, cookieFailureStage: .exportLaunch))
+            let controller = WebHomeSessionController(buildEnabled: true, defaults: defaults,
+                currentChannelIDProvider: { "UC_expected" }, executeRequest: { _ in
+                    if await counter.increment() == 1 { return failure }
+                    return try await gate.response()
+                })
+            try controller.prepareDefaultBrowserConsent()
+            try controller.enableUsingDefaultBrowser()
+            await controller.probeSession()
+            let retry = Task { await controller.probeSession() }
+            await gate.waitUntilSuspended()
+            #expect(controller.lastCookieFailureStage == nil)
+            if invalidate { await controller.disableAndClearTemporarySession() }
+            await gate.finish(response: failure, cancelled: true)
+            await retry.value
+            #expect(controller.lastCookieFailureStage == (invalidate ? nil : .exportLaunch))
+            #expect(controller.status == (invalidate ? .closed : .unavailable(.cookieSourceUnavailable)))
+        }
+    }
+
     @Test("identity stage stays volatile and clears after success, account changes, disconnect and unrelated failure")
     func identityStageLifecycle() async throws {
         let defaults = makeDefaults()

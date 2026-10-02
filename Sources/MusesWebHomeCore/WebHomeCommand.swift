@@ -38,7 +38,7 @@ public struct WebHomeCommand: Sendable {
         }
 
         guard let cookieManager else {
-            return failure(.cookieSourceUnavailable)
+            return failure(.cookieSourceUnavailable, cookieFailureStage: .workspaceSetup)
         }
         do {
             return try await cookieManager.withCookieJar(source: request.cookieSource) { jar in
@@ -68,6 +68,8 @@ public struct WebHomeCommand: Sendable {
                     expiresAt: fetchedAt.addingTimeInterval(15 * 60),
                     capability: .available)
             }
+        } catch let error as WebHomeCookieFailure {
+            return failure(.cookieSourceUnavailable, cookieFailureStage: error.stage)
         } catch let error as WebHomeIdentityFailure {
             return failure(error.code, identityPhase: error.phase)
         } catch let error as WebHomeCoreError {
@@ -79,11 +81,12 @@ public struct WebHomeCommand: Sendable {
         }
     }
 
-    private func failure(_ code: WebHomeErrorCode, identityPhase: WebHomeIdentityPhase? = nil) -> WebHomeResponse {
+    private func failure(_ code: WebHomeErrorCode, identityPhase: WebHomeIdentityPhase? = nil,
+                         cookieFailureStage: WebHomeCookieFailureStage? = nil) -> WebHomeResponse {
         WebHomeResponse(
             helperVersion: Self.helperVersion,
             parserSchemaVersion: Self.parserSchemaVersion,
             capability: .unavailable,
-            error: WebHomeError(code: code, identityPhase: identityPhase))
+            error: WebHomeError(code: code, identityPhase: identityPhase, cookieFailureStage: cookieFailureStage))
     }
 }

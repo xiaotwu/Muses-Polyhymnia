@@ -15,12 +15,16 @@ protocol YTDlpCookieExporting: Sendable {
     func export(browserSpecification: String, to destination: URL) async throws
 }
 
+struct WebHomeCookieFailure: Error, Sendable {
+    let stage: WebHomeCookieFailureStage
+}
+
 struct ProcessYTDlpCookieExporter: YTDlpCookieExporting, @unchecked Sendable {
     let executableURL: URL
 
     func export(browserSpecification: String, to destination: URL) async throws {
         guard FileManager.default.isExecutableFile(atPath: executableURL.path) else {
-            throw WebHomeCoreError.code(.cookieSourceUnavailable)
+            throw WebHomeCookieFailure(stage: .exportExecutable)
         }
         let process = Process()
         process.executableURL = executableURL
@@ -38,7 +42,7 @@ struct ProcessYTDlpCookieExporter: YTDlpCookieExporting, @unchecked Sendable {
         do {
             try process.run()
         } catch {
-            throw WebHomeCoreError.code(.cookieSourceUnavailable)
+            throw WebHomeCookieFailure(stage: .exportLaunch)
         }
 
         do {
@@ -62,7 +66,7 @@ struct ProcessYTDlpCookieExporter: YTDlpCookieExporting, @unchecked Sendable {
         let exportedSize = (attributes?[.size] as? NSNumber)?.intValue ?? 0
         guard process.terminationStatus == EXIT_SUCCESS
                 || exportedSize > WebHomeCookieJarManager.netscapeCookieHeader.utf8.count else {
-            throw WebHomeCoreError.code(.cookieSourceUnavailable)
+            throw WebHomeCookieFailure(stage: .exportNoOutput)
         }
     }
 }
@@ -130,8 +134,12 @@ final class WebHomeCookieJarManager: @unchecked Sendable {
         self.rootDirectory = rootDirectory.standardizedFileURL
         self.exporter = exporter
         self.fileManager = fileManager
-        try createPrivateDirectory(rootDirectory)
-        try cleanupOrphans()
+        do {
+            try createPrivateDirectory(rootDirectory)
+            try cleanupOrphans()
+        } catch {
+            throw WebHomeCookieFailure(stage: .workspaceSetup)
+        }
     }
 
     func withCookieJar<T: Sendable>(
@@ -142,7 +150,8 @@ final class WebHomeCookieJarManager: @unchecked Sendable {
         case .browser:
             let workspace = rootDirectory
                 .appendingPathComponent(UUID().uuidString, isDirectory: true)
-            try createPrivateDirectory(workspace)
+            do { try createPrivateDirectory(workspace) }
+            catch { throw WebHomeCookieFailure(stage: .workspaceSetup) }
             defer { try? fileManager.removeItem(at: workspace) }
             let jarURL = workspace.appendingPathComponent("cookies.txt")
             guard fileManager.createFile(
@@ -152,7 +161,7 @@ final class WebHomeCookieJarManager: @unchecked Sendable {
                 // already permission-restricted destination.
                 contents: Data(Self.netscapeCookieHeader.utf8),
                 attributes: [.posixPermissions: 0o600]) else {
-                throw WebHomeCoreError.code(.cookieSourceUnavailable)
+                throw WebHomeCookieFailure(stage: .workspaceSetup)
             }
             _ = chmod(jarURL.path, S_IRUSR | S_IWUSR)
             let browser = try browserSpecification(from: source)
@@ -224,7 +233,7 @@ final class WebHomeCookieJarManager: @unchecked Sendable {
               size.intValue <= Self.maximumCookieFileBytes,
               let data = try? Data(contentsOf: url, options: [.mappedIfSafe]),
               let text = String(data: data, encoding: .utf8) else {
-            throw WebHomeCoreError.code(.cookieSourceUnavailable)
+            throw WebHomeCookieFailure(stage: .jarRead)
         }
 
         let cookies = text.split(whereSeparator: \.isNewline).compactMap { rawLine -> WebHomeCookie? in
@@ -251,7 +260,7 @@ final class WebHomeCookieJarManager: @unchecked Sendable {
                 value: String(fields[6]))
         }
         guard !cookies.isEmpty else {
-            throw WebHomeCoreError.code(.cookieSourceUnavailable)
+            throw WebHomeCookieFailure(stage: .noAllowedDomain)
         }
         return WebHomeCookieJar(cookies: cookies)
     }
