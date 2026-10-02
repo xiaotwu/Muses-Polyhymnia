@@ -102,16 +102,16 @@ private struct YouTubeEntryContextMenu: ViewModifier {
                     NSPasteboard.general.setString(url.absoluteString, forType: .string)
                 }
                 Button {
-                    NSWorkspace.shared.open(url)
+                    resolve { PlaybackPresentation.video($0, playback: playback) }
                 } label: {
                     Label {
-                        Text(tr("Open on YouTube", "在 YouTube 打开"))
+                        Text(tr("Floating video", "悬浮视频"))
                     } icon: {
                         YouTubeMark(size: 12)
                             .accessibilityHidden(true)
                     }
                 }
-                .accessibilityLabel(tr("Open on YouTube", "在 YouTube 打开"))
+                .accessibilityLabel(tr("Floating video", "悬浮视频"))
             }
         }
         .alert(tr("Could not save to Library", "无法保存到资料库", zhHant: "無法儲存至資料庫"), isPresented: $saveFailed) {
@@ -187,16 +187,16 @@ struct TrackContextMenuItems: View {
                 NSPasteboard.general.setString(url.absoluteString, forType: .string)
             }
             Button {
-                NSWorkspace.shared.open(url)
+                PlaybackPresentation.video(snapshot, playback: playback)
             } label: {
                 Label {
-                    Text(tr("Open on YouTube", "在 YouTube 打开"))
+                    Text(tr("Floating video", "悬浮视频"))
                 } icon: {
                     YouTubeMark(size: 12)
                         .accessibilityHidden(true)
                 }
             }
-            .accessibilityLabel(tr("Open on YouTube", "在 YouTube 打开"))
+            .accessibilityLabel(tr("Floating video", "悬浮视频"))
         }
 
         Divider()

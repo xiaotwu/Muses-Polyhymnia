@@ -416,19 +416,23 @@ final class LyricsService {
     }
 
     func findCandidates(track: TrackSnapshot, refresh: Bool = false,
-                        source: String = "auto") async -> [LyricsCandidate] {
+                        source: String = "auto", keywords: String? = nil) async -> [LyricsCandidate] {
         var candidates: [LyricsCandidate] = []
         if source == "auto" || source == "lrclib" {
-            candidates = await findLrclibCandidates(track: track, refresh: refresh)
+            if let keywords, !keywords.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                candidates = await searchLrclib([LyricsEndpoint.lrclibKeywordSearch(keywords)])
+            } else {
+                candidates = await findLrclibCandidates(track: track, refresh: refresh)
+            }
         }
-        if !Task.isCancelled, source == "auto" || source == "musixmatch",
+        if !Task.isCancelled, keywords == nil, source == "auto" || source == "musixmatch",
            let result = await fetchMusixmatch(track: track) {
             candidates.append(LyricsCandidate(id: -1, trackName: Self.sanitizedTitle(track.title),
                 artistName: LyricsMatchPolicy.queryArtist(track.artist), albumName: track.albumTitle,
                 duration: track.durationSeconds, instrumental: false,
                 plainLyrics: result.plainLyrics, syncedLyrics: result.syncedLyrics, provider: .musixmatch))
         }
-        if !Task.isCancelled, source == "auto" || source == "lyricsOVH",
+        if !Task.isCancelled, keywords == nil, source == "auto" || source == "lyricsOVH",
            let result = await fetchLyricsOVH(track: track) {
             candidates.append(LyricsCandidate(id: -2, trackName: Self.sanitizedTitle(track.title),
                 artistName: LyricsMatchPolicy.queryArtist(track.artist), albumName: nil,

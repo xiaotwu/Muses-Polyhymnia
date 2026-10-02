@@ -75,11 +75,6 @@ struct YouTubeSettingsView: View {
                 detail(destination)
             } else {
                 accountOverview
-                Section {
-                    DisclosureGroup(tr("Permissions & sync", "权限与同步")) { accountDetails }
-                    DisclosureGroup(tr("Personalized Home", "个性化首页管理")) { webHomeDetails }
-                    DisclosureGroup(tr("Playback access", "播放访问")) { playbackCookieDetails }
-                } header: { Text(tr("Permissions & access", "权限与访问")) }
             }
         }
         .actionConfirmation($pendingRemoval)
@@ -160,128 +155,84 @@ struct YouTubeSettingsView: View {
 
     @ViewBuilder private var accountOverview: some View {
         Section {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 10) {
-                    if account.isConnecting || isWebHomeBusy {
-                        ProgressView().controlSize(.small)
-                    }
-                    if account.isConnected {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Label(
-                                account.account?.channel?.title ?? tr("Connected", "已连接", zhHant: "已連接"),
-                                systemImage: "checkmark.circle.fill")
-                                .font(MusesTypography.body.weight(.semibold))
-                                .foregroundStyle(BrandColors.textPrimary)
-                            Text(tr("YouTube connected", "已连接 YouTube", zhHant: "已連接 YouTube"))
-                                .font(MusesTypography.caption)
-                                .foregroundStyle(BrandColors.textSecondary)
-                        }
-                    } else {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Label(account.connectionState == .expired
-                                  ? tr("Session expired", "登录已过期", zhHant: "登入已過期")
-                                  : tr("Not connected", "未连接", zhHant: "未連接"),
-                                  systemImage: "person.crop.circle.badge.questionmark")
-                                .font(MusesTypography.body.weight(.semibold))
-                                .foregroundStyle(BrandColors.textSecondary)
-                            Text(account.connectionState == .expired
-                                 ? tr("Your YouTube session expired. Sign in again to restore account access.",
-                                      "YouTube 登录已过期。请重新登录以恢复账号访问。",
-                                      zhHant: "YouTube 登入已過期。請重新登入以恢復帳號存取。")
-                                 : tr("Sign in to import playlists and personalize Home.",
-                                      "登录即可导入歌单并个性化首页。",
-                                      zhHant: "登入即可匯入歌單並個人化首頁。"))
-                                .font(MusesTypography.caption)
-                                .foregroundStyle(BrandColors.textSecondary)
-                        }
-                    }
-                    Spacer()
-                    if account.isConnected {
-                        Button(tr("Sign Out", "退出登录"), role: .destructive, action: requestDisconnect)
-                        .settingsAction()
-                    }
+            HStack(alignment: .center, spacing: 14) {
+                Image(systemName: account.isConnected ? "person.crop.circle.fill" : "person.crop.circle.badge.questionmark")
+                    .font(MusesTypography.system(size: 30, weight: .medium))
+                    .foregroundStyle(BrandColors.accent)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(account.account?.channel?.title ?? (account.connectionState == .expired
+                         ? tr("Session expired", "登录已过期") : tr("Not connected", "未连接")))
+                        .font(MusesTypography.headline)
+                    Text(account.isConnected ? tr("YouTube connected", "已连接 YouTube")
+                         : tr("Connect your account to import playlists.", "连接账号以导入歌单。"))
+                        .font(MusesTypography.caption).foregroundStyle(.secondary)
                 }
-
+                Spacer()
+                if account.isConnecting { ProgressView().controlSize(.small) }
                 if account.isConnected {
-                    HStack {
-                        Text(tr("Playlists", "歌单", zhHant: "歌單"))
-                            .foregroundStyle(BrandColors.textSecondary)
-                        Spacer()
-                        if playlistSync.isImportingAccountPlaylists {
-                            ProgressView().controlSize(.small)
-                            Text("\(playlistSync.accountImportCompleted)/\(playlistSync.accountImportTotal)")
-                                .font(MusesTypography.caption.monospacedDigit())
-                        }
-                        Button {
-                            Task {
-                                await account.refresh()
-                                await playlistSync.importAccountPlaylists()
-                            }
-                        } label: {
-                            Image(systemName: "arrow.down.to.line")
-                                .frame(width: 18, height: 18)
-                        }
-                        .settingsAction().controlSize(.small)
-                        .disabled(account.isConnecting || playlistSync.isImportingAccountPlaylists)
-                        .help(tr("Import account playlists", "导入账号歌单", zhHant: "匯入帳號歌單"))
-                        .accessibilityLabel(tr("Import account playlists", "导入账号歌单", zhHant: "匯入帳號歌單"))
-                    }
-                    if let error = playlistSync.accountImportError {
-                        Text(error).font(MusesTypography.caption).foregroundStyle(.red)
-                    }
-                    HStack {
-                        Text(tr("Personalized Home", "个性化首页"))
-                            .foregroundStyle(BrandColors.textSecondary)
-                        Spacer()
-                        webHomeStatusAction
-                    }
-                    .padding(.top, 8)
-                }
-
-                if let error = webHomeConfigurationError {
-                    Label(error, systemImage: "exclamationmark.triangle")
-                        .font(MusesTypography.caption)
-                        .foregroundStyle(.red)
-                        .padding(.top, 4)
-                }
-                if let err = account.lastError {
-                    Text(err).font(MusesTypography.caption).foregroundStyle(.red)
-                        .padding(.top, 4)
-                }
-                if account.connectionState == .expired {
-                    Label(
-                        tr("Reconnect below to authorize this Mac again. Browser cookies and Web Home are separate.",
-                           "请使用下方按钮重新授权此 Mac。浏览器 Cookie 与 Web 首页权限彼此独立。",
-                           zhHant: "請使用下方按鈕重新授權此 Mac。瀏覽器 Cookie 與 Web 首頁權限彼此獨立。"),
-                        systemImage: "arrow.clockwise.circle")
-                        .font(MusesTypography.caption)
-                        .foregroundStyle(.red)
-                        .padding(.top, 2)
-                }
-                if isBrowserSessionUnavailable {
-                    browserSessionHelpRow
-                }
+                    SettingsIconButton(title: tr("Sign Out", "退出登录"), symbol: "rectangle.portrait.and.arrow.right", action: requestDisconnect)
+                } else { primaryAction }
             }
-            .padding(.vertical, 4)
-
-            if !account.isConnected {
-                primaryAction
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 4)
+            .padding(.vertical, 8)
+            if let error = account.lastError {
+                Label(error, systemImage: "exclamationmark.triangle")
+                    .font(MusesTypography.caption).foregroundStyle(.red)
             }
-
-            homeRecommendationSource
-        } header: { Text("YouTube").font(MusesTypography.headline.weight(.semibold)) }
+        } header: { Text(tr("Connection", "连接状态")) }
         Section {
-                officialPageLink(
-                    tr("Watch Later", "稍后观看", zhHant: "稍後觀看"),
-                    url: URL(string: "https://www.youtube.com/playlist?list=WL")!
-                )
-                officialPageLink(
-                    tr("YouTube watch history", "YouTube 观看历史", zhHant: "YouTube 觀看記錄"),
-                    url: URL(string: "https://www.youtube.com/feed/history")!
-                )
+            accountDetails
+            LabeledContent(tr("Account playlists", "账号歌单")) {
+                HStack(spacing: 8) {
+                    if playlistSync.isImportingAccountPlaylists {
+                        ProgressView().controlSize(.small)
+                        Text("\(playlistSync.accountImportCompleted)/\(playlistSync.accountImportTotal)")
+                            .font(MusesTypography.caption.monospacedDigit())
+                    }
+                    SettingsIconButton(title: tr("Import account playlists", "导入账号歌单"), symbol: "arrow.down.to.line") {
+                        Task { await account.refresh(); await playlistSync.importAccountPlaylists() }
+                    }.disabled(!account.isConnected || account.isConnecting || playlistSync.isImportingAccountPlaylists)
+                }
+            }
+            if let error = playlistSync.accountImportError {
+                Text(error).font(MusesTypography.caption).foregroundStyle(.red)
+            }
+        } header: { Text(tr("Permissions & sync", "权限与同步")) }
+        Section {
+            homeRecommendationSource
+            LabeledContent(tr("Session", "会话状态")) { webHomeStatusAction }
+            if webHome.isEnabled, !isWebHomeBusy, case .available = webHome.status {
+                EmptyView()
+            } else if webHome.isEnabled, !isWebHomeBusy {
+                Label(webHomeRecoveryMessage, systemImage: "exclamationmark.triangle")
+                    .font(MusesTypography.caption).foregroundStyle(BrandColors.heading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            webHomeDetails
+            if let error = webHomeConfigurationError {
+                Label(error, systemImage: "exclamationmark.triangle")
+                    .font(MusesTypography.caption).foregroundStyle(.red)
+            }
+            if isBrowserSessionUnavailable { browserSessionHelpRow }
+        } header: { Text(tr("Personalized Home", "个性化首页")) }
+        Section { playbackCookieDetails } header: { Text(tr("Playback access", "播放访问")) }
+        Section {
+            officialPageLink(tr("Watch Later", "稍后观看"), url: URL(string: "https://www.youtube.com/playlist?list=WL")!)
+            officialPageLink(tr("YouTube watch history", "YouTube 观看历史"), url: URL(string: "https://www.youtube.com/feed/history")!)
         } header: { Text(tr("YouTube on the web", "YouTube 网页")) }
+    }
+
+    private var webHomeRecoveryMessage: String {
+        switch webHome.status {
+        case .accountMismatch, .unavailable(.identityUnavailable):
+            tr("Open YouTube Music in the approved browser, select the channel shown above, then check the session again. Public recommendations remain available.",
+               "请在已批准的浏览器中打开 YouTube Music，选择上方频道后重新检查会话。公共推荐仍可使用。")
+        case .expired:
+            tr("Sign in to YouTube Music in the approved browser, then check again.", "请在已批准的浏览器中登录 YouTube Music 后重新检查。")
+        default:
+            tr("Personalized Home is temporarily unavailable. Retry the session or use Muses as the Home source.",
+               "个性化首页暂不可用，可重试会话或将首页来源切换为 Muses。")
+        }
     }
 
     private func officialPageLink(_ title: String, url: URL) -> some View {
@@ -392,7 +343,8 @@ struct YouTubeSettingsView: View {
         accountFailure(
             tr("Liked videos", "点赞视频"), state: account.likedVideosState)
 
-        VStack(alignment: .trailing, spacing: 8) {
+        HStack(spacing: 8) {
+            Spacer(minLength: 0)
             if account.isConnected {
                 if !account.canManagePlaylists {
                     Button {
@@ -436,7 +388,8 @@ struct YouTubeSettingsView: View {
                 : tr("Default browser", "默认浏览器"),
             value: webHomeBrowserDescription)
 
-        VStack(alignment: .trailing, spacing: 8) {
+        HStack(spacing: 8) {
+            Spacer(minLength: 0)
             if webHome.isEnabled {
                 Button(role: .destructive) {
                     pendingRemoval = ActionConfirmation(

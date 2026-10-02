@@ -237,8 +237,7 @@ enum TrayIcon {
         let image = url.flatMap { NSImage(contentsOf: $0) }
         // Center the lyre in the native 18pt canvas with a small symmetric inset.
         // Avoid a baseline lift: the tall mark already reads high beside other symbols.
-        return templateImage(from: image, pointSize: 18, sourceInsetFraction: 0.2,
-                             contentInset: 0.25)
+        return templateImage(from: image, pointSize: 18, contentInset: 0.5, trimInk: true)
     }()
     static let settingsImage = templateImage(pointSize: 24)
 
@@ -250,7 +249,8 @@ enum TrayIcon {
     }
 
     static func templateImage(from source: NSImage? = nil, pointSize: CGFloat = 18,
-                              sourceInsetFraction: CGFloat = 0, contentInset: CGFloat = 0) -> NSImage {
+                              sourceInsetFraction: CGFloat = 0, contentInset: CGFloat = 0,
+                              trimInk: Bool = false) -> NSImage {
         let src = source ?? logoImage ?? NSImage(size: NSSize(width: pointSize, height: pointSize))
         let scale: CGFloat = 2
         let px = max(Int((pointSize * scale).rounded()), 1)
@@ -273,13 +273,20 @@ enum TrayIcon {
         NSGraphicsContext.saveGraphicsState()
         NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
         let inset = min(max(0, contentInset * scale), CGFloat(px) / 2)
-        let drawRect = NSRect(x: inset, y: inset,
+        var drawRect = NSRect(x: inset, y: inset,
                               width: CGFloat(px) - inset * 2, height: CGFloat(px) - inset * 2)
+        let sourceRect = trimInk ? inkBounds(in: src)
+            : (sourceInsetFraction > 0
+               ? NSRect(origin: .zero, size: src.size).insetBy(dx: src.size.width * sourceInsetFraction,
+                                                              dy: src.size.height * sourceInsetFraction) : .zero)
+        if trimInk, sourceRect.width > 0, sourceRect.height > 0 {
+            let ratio = min(drawRect.width / sourceRect.width, drawRect.height / sourceRect.height)
+            let size = NSSize(width: sourceRect.width * ratio, height: sourceRect.height * ratio)
+            drawRect = NSRect(x: (CGFloat(px) - size.width) / 2, y: (CGFloat(px) - size.height) / 2,
+                              width: size.width, height: size.height)
+        }
         src.draw(in: drawRect,
-                 from: sourceInsetFraction > 0
-                    ? NSRect(origin: .zero, size: src.size).insetBy(dx: src.size.width * sourceInsetFraction,
-                                                                  dy: src.size.height * sourceInsetFraction)
-                    : .zero,
+                 from: sourceRect,
                  operation: .copy,
                  fraction: 1,
                  respectFlipped: true,
@@ -320,6 +327,27 @@ enum TrayIcon {
         img.addRepresentation(rep)
         img.isTemplate = true
         return img
+    }
+
+    /// Measure the visible mark rather than relying on symmetric source padding.
+    /// Bitmap rows run top-down; NSImage source rectangles use bottom-left origin.
+    static func inkBounds(in image: NSImage) -> NSRect {
+        guard let data = image.tiffRepresentation, let bitmap = NSBitmapImageRep(data: data) else { return .zero }
+        var minX = bitmap.pixelsWide, minY = bitmap.pixelsHigh, maxX = -1, maxY = -1
+        for y in 0..<bitmap.pixelsHigh {
+            for x in 0..<bitmap.pixelsWide {
+                guard let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB),
+                      color.alphaComponent > 0.08,
+                      0.299 * color.redComponent + 0.587 * color.greenComponent + 0.114 * color.blueComponent < 0.88 else { continue }
+                minX = min(minX, x); maxX = max(maxX, x)
+                minY = min(minY, y); maxY = max(maxY, y)
+            }
+        }
+        guard maxX >= minX, maxY >= minY else { return .zero }
+        let sx = image.size.width / CGFloat(bitmap.pixelsWide)
+        let sy = image.size.height / CGFloat(bitmap.pixelsHigh)
+        return NSRect(x: CGFloat(minX) * sx, y: image.size.height - CGFloat(maxY + 1) * sy,
+                      width: CGFloat(maxX - minX + 1) * sx, height: CGFloat(maxY - minY + 1) * sy)
     }
 }
 

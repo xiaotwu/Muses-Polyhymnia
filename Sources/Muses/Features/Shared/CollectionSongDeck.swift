@@ -699,7 +699,7 @@ struct CollectionDeckStage<Controls: View>: View {
                       abs(value.translation.width) > 7,
                       let origin = dragOrigin else { return }
                 horizontalDragActive = true
-                setPosition(origin - value.translation.width / geometry.spread, animated: false)
+                setPosition(origin - value.translation.width * 0.45 / geometry.spread, animated: false)
             }
             .onEnded { value in
                 let origin = dragOrigin ?? position
@@ -711,8 +711,8 @@ struct CollectionDeckStage<Controls: View>: View {
                 }
                 let target = CollectionDeckProjection.projectedIndex(
                     startPosition: origin,
-                    translation: value.translation.width,
-                    predictedTranslation: value.predictedEndTranslation.width,
+                    translation: value.translation.width * 0.45,
+                    predictedTranslation: value.predictedEndTranslation.width * 0.45,
                     spread: geometry.spread,
                     count: rows.count
                 )
@@ -1302,10 +1302,10 @@ struct CollectionDeckScrollInput {
         -(abs(horizontal) > abs(vertical) ? horizontal : vertical)
     }
 
-    /// Precise input follows finger motion immediately rather than repeatedly
-    /// retargeting a discrete snap animation. Keep the existing per-event bound.
+    /// About 85 points of finger movement advances one card. Limit event spikes
+    /// without changing display coalescing or the canonical collection focus.
     static func preciseMovement(delta: CGFloat) -> CGFloat {
-        min(3, max(-3, delta / 34))
+        min(1, max(-1, delta / 85))
     }
 
     mutating func consume(delta: CGFloat, timestamp: TimeInterval) -> Int {

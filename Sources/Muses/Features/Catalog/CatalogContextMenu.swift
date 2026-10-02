@@ -85,16 +85,17 @@ private struct CatalogCollectionContextMenu: ViewModifier {
                     NSPasteboard.general.setString(link.absoluteString, forType: .string)
                 }
                 Button {
-                    NSWorkspace.shared.open(link)
+                    if let first = tracks.first { PlaybackPresentation.video(first, context: tracks, playback: playback) }
+                    else { onOpen() }
                 } label: {
                     Label {
-                        Text(tr("Open on YouTube Music", "在 YouTube Music 打开"))
+                        Text(tr("Floating video", "悬浮视频"))
                     } icon: {
                         YouTubeMark(size: 12)
                             .accessibilityHidden(true)
                     }
                 }
-                .accessibilityLabel(tr("Open on YouTube Music", "在 YouTube Music 打开"))
+                .accessibilityLabel(tr("Floating video", "悬浮视频"))
             }
         }
     }

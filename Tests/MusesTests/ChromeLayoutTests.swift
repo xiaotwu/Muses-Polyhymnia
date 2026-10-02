@@ -655,7 +655,7 @@ struct ChromeLayoutTests {
         #expect(!volume.contains("Image(systemName: \"airplayaudio\")"))
 
         let menuBar = try readSource("Sources/Muses/Features/MiniPlayer/MenuBarPlayerView.swift")
-        #expect(menuBar.contains("LiquidGlassVolumeBar("))
+        #expect(menuBar.contains("VolumeKnob(size: 40)"))
         #expect(!menuBar.contains("Image(systemName: \"airplayaudio\")"))
     }
 

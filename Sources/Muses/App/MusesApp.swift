@@ -476,7 +476,9 @@ struct MusesApp: App {
                     .modelContainer(modelContainer)
                     .background(MiniPlayerOpener())
                     .onOpenURL { url in
-                        externalPlaybackRouter.open(url)
+                        if let route = LyricsSearchRoute(url: url) {
+                            MusesSingleInstance.requestLyricsSearch(route.query)
+                        } else { externalPlaybackRouter.open(url) }
                     }
             }
         }

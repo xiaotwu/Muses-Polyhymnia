@@ -300,8 +300,8 @@ struct GlobalSearchView: View {
                                 .youTubeEntryContextMenu(entry: entry) {
                                     Task { await playYouTube(entry) }
                                 }
-                                } else if let url = entry.resourceURL {
-                                    Button { NSWorkspace.shared.open(url) } label: {
+                                } else if entry.resourceURL != nil {
+                                    Button { openResource(entry) } label: {
                                         HStack {
                                             Image(systemName: entry.resourceKind == .channel ? "person.crop.circle" : "music.note.list")
                                             Text(entry.title)
@@ -359,11 +359,13 @@ struct GlobalSearchView: View {
 
     private func play(_ snapshot: TrackSnapshot, context: [TrackSnapshot]) {
         playback.playTrack(snapshot, context: context, from: .search)
+        PlaybackPresentation.nowPlaying()
     }
 
     private func playFirst(_ tracks: [TrackSnapshot], source: QueueSource) {
         guard let first = tracks.first else { return }
         playback.playTrack(first, context: tracks, from: source)
+        PlaybackPresentation.nowPlaying()
     }
 
     private func openNote(_ hit: NotesService.NoteSearchHit) {
@@ -377,9 +379,17 @@ struct GlobalSearchView: View {
         return TrackSnapshot(from: track)
     }
 
+    private func openResource(_ entry: YTDlpBridge.YTDlpPlaylistEntry) {
+        let browseID = entry.resourceKind == .playlist && !entry.id.hasPrefix("VL") ? "VL" + entry.id : entry.id
+        search.musicCatalog.open(MusicCatalogItem(id: "browse:" + browseID,
+            kind: entry.resourceKind == .channel ? .artist : .playlist,
+            title: entry.title, subtitle: entry.uploader ?? "YouTube Music", artwork: nil,
+            artists: [], releases: [], channels: []))
+    }
+
     private func playYouTube(_ entry: YTDlpBridge.YTDlpPlaylistEntry) async {
         guard entry.resourceKind == .video else {
-            if let url = entry.resourceURL { NSWorkspace.shared.open(url) }
+            openResource(entry)
             return
         }
         guard let searchService = search.youTubeSearch else { return }
@@ -390,6 +400,7 @@ struct GlobalSearchView: View {
                 youTubeEntries: search.youtubeResults
             )
             playback.playTrack(snapshot, context: context, from: .search)
+        PlaybackPresentation.nowPlaying()
         } catch {
             // Results remain visible so a failed import can be retried.
         }

@@ -43,6 +43,9 @@ struct WebHomeBootstrapContext: Sendable, Equatable {
     let visitorData: String
     let locale: String
     let region: String
+    var sessionIndex: String = "0"
+    var delegatedSessionID: String? = nil
+    var isYouTubeWeb = false
 }
 
 struct WebHomeSessionResult: Sendable {
@@ -57,8 +60,10 @@ struct WebHomeBootstrapParser: Sendable {
               let string = String(data: html, encoding: .utf8) else {
             throw WebHomeCoreError.code(.shapeChanged)
         }
-        if string.localizedCaseInsensitiveContains("consent.youtube.com")
-            || string.localizedCaseInsensitiveContains("recaptcha") {
+        // Normal signed-in pages reference consent and reCAPTCHA scripts too.
+        // Detect rendered challenges, not an incidental URL in a JS bundle.
+        let challenge = #"(?is)<form\b[^>]*action\s*=\s*["']https://consent\.youtube\.com|<(?:div|iframe)\b[^>]*(?:id|class)\s*=\s*["'][^"']*(?:g-recaptcha|recaptcha-container)"#
+        if string.range(of: challenge, options: .regularExpression) != nil {
             throw WebHomeCoreError.code(.consentOrCaptchaRequired)
         }
         guard let apiKey = capture("INNERTUBE_API_KEY", in: string),
@@ -69,12 +74,26 @@ struct WebHomeBootstrapParser: Sendable {
               !visitorData.isEmpty else {
             throw WebHomeCoreError.code(.shapeChanged)
         }
-        return WebHomeBootstrapContext(
+        var context = WebHomeBootstrapContext(
             apiKey: apiKey,
             clientVersion: clientVersion,
             visitorData: visitorData,
             locale: locale,
             region: region)
+        context.sessionIndex = capture("SESSION_INDEX", in: string) ?? captureNumber("SESSION_INDEX", in: string) ?? "0"
+        guard let index = Int(context.sessionIndex), (0...9).contains(index) else {
+            throw WebHomeCoreError.code(.identityUnavailable)
+        }
+        context.delegatedSessionID = capture("DELEGATED_SESSION_ID", in: string)
+        return context
+    }
+
+    private func captureNumber(_ key: String, in string: String) -> String? {
+        let pattern = "\"" + NSRegularExpression.escapedPattern(for: key) + "\"\\s*:\\s*([0-9]+)"
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(in: string, range: NSRange(string.startIndex..., in: string)),
+              let range = Range(match.range(at: 1), in: string) else { return nil }
+        return String(string[range])
     }
 
     private func capture(_ key: String, in string: String) -> String? {
@@ -89,6 +108,44 @@ struct WebHomeBootstrapParser: Sendable {
 }
 
 struct WebHomeIdentityParser: Sendable {
+    func selectedHandle(from data: Data) throws -> String {
+        guard data.count <= 2 * 1024 * 1024,
+              let root = try? JSONSerialization.jsonObject(with: data) else {
+            throw WebHomeCoreError.code(.identityUnavailable)
+        }
+        var handles: [String] = []
+        var selectedCount = 0
+        func visit(_ value: Any) {
+            if let dictionary = value as? [String: Any] {
+                if let item = dictionary["accountItem"] as? [String: Any], item["isSelected"] as? Bool == true {
+                    selectedCount += 1
+                    if let handle = item["channelHandle"] as? [String: Any], let runs = handle["runs"] as? [[String: Any]] {
+                        handles.append(runs.compactMap { $0["text"] as? String }.joined())
+                    }
+                }
+                dictionary.values.forEach(visit)
+            } else if let array = value as? [Any] { array.forEach(visit) }
+        }
+        visit(root)
+        guard selectedCount == 1, handles.count == 1, let handle = handles.first,
+              handle.hasPrefix("@"), (2...100).contains(handle.count),
+              handle.unicodeScalars.dropFirst().allSatisfy({ CharacterSet.alphanumerics.contains($0) || "._-".unicodeScalars.contains($0) }) else {
+            throw WebHomeCoreError.code(.identityUnavailable)
+        }
+        return handle
+    }
+
+    func resolvedChannelID(from data: Data) throws -> String {
+        guard data.count <= 2 * 1024 * 1024,
+              let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              let endpoint = root["endpoint"] as? [String: Any],
+              let browse = endpoint["browseEndpoint"] as? [String: Any],
+              let id = browse["browseId"] as? String, isChannelID(id) else {
+            throw WebHomeCoreError.code(.identityUnavailable)
+        }
+        return id
+    }
+
     func channelID(from data: Data) throws -> String {
         guard data.count <= 2 * 1024 * 1024,
               let root = try? JSONSerialization.jsonObject(with: data) else {
@@ -247,7 +304,44 @@ final class WebHomeSessionClient: @unchecked Sendable {
             cookies: cookies,
             timeout: timeout,
             extraBody: [:])
-        let channelID = try identityParser.channelID(from: identityResponse)
+        let channelID: String
+        do {
+            channelID = try identityParser.channelID(from: identityResponse)
+        } catch WebHomeCoreError.code(.identityUnavailable) {
+            // WEB_REMIX may omit the current-channel link entirely. Verify the
+            // same selected account using YouTube's WEB account menu, keeping
+            // cookie material inside this helper and rejecting account switches.
+            let webBootstrap = try await send(
+                request: URLRequest(url: URL(string: "https://www.youtube.com/")!),
+                timeout: timeout, cookies: cookies, context: nil, body: nil)
+            guard webBootstrap.statusCode == 200, webBootstrap.finalURL?.host == "www.youtube.com" else {
+                throw WebHomeCoreError.code(.identityUnavailable)
+            }
+            var webContext = try bootstrapParser.parse(html: webBootstrap.data, locale: request.locale, region: request.region)
+            guard webContext.sessionIndex == context.sessionIndex,
+                  webContext.delegatedSessionID == context.delegatedSessionID else {
+                throw WebHomeCoreError.code(.accountMismatch)
+            }
+            webContext.isYouTubeWeb = true
+            let webIdentity = try await post(endpoint: "account/account_menu", context: webContext,
+                                             cookies: cookies, timeout: timeout, extraBody: [:])
+            do {
+                channelID = try identityParser.channelID(from: webIdentity)
+            } catch WebHomeCoreError.code(.identityUnavailable) {
+                // Current account menus may expose only a handle. Resolve only
+                // the uniquely selected account, never an arbitrary result or
+                // the requested OAuth ID. This is still a read-only verification.
+                let accounts = try await post(endpoint: "account/accounts_list", context: webContext,
+                                              cookies: cookies, timeout: timeout, extraBody: [:])
+                let handle = try identityParser.selectedHandle(from: accounts)
+                var channelURL = URLComponents(string: "https://www.youtube.com")!
+                channelURL.path = "/" + handle
+                let resolved = try await post(endpoint: "navigation/resolve_url", context: webContext,
+                                              cookies: cookies, timeout: timeout,
+                                              extraBody: ["url": channelURL.url!.absoluteString])
+                channelID = try identityParser.resolvedChannelID(from: resolved)
+            }
+        }
         guard channelID == request.expectedChannelID else {
             throw WebHomeCoreError.code(.accountMismatch)
         }
@@ -284,7 +378,7 @@ final class WebHomeSessionClient: @unchecked Sendable {
         extraBody: [String: Any]
     ) async throws -> Data {
         var components = URLComponents(
-            string: "https://music.youtube.com/youtubei/v1/\(endpoint)")!
+            string: "\(context.isYouTubeWeb ? "https://www.youtube.com" : "https://music.youtube.com")/youtubei/v1/\(endpoint)")!
         components.queryItems = [
             URLQueryItem(name: "key", value: context.apiKey),
             URLQueryItem(name: "prettyPrint", value: "false")
@@ -292,7 +386,7 @@ final class WebHomeSessionClient: @unchecked Sendable {
         var body: [String: Any] = [
             "context": [
                 "client": [
-                    "clientName": "WEB_REMIX",
+                    "clientName": context.isYouTubeWeb ? "WEB" : "WEB_REMIX",
                     "clientVersion": context.clientVersion,
                     "hl": context.locale,
                     "gl": context.region,
@@ -302,6 +396,11 @@ final class WebHomeSessionClient: @unchecked Sendable {
             ]
         ]
         for (key, value) in extraBody { body[key] = value }
+        if let delegatedID = context.delegatedSessionID {
+            var requestContext = body["context"] as? [String: Any] ?? [:]
+            requestContext["user"] = ["enableSafetyMode": false, "onBehalfOfUser": delegatedID]
+            body["context"] = requestContext
+        }
         let bodyData = try JSONSerialization.data(withJSONObject: body)
         let response = try await send(
             request: URLRequest(url: components.url!),
@@ -332,17 +431,18 @@ final class WebHomeSessionClient: @unchecked Sendable {
         request.timeoutInterval = timeout
         request.httpMethod = body == nil ? "GET" : "POST"
         request.httpBody = body
-        request.setValue("https://music.youtube.com", forHTTPHeaderField: "Origin")
-        request.setValue("https://music.youtube.com/", forHTTPHeaderField: "Referer")
+        let origin = base.url?.host == "www.youtube.com" ? "https://www.youtube.com" : "https://music.youtube.com"
+        request.setValue(origin, forHTTPHeaderField: "Origin")
+        request.setValue(origin + "/", forHTTPHeaderField: "Referer")
         request.setValue(Self.desktopWebUserAgent, forHTTPHeaderField: "User-Agent")
-        request.setValue(cookies.header(for: "music.youtube.com"), forHTTPHeaderField: "Cookie")
-        request.setValue(authorization(sapisid: sapisid), forHTTPHeaderField: "Authorization")
-        request.setValue("0", forHTTPHeaderField: "X-Goog-AuthUser")
+        request.setValue(cookies.header(for: base.url?.host ?? "music.youtube.com"), forHTTPHeaderField: "Cookie")
+        request.setValue(authorization(sapisid: sapisid, origin: origin), forHTTPHeaderField: "Authorization")
+        request.setValue(context?.sessionIndex ?? "0", forHTTPHeaderField: "X-Goog-AuthUser")
         if body != nil {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         }
         if let context {
-            request.setValue("67", forHTTPHeaderField: "X-YouTube-Client-Name")
+            request.setValue(context.isYouTubeWeb ? "1" : "67", forHTTPHeaderField: "X-YouTube-Client-Name")
             request.setValue(context.clientVersion, forHTTPHeaderField: "X-YouTube-Client-Version")
             request.setValue(context.visitorData, forHTTPHeaderField: "X-Goog-Visitor-Id")
         }
@@ -363,9 +463,9 @@ final class WebHomeSessionClient: @unchecked Sendable {
         }
     }
 
-    private func authorization(sapisid: String) -> String {
+    private func authorization(sapisid: String, origin: String) -> String {
         let timestamp = Int(now().timeIntervalSince1970)
-        let input = Data("\(timestamp) \(sapisid) https://music.youtube.com".utf8)
+        let input = Data("\(timestamp) \(sapisid) \(origin)".utf8)
         let digest = Insecure.SHA1.hash(data: input)
             .map { String(format: "%02x", $0) }.joined()
         return "SAPISIDHASH \(timestamp)_\(digest)"

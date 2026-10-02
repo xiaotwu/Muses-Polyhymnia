@@ -65,13 +65,15 @@ struct GlobalSearchTrackRow: View {
                 Text(formatDuration(snapshot.durationSeconds))
                     .font(MusesTypography.caption.monospacedDigit())
                     .foregroundStyle(BrandColors.textSecondary)
-                YouTubeMark(size: 13)
-                    .accessibilityHidden(true)
+                Color.clear.frame(width: 28, height: 28)
             }
             .frame(minHeight: SearchPagePolicy.resultRowHeight)
             .contentShape(Rectangle())
         }
         .buttonStyle(.fullAreaPlain)
+        .overlay(alignment: .trailing) {
+            YouTubeVideoButton(entry: .init(id: snapshot.youTubeId, title: snapshot.title, uploader: snapshot.artist, duration: snapshot.durationSeconds))
+        }
         .overlay(alignment: .bottom) {
             Rectangle().fill(BrandColors.hairline).frame(height: 1)
         }
@@ -118,19 +120,7 @@ struct GlobalSearchYouTubeRow: View {
                     .help(tr("In Library", "已在资料库中"))
                     .accessibilityLabel(tr("In Library", "已在资料库中"))
             }
-            YouTubeMark(size: 14)
-                .accessibilityHidden(true)
-            Button {
-                guard let url = URL(string: "https://music.youtube.com/watch?v=\(entry.id)") else { return }
-                NSWorkspace.shared.open(url)
-            } label: {
-                Image(systemName: "arrow.up.right")
-                    .font(MusesTypography.system(size: 12, weight: .semibold))
-                    .frame(width: 28, height: 28)
-            }
-            .buttonStyle(.fullAreaPlain)
-            .help(tr("Open in Browser", "在浏览器中打开"))
-            .accessibilityLabel(tr("Open in Browser", "在浏览器中打开"))
+            YouTubeVideoButton(entry: entry)
         }
         .frame(minHeight: SearchPagePolicy.resultRowHeight)
         .overlay(alignment: .bottom) {

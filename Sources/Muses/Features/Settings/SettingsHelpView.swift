@@ -25,6 +25,16 @@ struct SettingsHelpView: View {
                 }
             } header: { Text(tr("Common questions", "常见问题")) }
             Section {
+                LabeledContent(tr("Report an issue", "报告问题")) {
+                    SettingsIconButton(title: tr("Report an issue", "报告问题"), symbol: "arrow.up.right") {
+                        NSWorkspace.shared.open(URL(string: "https://github.com/xiaotwu/Muses-Polyhymnia/issues/new?template=bug_report.yml")!)
+                    }
+                }
+                LabeledContent(tr("Discuss", "参与讨论")) {
+                    SettingsIconButton(title: tr("Discuss", "参与讨论"), symbol: "arrow.up.right") {
+                        NSWorkspace.shared.open(URL(string: "https://github.com/xiaotwu/Muses-Polyhymnia/discussions")!)
+                    }
+                }
                 LabeledContent(tr("YouTube Help", "YouTube 帮助")) {
                     SettingsIconButton(title: tr("YouTube Help", "YouTube 帮助"), symbol: "arrow.up.right") {
                         NSWorkspace.shared.open(URL(string: "https://support.google.com/youtube/")!)

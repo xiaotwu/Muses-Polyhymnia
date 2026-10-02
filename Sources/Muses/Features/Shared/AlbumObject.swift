@@ -24,6 +24,7 @@ struct AlbumObjectView: View {
     var homeCornerRadius: CGFloat? = nil
     var hoverLift: CGFloat? = nil
     var pressedScale: CGFloat = 1
+    var videoEntry: YTDlpBridge.YTDlpPlaylistEntry? = nil
     var isYouTube = false
     var isNowPlaying: Bool = false
     /// Snap-level identity for `.play` rails. Compared inside `NowPlayingMark`,
@@ -55,6 +56,7 @@ struct AlbumObjectView: View {
             objectContent
         }
         .buttonStyle(AlbumObjectPressStyle(scale: pressedScale, reduceMotion: reduceMotion))
+        .overlay(alignment: .topTrailing) { sourceBadge }
         .overlay(alignment: .topLeading) {
             if style == .standard {
                 hoverPlayOverlay
@@ -258,7 +260,6 @@ struct AlbumObjectView: View {
             )
             .shadow(radius: style == .standard && hovering && showsHoverPlay ? 18 : 0)
             .overlay(alignment: .bottomLeading) { nowPlayingBadge }
-            .overlay(alignment: .topTrailing) { sourceBadge }
     }
 
     @ViewBuilder
@@ -290,14 +291,16 @@ struct AlbumObjectView: View {
     private var sourceBadge: some View {
         if isYouTube {
             let shape = RoundedRectangle(cornerRadius: 7, style: .continuous)
-            YouTubeMark(size: 12)
+            Group {
+                if let videoEntry { YouTubeVideoButton(entry: videoEntry) }
+                else { YouTubeMark(size: 12).accessibilityHidden(true) }
+            }
                 .padding(.horizontal, 7)
-                .frame(height: 24)
+                .frame(height: videoEntry == nil ? 24 : 32)
                 .background(ContentBadgeStyle.fill, in: shape)
                 .overlay(shape.stroke(ContentBadgeStyle.stroke, lineWidth: ContentBadgeStyle.lineWidth))
                 .padding(8)
-                .help(tr("YouTube playlist", "YouTube 歌单"))
-                .accessibilityLabel(tr("YouTube playlist", "YouTube 歌单"))
+                .help(videoEntry == nil ? tr("YouTube playlist", "YouTube 歌单") : tr("Floating video", "悬浮视频"))
         }
     }
 }

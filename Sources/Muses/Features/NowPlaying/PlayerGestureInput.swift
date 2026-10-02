@@ -121,6 +121,7 @@ struct PlayerGestureInput: NSViewRepresentable {
         var y: CGFloat = 0
         var triggered = false
         var eligible = false
+        var lastEventAt: TimeInterval = 0
 
         func install() {
             monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
@@ -131,20 +132,29 @@ struct PlayerGestureInput: NSViewRepresentable {
         func stop() { if let monitor { NSEvent.removeMonitor(monitor) }; monitor = nil }
         func handle(_ event: NSEvent) -> NSEvent? {
             guard let view, let config = configuration, config.enabled,
-                  event.window === view.window, event.hasPreciseScrollingDeltas,
-                  event.momentumPhase.isEmpty else { return event }
-            if event.phase.contains(.began) {
+                  event.window === view.window, event.hasPreciseScrollingDeltas else { return event }
+            if !event.momentumPhase.isEmpty { return eligible && triggered ? nil : event }
+            if event.phase.contains(.began) || event.timestamp - lastEventAt > 0.3 {
                 x = 0; y = 0; triggered = false
                 let point = view.convert(event.locationInWindow, from: nil)
                 eligible = view.bounds.contains(point)
-                    && (!config.hasLyricsColumn || point.x < view.bounds.width * 0.5)
-                var hit = event.window?.contentView?.hitTest(event.locationInWindow)
+                    && (!config.hasLyricsColumn || view.bounds.width < NowPlayingLayout.splitBreakpoint
+                        || point.x < view.bounds.width * 0.5)
+                let content = event.window?.contentView
+                var hit = content?.hitTest(content?.convert(event.locationInWindow, from: nil) ?? .zero)
                 while let target = hit {
-                    if target is NSScrollView || target is NSControl { eligible = false; break }
+                    if target is NSControl || target is NSTextView { eligible = false; break }
+                    if let scroll = target as? NSScrollView, let document = scroll.documentView,
+                       document.bounds.height > scroll.contentView.bounds.height + 1
+                        || document.bounds.width > scroll.contentView.bounds.width + 1 {
+                        eligible = false; break
+                    }
                     hit = target.superview
                 }
             }
-            guard eligible, !triggered else { return event }
+            lastEventAt = event.timestamp
+            guard eligible else { return event }
+            guard !triggered else { return nil }
             guard event.phase.contains(.began) || event.phase.contains(.changed) else { return event }
             x += PlayerGesturePolicy.fingerDelta(event.scrollingDeltaX, invertedFromDevice: event.isDirectionInvertedFromDevice)
             y += PlayerGesturePolicy.fingerDelta(event.scrollingDeltaY, invertedFromDevice: event.isDirectionInvertedFromDevice)

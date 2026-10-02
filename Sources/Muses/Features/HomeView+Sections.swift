@@ -55,6 +55,7 @@ extension HomeView {
                 subtitle: card.uploader ?? "YouTube Music",
                 artwork: ArtworkSource.resolve(
                     remoteURL: card.thumbnailURL, youTubeId: card.playableVideoID),
+                videoEntry: card.playableVideoID.map { .init(id: $0, title: card.title, uploader: card.uploader, duration: card.duration) },
                 isYouTube: true,
                 style: .home,
                 onOpen: { Task { await play(card) } },
@@ -68,6 +69,7 @@ extension HomeView {
                 title: snapshot.title,
                 subtitle: SongCreditCache.shared.artist(snapshot: snapshot),
                 artwork: ArtworkSource.resolve(for: snapshot),
+                videoEntry: .init(id: snapshot.youTubeId, title: snapshot.title, uploader: snapshot.artist, duration: snapshot.durationSeconds),
                 isYouTube: true,
                 nowPlayingID: snapshot.id,
                 style: .home,
@@ -325,6 +327,8 @@ extension HomeView {
                 size: MusicObjectMetrics.albumRail,
                 role: canPlay ? .play : .browse,
                 style: .home,
+                videoEntry: card.playableVideoID.map { .init(id: $0, title: card.title, uploader: card.uploader, duration: card.duration) },
+                isYouTube: true,
                 showsHoverPlay: canPlay,
                 onSelect: { openWebCard(card) },
                 onPlay: {
@@ -420,16 +424,17 @@ extension HomeView {
                                 name: .musesNavigateYouTubeImport, object: imported)
                         }
                         Button {
-                            if let url = URL(string: imported.url) { NSWorkspace.shared.open(url) }
+                            let context = (imported.items ?? []).sorted { $0.order < $1.order }.compactMap(\.track).map(TrackSnapshot.init(from:))
+                            if let first = context.first { PlaybackPresentation.video(first, context: context, playback: playback) }
                         } label: {
                             Label {
-                                Text(tr("Open on YouTube", "在 YouTube 打开"))
+                                Text(tr("Floating video", "悬浮视频"))
                             } icon: {
                                 YouTubeMark(size: 12)
                                     .accessibilityHidden(true)
                             }
                         }
-                        .accessibilityLabel(tr("Open on YouTube", "在 YouTube 打开"))
+                        .accessibilityLabel(tr("Floating video", "悬浮视频"))
                     }
                 }
             }
@@ -665,6 +670,7 @@ extension HomeView {
                       source: QueueSource = .search) {
         let playableContext = context.isEmpty ? [snapshot] : context
         playback.playTrack(snapshot, context: playableContext, from: source)
+        PlaybackPresentation.nowPlaying()
     }
 
     func play(_ card: YouTubeDiscoveryCard,
@@ -696,6 +702,7 @@ extension HomeView {
             let context = TrackSnapshot.playbackContext(playing: snapshot, youTubeEntries: entries)
             interactionError = nil
             playback.playTrack(snapshot, context: context, from: .search)
+        PlaybackPresentation.nowPlaying()
         } catch {
             interactionError = tr(
                 "This YouTube Music item could not be prepared: \(error.localizedDescription)",
@@ -713,6 +720,7 @@ extension HomeView {
             )
             interactionError = nil
             playback.playTrack(snapshot, context: context, from: .search)
+        PlaybackPresentation.nowPlaying()
         } catch {
             interactionError = tr(
                 "This YouTube Music item could not be prepared: \(error.localizedDescription)",
@@ -736,6 +744,7 @@ extension HomeView {
         }
         interactionError = nil
         playback.playTrack(first, context: snapshots, from: .import)
+        PlaybackPresentation.nowPlaying()
     }
 
     func playAll(_ items: [DiscoveryItem]) {
@@ -774,6 +783,7 @@ extension HomeView {
                 "正在播放可用歌曲。以下内容无法准备：\(failedTitles.joined(separator: "、"))", zhHant: "正在播放可用歌曲。以下內容無法準備：\(failedTitles.joined(separator: "、"))"
             )
             playback.playTrack(first, context: snapshots, from: .search)
+        PlaybackPresentation.nowPlaying()
         }
     }
 
@@ -845,23 +855,22 @@ extension HomeView {
     }
 
     func openWebCard(_ card: YouTubeDiscoveryCard) {
-        guard let endpoint = card.browseEndpoint ?? card.playEndpoint else { return }
-        var components = URLComponents()
-        components.scheme = "https"
-        components.host = "music.youtube.com"
+        if card.playableVideoID != nil { Task { await play(card) }; return }
+        guard card.availability == .available,
+              let endpoint = card.browseEndpoint ?? card.playEndpoint else { return }
+        let browseID: String
+        let kind: MusicCatalogKind
         switch endpoint.kind {
-        case .video:
-            components.path = "/watch"
-            components.queryItems = [URLQueryItem(name: "v", value: endpoint.identifier)]
-        case .playlist:
-            components.path = "/playlist"
-            components.queryItems = [URLQueryItem(name: "list", value: endpoint.identifier)]
-        case .browse:
-            components.path = "/browse/\(endpoint.identifier)"
-        case .channel:
-            components.path = "/channel/\(endpoint.identifier)"
+        case .video: Task { await play(card) }; return
+        case .playlist: browseID = endpoint.identifier.hasPrefix("VL") ? endpoint.identifier : "VL" + endpoint.identifier; kind = .playlist
+        case .browse: browseID = endpoint.identifier; kind = endpoint.identifier.hasPrefix("MPRE") ? .album : .playlist
+        case .channel: browseID = endpoint.identifier; kind = .artist
         }
-        if let url = components.url { NSWorkspace.shared.open(url) }
+        globalSearch.reset()
+        globalSearch.musicCatalog.browse(MusicCatalogItem(id: "browse:" + browseID, kind: kind,
+            title: card.title, subtitle: card.uploader ?? "YouTube Music",
+            artwork: card.thumbnailURL.flatMap(URL.init(string:)), artists: [], releases: [], channels: []))
+        NotificationCenter.default.post(name: .musesNavigateFromSearch, object: GlobalSearchRoute.section(.search))
     }
 
     func webCardSubtitle(_ card: YouTubeDiscoveryCard) -> String {

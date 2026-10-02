@@ -44,5 +44,8 @@ struct MusesAppShortcuts: AppShortcutsProvider {
         AppShortcut(intent: PlayYouTubeLinkIntent(),
                     phrases: ["Play a YouTube link in \(.applicationName)"],
                     shortTitle: "Play YouTube Link", systemImageName: "play.rectangle")
+        AppShortcut(intent: SearchLyricsIntent(),
+                    phrases: ["Search lyrics in \(.applicationName)", "Match lyrics in \(.applicationName)"],
+                    shortTitle: "Search Lyrics", systemImageName: "text.magnifyingglass")
     }
 }

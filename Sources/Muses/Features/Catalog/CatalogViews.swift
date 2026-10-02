@@ -429,9 +429,10 @@ struct CatalogReleaseDetailView: View {
                         .disabled(isLoadingOnlineTracks)
                     if isLoadingOnlineTracks { ProgressView().controlSize(.small) }
 
-                    if let url = YouTubeCatalogLink.releaseURL(stableID: currentRelease.stableID) {
+                    if YouTubeCatalogLink.releaseURL(stableID: currentRelease.stableID) != nil {
                         Button {
-                            NSWorkspace.shared.open(url)
+                            if let first = currentRelease.tracks.first { PlaybackPresentation.video(first, context: currentRelease.tracks, playback: playback) }
+                            else { checkOnlineTracklist() }
                         } label: {
                             YouTubeMark(size: 14)
                                 .padding(8)
@@ -439,7 +440,7 @@ struct CatalogReleaseDetailView: View {
                                 .overlay(Circle().stroke(BrandColors.hairline, lineWidth: 1))
                         }
                         .buttonStyle(.fullAreaPlain)
-                        .help(tr("Open in YouTube Music", "在 YouTube Music 打开"))
+                        .help(tr("Floating video", "悬浮视频"))
                     }
                 }
             }
@@ -1047,9 +1048,10 @@ struct CatalogArtistDetailView: View {
                         .disabled(isLoadingOnline)
                     if isLoadingOnline { ProgressView().controlSize(.small) }
 
-                    if let url = YouTubeCatalogLink.artistURL(stableID: currentArtist.stableID) {
+                    if YouTubeCatalogLink.artistURL(stableID: currentArtist.stableID) != nil {
                         Button {
-                            NSWorkspace.shared.open(url)
+                            if let first = orderedTracks.first { PlaybackPresentation.video(first, context: orderedTracks, playback: playback) }
+                            else { toggleOnlineDiscovery() }
                         } label: {
                             YouTubeMark(size: 14)
                                 .padding(8)
@@ -1057,7 +1059,7 @@ struct CatalogArtistDetailView: View {
                                 .overlay(Circle().stroke(BrandColors.hairline, lineWidth: 1))
                         }
                         .buttonStyle(.fullAreaPlain)
-                        .help(tr("Open in YouTube Music", "在 YouTube Music 打开"))
+                        .help(tr("Floating video", "悬浮视频"))
                     }
                 }
                 .padding(.top, 4)

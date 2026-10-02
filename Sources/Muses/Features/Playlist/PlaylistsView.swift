@@ -228,16 +228,17 @@ struct PlaylistsView: View {
                                         YouTubeShareMenu(target: target)
                                     }
                                     Button {
-                                        NSWorkspace.shared.open(url)
+                                        let context = (imp.items ?? []).sorted { $0.order < $1.order }.compactMap(\.track).map(TrackSnapshot.init(from:))
+                            if let first = context.first { PlaybackPresentation.video(first, context: context, playback: playback) }
                                     } label: {
                                         Label {
-                                            Text(tr("Open on YouTube", "在 YouTube 打开"))
+                                            Text(tr("Floating video", "悬浮视频"))
                                         } icon: {
                                             YouTubeMark(size: 12)
                                                 .accessibilityHidden(true)
                                         }
                                     }
-                                    .accessibilityLabel(tr("Open on YouTube", "在 YouTube 打开"))
+                                    .accessibilityLabel(tr("Floating video", "悬浮视频"))
                                 }
                                 Divider()
                                 Button(tr("Delete Import", "删除导入"), systemImage: "trash",

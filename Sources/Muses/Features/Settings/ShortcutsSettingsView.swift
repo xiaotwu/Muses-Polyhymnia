@@ -6,7 +6,7 @@ struct ShortcutsSettingsView: View {
     @Environment(RuntimeCapabilities.self) private var capabilities
     @AppStorage(PrefKey.ffGlobalHotkeys) private var globalHotkeys = false
     @AppStorage(PrefKey.gestureClosePlayer) private var closePlayer = true
-    @AppStorage(PrefKey.gestureChangeTrack) private var changeTrack = false
+    @AppStorage(PrefKey.gestureChangeTrack) private var changeTrack = true
     @AppStorage(PrefKey.gestureShowLyrics) private var showLyrics = false
 
     var body: some View {

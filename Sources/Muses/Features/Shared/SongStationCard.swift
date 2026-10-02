@@ -15,6 +15,7 @@ struct SongStationCard: View {
     let title: String
     let subtitle: String
     let artwork: ArtworkSource
+    var videoEntry: YTDlpBridge.YTDlpPlaylistEntry? = nil
     var isYouTube: Bool = false
     var nowPlayingID: UUID? = nil
     var style: SongStationCardStyle = .portraitOverlay
@@ -41,6 +42,7 @@ struct SongStationCard: View {
                 .offset(y: hovering && !reduceMotion ? -3 : 0)
             }
         }
+        .overlay(alignment: .topTrailing) { youTubeBadge }
         .onHover { hovering = $0 }
         .animation(MusesMotion.hoverAnimation(reduceMotion: reduceMotion), value: hovering)
         .accessibilityLabel("\(title) — \(subtitle)")
@@ -91,7 +93,6 @@ struct SongStationCard: View {
                     }
                     .padding(12)
                 }
-                .overlay(alignment: .topTrailing) { youTubeBadge }
             }
             .overlay(alignment: .bottomTrailing) { hoverPlay(padding: 10) }
             .clipShape(shape)
@@ -109,7 +110,6 @@ struct SongStationCard: View {
                 targetSize: SongGridMetrics.maxCard,
                 presentation: .fitOnAmbient
             )
-            .overlay(alignment: .topTrailing) { youTubeBadge }
             .overlay(alignment: .bottomLeading) { nowPlayingBadge }
             .overlay(alignment: .bottomTrailing) { hoverPlay(padding: 9) }
 
@@ -141,9 +141,8 @@ struct SongStationCard: View {
     @ViewBuilder
     private var youTubeBadge: some View {
         if isYouTube {
-            YouTubeMark(size: 16)
-                .padding(10)
-                .accessibilityHidden(true)
+            if let videoEntry { YouTubeVideoButton(entry: videoEntry).padding(4) }
+            else { YouTubeMark(size: 16).padding(10).accessibilityHidden(true) }
         }
     }
 

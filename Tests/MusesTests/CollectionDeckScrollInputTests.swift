@@ -20,14 +20,14 @@ struct CollectionDeckScrollInputTests {
     }
     @Test("Precise scrolling follows sub-threshold input and preserves direction and bounds")
     func continuousTrackpadMovement() {
-        #expect(CollectionDeckScrollInput.preciseMovement(delta: 8.5) == 0.25)
-        #expect(CollectionDeckScrollInput.preciseMovement(delta: -17) == -0.5)
-        #expect(CollectionDeckScrollInput.preciseMovement(delta: 340) == 3)
-        #expect(CollectionDeckScrollInput.preciseMovement(delta: -340) == -3)
+        #expect(CollectionDeckScrollInput.preciseMovement(delta: 8.5) == 0.1)
+        #expect(CollectionDeckScrollInput.preciseMovement(delta: -17) == -0.2)
+        #expect(CollectionDeckScrollInput.preciseMovement(delta: 340) == 1)
+        #expect(CollectionDeckScrollInput.preciseMovement(delta: -340) == -1)
         let position = (0..<40).reduce(CGFloat(0)) { value, _ in
             value + CollectionDeckScrollInput.preciseMovement(delta: 8.5)
         }
-        #expect(position == 10)
+        #expect(abs(position - 4) < 0.00001)
     }
     @Test("Down and right scroll toward later songs on the dominant axis")
     func direction() {

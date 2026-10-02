@@ -30,6 +30,11 @@ struct RootView: View {
     @State private var showYouTubeLink = false
     @State private var droppedYouTubeLink = ""
     @State private var showNowPlaying = false
+    @State private var lyricsSearchRequest: LyricsSearchRequest?
+    private struct LyricsSearchRequest: Identifiable {
+        let id = UUID()
+        let query: String
+    }
     /// The visual layer remains mounted only for the 300ms opacity dismissal;
     /// logical presentation, hit testing, and accessibility stop immediately.
     @State private var nowPlayingOverlayMounted = false
@@ -114,6 +119,10 @@ struct RootView: View {
                 if failed { showQueue = true }
             }
             .onAppear {
+                if let query = MusesSingleInstance.pendingLyricsQuery {
+                    lyricsSearchRequest = LyricsSearchRequest(query: query)
+                    MusesSingleInstance.pendingLyricsQuery = nil
+                }
                 if playback.queue.persistenceFailed { showQueue = true }
                 if MusesSingleInstance.pendingVideoPresentation {
                     MusesSingleInstance.pendingVideoPresentation = false
@@ -299,9 +308,21 @@ struct RootView: View {
                 handleDockLyrics()
             }
             .onReceive(NotificationCenter.default.publisher(for: .musesShowYouTubeVideo)) { _ in
-                guard playback.state.track?.youTubeId != nil else { return }
+                guard let track = playback.state.track, !track.youTubeId.isEmpty else { return }
                 MusesSingleInstance.pendingVideoPresentation = false
+                PlaybackPresentation.video(track, playback: playback)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .musesOpenNowPlaying)) { _ in
+                guard playback.state.track != nil else { return }
+                openNowPlaying()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .musesDockYouTubeVideo)) { _ in
+                guard playback.videoSession != nil else { return }
                 showYouTubeVideo = true
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .musesSearchLyrics)) { note in
+                lyricsSearchRequest = LyricsSearchRequest(query: note.object as? String ?? "")
+                MusesSingleInstance.pendingLyricsQuery = nil
             }
     }
 
@@ -355,6 +376,17 @@ struct RootView: View {
 
     private var sheetHost: some View {
         alertHost
+            .sheet(item: $lyricsSearchRequest) { request in
+                if let track = playback.transportState.track {
+                    LyricsMatchPicker(track: track, initialQuery: request.query).id(track.id)
+                } else {
+                    VStack(spacing: 16) {
+                        ContentUnavailableView(tr("Play a song first", "请先播放歌曲"), systemImage: "music.note",
+                            description: Text(tr("Lyrics are matched to the current recording.", "歌词会匹配当前录音版本。")))
+                        Button(tr("Close", "关闭")) { lyricsSearchRequest = nil }.keyboardShortcut(.cancelAction)
+                    }.padding(24).frame(width: 460, height: 260)
+                }
+            }
             .sheet(isPresented: $showAudioInfo) {
                 AudioInfoPanel()
                     .tint(BrandColors.accent)
@@ -471,7 +503,9 @@ struct RootView: View {
                                       if showQueue { showLyricsDrawer = false }
                                   }
                               },
-                              onVideoTap: { showYouTubeVideo = true })
+                              onVideoTap: {
+                                  if let track = playback.state.track { PlaybackPresentation.video(track, playback: playback) }
+                              })
                         .padding(.horizontal, AppleMusicTokens.playerHorizontalMargin)
                         .padding(.bottom, AppleMusicTokens.playerBottomMargin)
                 }
@@ -806,6 +840,8 @@ extension EnvironmentValues {
 extension Notification.Name {
     static let musesToggleQueue = Notification.Name("muses.toggleQueue")
     static let musesToggleNowPlaying = Notification.Name("muses.toggleNowPlaying")
+    static let musesOpenNowPlaying = Notification.Name("muses.openNowPlaying")
+    static let musesSearchLyrics = Notification.Name("muses.searchLyrics")
     static let musesFocusSearch = Notification.Name("muses.focusSearch")
     static let musesNavigateFromSearch = Notification.Name("muses.navigateFromSearch")
     static let musesNavigateToRelease = Notification.Name("muses.navigateToRelease")
@@ -816,6 +852,7 @@ extension Notification.Name {
     static let musesOpenSettings = Notification.Name("muses.openSettings")
     static let musesToggleLyrics = Notification.Name("muses.toggleLyrics")
     static let musesShowYouTubeVideo = Notification.Name("muses.showYouTubeVideo")
+    static let musesDockYouTubeVideo = Notification.Name("muses.dockYouTubeVideo")
     // Desktop integration notifications (mini player, desktop lyrics).
     static let musesOpenMiniPlayer = Notification.Name("muses.openMiniPlayer")
     static let musesToggleDesktopLyrics = Notification.Name("muses.toggleDesktopLyrics")

@@ -179,7 +179,7 @@ struct NowPlayingView: View {
     @State private var volumePresented = false
     @State private var lastVolumeEscapeTimestamp: TimeInterval?
     @AppStorage(PrefKey.gestureClosePlayer) private var swipeClose = true
-    @AppStorage(PrefKey.gestureChangeTrack) private var swipeTracks = false
+    @AppStorage(PrefKey.gestureChangeTrack) private var swipeTracks = true
     @AppStorage(PrefKey.gestureShowLyrics) private var swipeLyrics = false
     @State private var volumeEscapeHandled = false
     @State private var volumeEscapePending = false
@@ -508,16 +508,16 @@ struct NowPlayingView: View {
                     chaptersPresented = true
                 }
                 Button {
-                    NSWorkspace.shared.open(url)
+                    if let track = playback.state.track { PlaybackPresentation.video(track, playback: playback) }
                 } label: {
                     Label {
-                        Text(tr("Open on YouTube", "在 YouTube 打开"))
+                        Text(tr("Floating video", "悬浮视频"))
                     } icon: {
                         YouTubeMark(size: 12)
                             .accessibilityHidden(true)
                     }
                 }
-                .accessibilityLabel(tr("Open on YouTube", "在 YouTube 打开"))
+                .accessibilityLabel(tr("Floating video", "悬浮视频"))
             }
         }
         .disabled(playback.state.track == nil)

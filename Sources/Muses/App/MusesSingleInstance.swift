@@ -9,6 +9,13 @@ enum MusesSingleInstance {
     @MainActor static var pendingSettings = false
     @MainActor static var pendingVideoPresentation = false
     @MainActor static var pendingSearchRoute: GlobalSearchRoute?
+    @MainActor static var pendingLyricsQuery: String?
+
+    @MainActor static func requestLyricsSearch(_ query: String) {
+        pendingLyricsQuery = query
+        orderFrontMainWindow()
+        NotificationCenter.default.post(name: .musesSearchLyrics, object: query)
+    }
 
     @MainActor
     static func requestSettings(_ category: SettingsCategory? = nil) {

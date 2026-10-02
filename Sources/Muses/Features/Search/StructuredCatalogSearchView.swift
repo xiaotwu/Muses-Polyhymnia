@@ -225,7 +225,6 @@ struct StructuredCatalogSearchView: View {
         if item.id.hasPrefix("browse:") { browser.open(item); return }
         guard podcastState(item)?.availability != .unavailable else { return }
         guard let entry = item.playableEntry, let resolver = search.youTubeSearch else {
-            if item.id.hasPrefix("video:"), let url = URL(string: "https://music.youtube.com/watch?v=" + item.id.dropFirst(6)) { NSWorkspace.shared.open(url) }
             return
         }
         let sourceItems = related ? browser.relatedItems : browser.items
@@ -249,6 +248,7 @@ struct StructuredCatalogSearchView: View {
                         mediaKind: podcast ? .podcastEpisode : .song),
                     from: podcast ? .podcast : .search,
                     resumeAtMs: podcastState(item).flatMap { $0.completed ? nil : $0.lastPositionMs })
+                PlaybackPresentation.nowPlaying()
             } catch { playbackError = true }
         }
     }

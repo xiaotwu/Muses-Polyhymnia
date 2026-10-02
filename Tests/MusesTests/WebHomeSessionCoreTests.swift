@@ -8,6 +8,24 @@ import MusesWebHomeProtocol
 struct WebHomeSessionCoreTests {
     private let channelID = "UC1234567890123456789012"
 
+    @Test("handle fallback requires exactly one selected account and an explicit resolved channel")
+    func selectedHandleVerification() throws {
+        let parser = WebHomeIdentityParser()
+        let selected: [String: Any] = ["accountItem": ["isSelected": true, "channelHandle": ["runs": [["text": "@Example"]]]]]
+        let unselected: [String: Any] = ["accountItem": ["isSelected": false, "channelHandle": ["runs": [["text": "@Other"]]]]]
+        #expect(try parser.selectedHandle(from: JSONSerialization.data(withJSONObject: [selected, unselected])) == "@Example")
+        #expect(throws: WebHomeCoreError.self) {
+            try parser.selectedHandle(from: JSONSerialization.data(withJSONObject: [selected, selected]))
+        }
+        #expect(throws: WebHomeCoreError.self) {
+            try parser.selectedHandle(from: JSONSerialization.data(withJSONObject: [unselected]))
+        }
+        #expect(try parser.resolvedChannelID(from: JSONSerialization.data(withJSONObject: ["endpoint": ["browseEndpoint": ["browseId": channelID]]])) == channelID)
+        #expect(throws: WebHomeCoreError.self) {
+            try parser.resolvedChannelID(from: JSONSerialization.data(withJSONObject: ["unrelated": ["browseId": channelID]]))
+        }
+    }
+
     @Test("temporary browser jar is 0600 inside a 0700 directory and is deleted")
     func temporaryJarPermissionsAndCleanup() async throws {
         let root = temporaryRoot()
@@ -230,6 +248,50 @@ struct WebHomeSessionCoreTests {
                 cookies: jar)
         }
         #expect(await transport.requests.isEmpty)
+    }
+
+    @Test("WEB identity fallback verifies the same account without fetching Home")
+    func identityFallback() async throws {
+        let web = WebHomeTransportResponse(data: bootstrapHTML, statusCode: 200,
+                                          finalURL: URL(string: "https://www.youtube.com/"))
+        let transport = QueueWebHomeTransport(responses: [response(bootstrapHTML), response(Data("{}".utf8)),
+                                                         web, response(identityJSON(channelID: channelID))])
+        let result = try await WebHomeSessionClient(transport: transport).execute(
+            request: request(expectedChannelID: channelID), cookies: cookieJar)
+        #expect(result.channelID == channelID)
+        #expect(result.payload == nil)
+        let requests = await transport.requests
+        #expect(requests.count == 4)
+        #expect(requests[3].url?.host == "www.youtube.com")
+        #expect(requests[3].value(forHTTPHeaderField: "X-YouTube-Client-Name") == "1")
+        #expect(requests[3].value(forHTTPHeaderField: "Origin") == "https://www.youtube.com")
+    }
+
+    @Test("Bootstrap ignores incidental consent scripts but rejects visible challenges")
+    func bootstrapChallenges() throws {
+        let parser = WebHomeBootstrapParser()
+        let normal = Data((String(decoding: bootstrapHTML, as: UTF8.self)
+            + "<script src='https://www.google.com/recaptcha/api.js'></script><a href='https://consent.youtube.com'>Privacy</a>").utf8)
+        #expect(try parser.parse(html: normal, locale: "en", region: "US").apiKey == "key")
+        let challenge = Data("<form action='https://consent.youtube.com/save'>Continue</form>".utf8)
+        #expect(throws: WebHomeCoreError.code(.consentOrCaptchaRequired)) {
+            try parser.parse(html: challenge, locale: "en", region: "US")
+        }
+    }
+
+    @Test("WEB identity fallback rejects a changed selected account")
+    func fallbackAccountSwitch() async throws {
+        let selected = Data("""
+        {"INNERTUBE_API_KEY":"key","INNERTUBE_CLIENT_VERSION":"1","VISITOR_DATA":"visitor","SESSION_INDEX":1}
+        """.utf8)
+        let web = WebHomeTransportResponse(data: selected, statusCode: 200,
+                                          finalURL: URL(string: "https://www.youtube.com/"))
+        let transport = QueueWebHomeTransport(responses: [response(bootstrapHTML), response(Data("{}".utf8)), web])
+        await expectCoreError(.accountMismatch) {
+            try await WebHomeSessionClient(transport: transport).execute(
+                request: request(expectedChannelID: channelID), cookies: cookieJar)
+        }
+        #expect(await transport.requests.count == 3)
     }
 
     private var cookieText: String {

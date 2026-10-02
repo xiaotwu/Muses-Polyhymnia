@@ -57,20 +57,31 @@ final class VideoSurface: NSObject, NSWindowDelegate {
         guard !isClosing, !isFloating, let playback else { return }
         isFloating = true
         guard presentsWindow else { return }
-        let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 480, height: 310),
-                            styleMask: [.titled, .closable, .resizable, .utilityWindow],
+        let panel = NSPanel(contentRect: NSRect(x: 0, y: 0, width: 480, height: 270),
+                            styleMask: [.titled, .fullSizeContentView, .resizable, .utilityWindow],
                             backing: .buffered, defer: false)
         panel.title = tr("Floating Video", "悬浮视频", zhHant: "浮動影片")
         panel.identifier = NSUserInterfaceItemIdentifier("Muses.floating-video")
         panel.isReleasedWhenClosed = false
+        panel.titleVisibility = .hidden
+        panel.titlebarAppearsTransparent = true
+        panel.standardWindowButton(.closeButton)?.isHidden = true
+        panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
+        panel.standardWindowButton(.zoomButton)?.isHidden = true
+        panel.isMovableByWindowBackground = true
         panel.hidesOnDeactivate = false
         panel.level = .floating
         panel.collectionBehavior = [.fullScreenAuxiliary, .moveToActiveSpace]
-        panel.contentMinSize = NSSize(width: 320, height: 220)
+        panel.contentMinSize = NSSize(width: 320, height: 180)
+        panel.contentAspectRatio = NSSize(width: 16, height: 9)
         panel.delegate = self
         panel.contentView = NSHostingView(rootView: FloatingVideoView(surface: self).environment(playback))
         self.panel = panel
-        panel.center()
+        if let main = NSApp.windows.first(where: { $0.identifier == MusesSingleInstance.mainWindowIdentifier }),
+           let visible = main.screen?.visibleFrame {
+            panel.setFrameOrigin(NSPoint(x: min(max(visible.minX, main.frame.maxX - 504), visible.maxX - 480),
+                                         y: min(max(visible.minY, main.frame.minY + 24), visible.maxY - 270)))
+        } else { panel.center() }
         panel.makeKeyAndOrderFront(nil)
     }
 
@@ -86,7 +97,7 @@ final class VideoSurface: NSObject, NSWindowDelegate {
         dock()
         MusesSingleInstance.pendingVideoPresentation = true
         MusesSingleInstance.orderFrontMainWindow()
-        NotificationCenter.default.post(name: .musesShowYouTubeVideo, object: nil)
+        NotificationCenter.default.post(name: .musesDockYouTubeVideo, object: nil)
     }
 
     func close() {
@@ -121,7 +132,7 @@ private struct FloatingVideoView: View {
     @Environment(PlaybackService.self) private var playback
 
     var body: some View {
-        VStack(spacing: 0) {
+        ZStack(alignment: .topTrailing) {
             YouTubeWKEmbed(surface: surface, floating: true)
                 .background(.black)
                 .overlay {
@@ -130,23 +141,22 @@ private struct FloatingVideoView: View {
                             .foregroundStyle(.white).padding()
                     }
                 }
-            HStack {
+            HStack(spacing: 12) {
                 Button(action: surface.returnToMain) {
                     Label(tr("Return to main window", "返回主窗口", zhHant: "返回主視窗"),
                           systemImage: "arrow.up.left.and.arrow.down.right")
                 }
-                Spacer()
-                Button { playback.toggle() } label: {
-                    Image(systemName: playback.primaryAction.symbol)
-                }
-                .accessibilityLabel(playback.primaryAction.title)
                 Button(action: surface.close) { Image(systemName: "xmark") }
                     .accessibilityLabel(tr("Close video", "关闭视频", zhHant: "關閉影片"))
             }
+            .labelStyle(.iconOnly)
             .buttonStyle(.borderless)
+            .foregroundStyle(.white)
+            .padding(8)
+            .background(.black.opacity(0.65), in: Capsule())
             .padding(10)
-            .background(.regularMaterial)
         }
+        .ignoresSafeArea()
         .onExitCommand(perform: surface.close)
     }
 }

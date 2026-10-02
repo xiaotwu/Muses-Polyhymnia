@@ -171,6 +171,8 @@ struct NewView: View {
                         artwork: ArtworkSource.resolve(for: snapshot),
                         size: MusicObjectMetrics.albumRail,
                         role: .play,
+                        videoEntry: .init(id: snapshot.youTubeId, title: snapshot.title, uploader: snapshot.artist, duration: snapshot.durationSeconds),
+                        isYouTube: true,
                         nowPlayingID: snapshot.id,
                         showsHoverPlay: true,
                         onSelect: {},
@@ -203,6 +205,8 @@ struct NewView: View {
                                 youTubeId: card.id),
                             size: MusicObjectMetrics.albumRail,
                             role: .play,
+                            videoEntry: .init(id: card.playableVideoID ?? card.id, title: card.title, uploader: card.uploader, duration: card.duration),
+                            isYouTube: true,
                             showsHoverPlay: true,
                             onSelect: {},
                             onPlay: { Task { await play(card, siblings: cards) } }
@@ -322,6 +326,7 @@ struct NewView: View {
             context: playable.isEmpty ? [snapshot] : playable,
             from: .songs
         )
+        PlaybackPresentation.nowPlaying()
     }
 
     private func play(_ card: YouTubeDiscoveryCard,
@@ -347,6 +352,7 @@ struct NewView: View {
                 youTubeEntries: entries
             )
             playback.playTrack(snapshot, context: context, from: .search)
+        PlaybackPresentation.nowPlaying()
         } catch {
             // Keep the discovery surface stable so the user can retry.
         }
@@ -383,8 +389,7 @@ private struct CompactDiscoveryTrackRow: View {
                 Spacer(minLength: 8)
                 NowPlayingMark(itemID: snapshot.id)
                     .font(MusesTypography.caption)
-                YouTubeMark(size: 13)
-                    .accessibilityHidden(true)
+                Color.clear.frame(width: 28, height: 28)
             }
             .padding(.horizontal, 8)
             .frame(height: 58)
@@ -393,6 +398,10 @@ private struct CompactDiscoveryTrackRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.fullAreaPlain)
+        .overlay(alignment: .trailing) {
+            YouTubeVideoButton(entry: .init(id: snapshot.youTubeId, title: snapshot.title, uploader: snapshot.artist, duration: snapshot.durationSeconds))
+                .padding(.trailing, 8)
+        }
         .onHover { hovering = $0 }
         .animation(MusesMotion.hoverAnimation(reduceMotion: reduceMotion), value: hovering)
         .overlay(alignment: .bottom) {

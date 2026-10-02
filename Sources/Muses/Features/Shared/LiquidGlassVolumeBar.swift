@@ -135,8 +135,14 @@ struct LiquidGlassVolumeBar: View {
                     }
                 }
             }
-            .frame(height: geo.size.height)
+            .frame(width: availableWidth, height: geo.size.height, alignment: .leading)
             .contentShape(Rectangle())
+            .background {
+                VolumeScrollInput { delta in
+                    playback.setVolume(VolumeScaleMapping.adjusted(playback.volume, delta: delta))
+                }
+                .allowsHitTesting(false)
+            }
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { value in
@@ -205,5 +211,60 @@ enum VolumeScaleMapping {
     static func volume(at x: CGFloat, width: CGFloat) -> Float {
         guard x.isFinite, width.isFinite, width > 0 else { return 0 }
         return Float(min(1, max(0, x / width)))
+    }
+
+    static func adjusted(_ volume: Float, delta: CGFloat) -> Float {
+        guard delta.isFinite else { return volume }
+        return min(1, max(0, volume + Float(delta / 400)))
+    }
+}
+
+/// Only the visible volume scale owns its wheel/trackpad input. Momentum is
+/// consumed without changing volume; it must never reach track navigation.
+struct VolumeScrollInput: NSViewRepresentable {
+    var adjust: (CGFloat) -> Void
+    func makeCoordinator() -> Coordinator { Coordinator() }
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        context.coordinator.view = view
+        context.coordinator.adjust = adjust
+        context.coordinator.install()
+        return view
+    }
+    func updateNSView(_ view: NSView, context: Context) { context.coordinator.adjust = adjust }
+    static func dismantleNSView(_ view: NSView, coordinator: Coordinator) { coordinator.stop() }
+
+    @MainActor final class Coordinator {
+        weak var view: NSView?
+        var adjust: ((CGFloat) -> Void)?
+        private var monitor: Any?
+        private var ownsGesture = false
+        private var lastEventTime: TimeInterval = 0
+        func install() {
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+                let consumed = MainActor.assumeIsolated { self?.consume(event) == true }
+                return consumed ? nil : event
+            }
+        }
+        func consume(_ event: NSEvent) -> Bool {
+            guard let view, let window = view.window, event.window === window else { return false }
+            let inside = view.bounds.contains(view.convert(event.locationInWindow, from: nil))
+            if event.phase.contains(.began) || !event.hasPreciseScrollingDeltas ||
+                (event.momentumPhase.isEmpty && event.timestamp - lastEventTime > 0.3) {
+                ownsGesture = inside
+            }
+            lastEventTime = event.timestamp
+            if !event.momentumPhase.isEmpty { return ownsGesture }
+            guard inside || ownsGesture else { return false }
+            let horizontal = abs(event.scrollingDeltaX) > abs(event.scrollingDeltaY)
+            // Right/up increases volume independently of Natural Scrolling.
+            let physical = PlayerGesturePolicy.fingerDelta(
+                horizontal ? event.scrollingDeltaX : -event.scrollingDeltaY,
+                invertedFromDevice: event.isDirectionInvertedFromDevice)
+            let delta = event.hasPreciseScrollingDeltas ? physical : physical * 8
+            adjust?(delta)
+            return true
+        }
+        func stop() { if let monitor { NSEvent.removeMonitor(monitor) }; monitor = nil }
     }
 }
