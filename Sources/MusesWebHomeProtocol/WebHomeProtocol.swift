@@ -103,6 +103,8 @@ public enum WebHomeCookieFailureStage: String, Codable, Sendable, Equatable {
     case exportNoOutput
     case jarRead
     case noAllowedDomain
+    case browserDatabaseLookup
+    case browserKeyLookup
 }
 
 public struct WebHomeError: Codable, Sendable, Equatable {

@@ -164,9 +164,10 @@ struct WebHomePayloadParserTests {
 }
 
 private actor ParserTestCookieExporter: YTDlpCookieExporting {
-    func export(browserSpecification: String, to destination: URL) async throws {
+    func export(browserSpecification: String, to destination: URL) async throws -> WebHomeCookieFailureStage? {
         try Data("# Netscape HTTP Cookie File\n.youtube.com\tTRUE\t/\tTRUE\t0\tSAPISID\tsecret\n".utf8)
             .write(to: destination)
+        return nil
     }
 }
 

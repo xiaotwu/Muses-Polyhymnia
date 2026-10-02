@@ -46,9 +46,160 @@ struct WebHomeSessionCoreTests {
         let future = try decoder.decode(WebHomeError.self, from: Data(#"{"code":"cookieSourceUnavailable","cookieFailureStage":"futureStage"}"#.utf8))
         #expect(future.cookieFailureStage == nil)
         #expect(future.code == .cookieSourceUnavailable)
-        let error = WebHomeError(code: .cookieSourceUnavailable, cookieFailureStage: .exportNoOutput)
-        #expect(try decoder.decode(WebHomeError.self, from: JSONEncoder().encode(error)) == error)
+        for stage in [WebHomeCookieFailureStage.exportNoOutput, .browserDatabaseLookup, .browserKeyLookup] {
+            let error = WebHomeError(code: .cookieSourceUnavailable, cookieFailureStage: stage)
+            #expect(try decoder.decode(WebHomeError.self, from: JSONEncoder().encode(error)) == error)
+        }
         #expect(WebHomeProtocolVersion.current == 2)
+    }
+
+    @Test("Cookie stderr scanning recognizes only fixed upstream diagnostics within a bounded budget")
+    func cookieDiagnosticWhitelist() {
+        var database = CookieExportDiagnosticScanner()
+        for byte in "ERROR: could not find chrome cookies database in ".utf8 {
+            database.consume([byte])
+        }
+        database.consume(Data(repeating: 120, count: 100_000))
+        database.finish()
+        #expect(database.stage == .browserDatabaseLookup)
+        var key = CookieExportDiagnosticScanner()
+        key.consume("WARNING: find-generic-password failed\n".utf8)
+        key.finish()
+        #expect(key.stage == .browserKeyLookup)
+        var decrypt = CookieExportDiagnosticScanner()
+        decrypt.consume("WARNING: cannot decrypt v10 cookies: no key found\n".utf8)
+        decrypt.finish()
+        #expect(decrypt.stage == .browserKeyLookup)
+        var unknown = CookieExportDiagnosticScanner()
+        unknown.consume("ERROR: [Errno 13] Permission denied\nWARNING: find-generic-password failed extra unknown text\n".utf8)
+        unknown.finish()
+        #expect(unknown.stage == nil)
+        var exhausted = CookieExportDiagnosticScanner()
+        exhausted.consume(Data(repeating: 120, count: CookieExportDiagnosticScanner.maximumScanBytes))
+        exhausted.consume("\nWARNING: find-generic-password failed\n".utf8)
+        exhausted.finish()
+        #expect(exhausted.stage == nil)
+        var conflict = CookieExportDiagnosticScanner()
+        conflict.consume("ERROR: could not find firefox cookies database in ignored\nWARNING: find-generic-password failed\n".utf8)
+        conflict.finish()
+        #expect(conflict.stage == nil)
+    }
+
+    @Test("Synthetic exporter diagnostics never replace valid jar success or jar-read failure")
+    func cookieDiagnosticJarPrecedence() async throws {
+        for variant in 0...2 {
+            let root = temporaryRoot()
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: root) }
+            let executable = root.appendingPathComponent("fake-exporter")
+            let contents = variant == 0
+                ? "printf '.youtube.com\\tTRUE\\t/\\tTRUE\\t0\\tSAPISID\\tsynthetic\\n' >> \"$destination\""
+                : (variant == 1 ? "printf '\\377' > \"$destination\"" : "")
+            let script = """
+            #!/bin/sh
+            destination=""
+            while [ "$#" -gt 0 ]; do
+              if [ "$1" = "--cookies" ]; then shift; destination="$1"; fi
+              shift
+            done
+            printf 'WARNING: find-generic-password failed\n' >&2
+            \(contents)
+            exit 0
+            """
+            try Data(script.utf8).write(to: executable)
+            #expect(chmod(executable.path, S_IRWXU) == 0)
+            let manager = try WebHomeCookieJarManager(rootDirectory: root.appendingPathComponent("workspace"),
+                exporter: ProcessYTDlpCookieExporter(executableURL: executable))
+            do {
+                let valid = try await manager.withCookieJar(source: .init(browserName: "chrome")) { jar in jar.sapisid != nil }
+                #expect(variant == 0 && valid)
+            } catch let error as WebHomeCookieFailure {
+                #expect(error.stage == (variant == 1 ? .jarRead : .browserKeyLookup))
+                #expect(variant != 0)
+            }
+        }
+    }
+
+    @Test("Exporter drains oversized stderr, ignores stdout and cancels without waiting on pipe EOF")
+    func cookieDiagnosticProcessLifetime() async throws {
+        let root = temporaryRoot()
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let executable = root.appendingPathComponent("fake-exporter")
+        let destination = root.appendingPathComponent("synthetic.txt")
+        try Data(WebHomeCookieJarManager.netscapeCookieHeader.utf8).write(to: destination)
+        let script = """
+        #!/bin/sh
+        printf 'ERROR: could not find chrome cookies database in stdout-only\n'
+        /usr/bin/head -c 200000 /dev/zero >&2
+        printf '\nWARNING: find-generic-password failed\n' >&2
+        exit 2
+        """
+        try Data(script.utf8).write(to: executable)
+        #expect(chmod(executable.path, S_IRWXU) == 0)
+        let exporter = ProcessYTDlpCookieExporter(executableURL: executable)
+        do {
+            _ = try await exporter.export(browserSpecification: "chrome", to: destination)
+            Issue.record("No produced jar must fail")
+        } catch let error as WebHomeCookieFailure {
+            #expect(error.stage == .exportNoOutput)
+        }
+        try Data("#!/bin/sh\nprintf 'ERROR: could not find chrome cookies database in synthetic-only\\n' >&2\nexit 1\n".utf8).write(to: executable)
+        #expect(chmod(executable.path, S_IRWXU) == 0)
+        do {
+            _ = try await exporter.export(browserSpecification: "chrome", to: destination)
+            Issue.record("Missing database export must fail")
+        } catch let error as WebHomeCookieFailure {
+            #expect(error.stage == .browserDatabaseLookup)
+        }
+        try Data("#!/bin/sh\nexec /bin/sleep 30\n".utf8).write(to: executable)
+        #expect(chmod(executable.path, S_IRWXU) == 0)
+        let operation = Task { try await exporter.export(browserSpecification: "chrome", to: destination) }
+        try await Task.sleep(for: .milliseconds(100))
+        let clock = ContinuousClock()
+        let cancelledAt = clock.now
+        operation.cancel()
+        do {
+            _ = try await operation.value
+            Issue.record("Cancelled export must fail")
+        } catch let error as WebHomeCoreError {
+            #expect(error.code == .cancelled)
+        }
+        #expect(clock.now - cancelledAt < .seconds(5))
+    }
+
+    @Test("Exporter finishes when a synthetic descendant briefly retains the stderr pipe")
+    func cookieDiagnosticInheritedPipe() async throws {
+        let root = temporaryRoot()
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let executable = root.appendingPathComponent("fake-exporter")
+        let destination = root.appendingPathComponent("synthetic.txt")
+        let pidFile = root.appendingPathComponent("synthetic-child.pid")
+        try Data(WebHomeCookieJarManager.netscapeCookieHeader.utf8).write(to: destination)
+        let script = """
+        #!/bin/sh
+        /bin/sleep 3 &
+        printf '%s' "$!" > '\(pidFile.path)'
+        exit 2
+        """
+        try Data(script.utf8).write(to: executable)
+        #expect(chmod(executable.path, S_IRWXU) == 0)
+        defer {
+            if let text = try? String(contentsOf: pidFile, encoding: .utf8), let pid = Int32(text) {
+                _ = kill(pid, SIGTERM)
+            }
+        }
+        let clock = ContinuousClock()
+        let started = clock.now
+        do {
+            _ = try await ProcessYTDlpCookieExporter(executableURL: executable)
+                .export(browserSpecification: "chrome", to: destination)
+            Issue.record("No produced jar must fail despite an inherited pipe")
+        } catch let error as WebHomeCookieFailure {
+            #expect(error.stage == .exportNoOutput)
+        }
+        #expect(clock.now - started < .seconds(1))
     }
 
     @Test("identity stage metadata is additive and unknown stages do not break error decoding")
@@ -557,12 +708,13 @@ struct WebHomeSessionCoreTests {
 
 private struct StageCookieExporter: YTDlpCookieExporting {
     let stage: WebHomeCookieFailureStage
-    func export(browserSpecification: String, to destination: URL) async throws {
+    func export(browserSpecification: String, to destination: URL) async throws -> WebHomeCookieFailureStage? {
         switch stage {
         case .jarRead: try Data([0xff]).write(to: destination)
         case .noAllowedDomain: try Data(WebHomeCookieJarManager.netscapeCookieHeader.utf8).write(to: destination)
         default: throw WebHomeCookieFailure(stage: stage)
         }
+        return nil
     }
 }
 
@@ -576,12 +728,13 @@ private actor RecordingCookieExporter: YTDlpCookieExporting {
         self.cookieText = cookieText
     }
 
-    func export(browserSpecification: String, to destination: URL) async throws {
+    func export(browserSpecification: String, to destination: URL) async throws -> WebHomeCookieFailureStage? {
         self.destination = destination
         let attributes = try FileManager.default.attributesOfItem(atPath: destination.path)
         modeDuringExport = attributes[.posixPermissions] as? Int
         initialContents = try String(contentsOf: destination, encoding: .utf8)
         try Data(cookieText.utf8).write(to: destination)
+        return nil
     }
 }
 

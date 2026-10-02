@@ -515,6 +515,8 @@ struct YouTubeSettingsView: View {
         case .exportNoOutput: tr("export completion", "导出结果检查")
         case .jarRead: tr("temporary session file validation", "临时会话文件验证")
         case .noAllowedDomain: tr("supported session filtering", "支持的会话内容筛选")
+        case .browserDatabaseLookup: tr("browser database lookup reported by the export tool", "导出工具报告的浏览器数据库定位步骤")
+        case .browserKeyLookup: tr("browser key lookup reported by the export tool", "导出工具报告的浏览器密钥查询步骤")
         }
         return tr("Browser session preparation stopped at: \(step). The step does not confirm a permission or sign-in cause. This diagnostic contains no session contents or process output.",
                   "浏览器会话准备停止于：\(step)。此步骤不能确认是否由权限或登录状态导致；此诊断不包含会话内容或进程输出。")
