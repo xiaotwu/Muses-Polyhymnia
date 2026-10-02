@@ -217,7 +217,7 @@ final class HistoryService {
                     id: $0.id, trackId: $0.trackId, title: $0.trackTitle,
                     artist: $0.artist, albumTitle: $0.albumTitle,
                     startedAt: $0.startedAt, listenedMs: $0.listenedMs,
-                    outcome: $0.outcome
+                    outcome: $0.outcome, completionRatio: $0.completionRatio
                 )
             },
             totalEventCount: all.count

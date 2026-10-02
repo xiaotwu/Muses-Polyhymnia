@@ -12,6 +12,7 @@ struct HistoryView: View {
     @State private var loadError: String?
     @State private var isLoading = true
     @State private var showClearConfirm = false
+    @State private var heatmapExpanded = false
 
     private let metricColumns = [
         GridItem(.adaptive(minimum: 148, maximum: 220), spacing: 12)
@@ -101,26 +102,40 @@ struct HistoryView: View {
 
     private func dashboardContent(_ value: ListeningHistoryDashboard) -> some View {
         VStack(alignment: .leading, spacing: AppleMusicSpacing.section) {
-            HStack {
-                Text(tr("Listening overview", "收听概览"))
-                    .font(MusesTypography.sectionTitle)
-                Spacer()
-                Picker("", selection: $range) {
-                    ForEach(RecapRange.allCases, id: \.self) { item in
-                        Text(item.label).tag(item)
-                    }
+            ViewThatFits(in: .horizontal) {
+                HStack {
+                    Text(tr("Listening overview", "收听概览"))
+                        .font(MusesTypography.sectionTitle)
+                    Spacer()
+                    rangePicker
                 }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .frame(maxWidth: 330)
-                .accessibilityLabel(tr("History range", "历史时间范围"))
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(tr("Listening overview", "收听概览"))
+                        .font(MusesTypography.sectionTitle)
+                    rangePicker
+                }
             }
 
             metricGrid(value.recap)
-            ListeningHeatmapView(heatmap: value.heatmap)
+            DisclosureGroup(isExpanded: $heatmapExpanded) {
+                ListeningHeatmapView(heatmap: value.heatmap)
+                    .padding(.top, 10)
+            } label: {
+                Label(tr("Listening heatmap", "收听热力图"), systemImage: "square.grid.3x3")
+                    .font(MusesTypography.headline)
+            }
             topLists(value.recap)
             recentActivity(value.recent, range: value.recap.rangeLabel)
         }
+    }
+
+    private var rangePicker: some View {
+        Picker(tr("History range", "历史时间范围"), selection: $range) {
+            ForEach(RecapRange.allCases, id: \.self) { Text($0.label).tag($0) }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .frame(width: 330)
     }
 
     private func metricGrid(_ recap: ListeningRecap) -> some View {
@@ -222,44 +237,12 @@ struct HistoryView: View {
                 .font(MusesTypography.sectionTitle)
             LazyVStack(spacing: 2) {
                 ForEach(events) { event in
-                    let track = library.track(by: event.trackId)
-                    HStack(spacing: 12) {
-                        ArtworkView(
-                            source: track.map(ArtworkSource.resolve(for:)) ?? .placeholder,
-                            cornerRadius: 5,
-                            glyphSize: 16,
-                            targetSize: 44
-                        )
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(event.title).font(MusesTypography.callout.weight(.semibold)).lineLimit(1)
-                            Text(event.artist).font(MusesTypography.caption).foregroundStyle(BrandColors.textSecondary).lineLimit(1)
-                        }
-                        Spacer(minLength: 12)
-                        Text(event.startedAt, style: .relative)
-                            .font(MusesTypography.caption)
-                            .foregroundStyle(BrandColors.textSecondary)
-                        Text(ListeningFormat.duration(event.listenedMs))
-                            .font(MusesTypography.caption.monospacedDigit())
-                            .foregroundStyle(BrandColors.textSecondary)
-                            .frame(width: 60, alignment: .trailing)
-                        Button { play(event, within: events) } label: {
-                            Image(systemName: "play.fill")
-                                .frame(width: 28, height: 28)
-                        }
-                        .buttonStyle(.fullAreaPlain)
-                        .foregroundStyle(BrandColors.accent)
-                        .disabled(track == nil)
-                        .help(track == nil
-                              ? tr("This song is no longer in the library", "这首歌曲已不在资料库中")
-                              : tr("Play", "播放"))
-                        .accessibilityLabel(tr("Play \(event.title)", "播放 \(event.title)", zhHant: "播放 \(event.title)"))
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 7)
-                    .background(
-                        playback.state.track?.id == event.trackId
-                            ? BrandColors.accent.opacity(0.09) : Color.clear,
-                        in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    let track = library.track(by: event.trackId).map { TrackSnapshot(from: $0) }
+                    HistoryTimelineRow(
+                        event: event,
+                        track: track,
+                        isCurrent: playback.state.track?.id == event.trackId,
+                        onPlay: { play(event, within: events) }
                     )
                 }
             }
@@ -358,6 +341,78 @@ struct HistoryView: View {
     }
 }
 
+/// Timeline rows consume stored event values rather than sampling the playback clock.
+private struct HistoryTimelineRow: View {
+    let event: ListeningEventSnapshot
+    let track: TrackSnapshot?
+    let isCurrent: Bool
+    let onPlay: () -> Void
+
+    private var isPlayable: Bool { track?.youTubeId != nil }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ArtworkView(source: track.map(ArtworkSource.resolve(for:)) ?? .placeholder,
+                        cornerRadius: 6, glyphSize: 16, targetSize: 44)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(event.title)
+                    .font(MusesTypography.song(size: 13, emphasized: true, text: event.title))
+                    .lineLimit(1)
+                Text(event.artist)
+                    .font(MusesTypography.caption)
+                    .foregroundStyle(BrandColors.textSecondary)
+                    .lineLimit(1)
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 14) { time; listeningDetails }
+                    VStack(alignment: .leading, spacing: 4) { time; listeningDetails }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Button(action: onPlay) {
+                Image(systemName: "play.fill").frame(width: 28, height: 28)
+            }
+            .buttonStyle(.borderless)
+            .foregroundStyle(BrandColors.textPrimary)
+            .disabled(!isPlayable)
+            .help(isPlayable ? tr("Play", "播放") : tr("This song is no longer available in the library", "此歌曲已无法从资料库播放"))
+            .accessibilityLabel(tr("Play \(event.title)", "播放 \(event.title)"))
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(isCurrent ? BrandColors.accent.opacity(0.09) : Color.clear,
+                    in: RoundedRectangle(cornerRadius: 8))
+        .accessibilityElement(children: .contain)
+        .contextMenu {
+            if let track, isPlayable {
+                TrackContextMenuItems(snapshot: track, onPlay: onPlay)
+            } else {
+                Button(tr("Play", "播放"), systemImage: "play.fill", action: onPlay)
+                    .disabled(true)
+            }
+        }
+    }
+
+    private var time: some View {
+        Text(event.startedAt, format: .dateTime.month(.abbreviated).day().hour().minute())
+            .font(MusesTypography.caption2)
+            .foregroundStyle(BrandColors.textSecondary)
+    }
+
+    private var listeningDetails: some View {
+        HStack(spacing: 10) {
+            Text(tr("Listened \(ListeningFormat.duration(event.listenedMs))", "已听 \(ListeningFormat.duration(event.listenedMs))"))
+            if let ratio = event.completionRatio, ratio.isFinite {
+                Text(tr("\(Int((min(1, max(0, ratio)) * 100).rounded()))% complete", "完成 \(Int((min(1, max(0, ratio)) * 100).rounded()))%"))
+            } else {
+                Text(tr("Completion unknown", "完成度未知"))
+            }
+        }
+        .font(MusesTypography.caption2.monospacedDigit())
+        .foregroundStyle(BrandColors.textSecondary)
+    }
+}
+
 private struct HistoryMetricCard: View {
     let value: String
     let label: String
@@ -372,12 +427,9 @@ private struct HistoryMetricCard: View {
                 .font(MusesTypography.caption)
                 .foregroundStyle(BrandColors.textSecondary)
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, minHeight: 86, alignment: .leading)
-        .background(
-            BrandColors.surface.opacity(0.55),
-            in: RoundedRectangle(cornerRadius: AppleMusicTokens.cardCorner, style: .continuous)
-        )
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
+        .accessibilityElement(children: .combine)
     }
 }
 

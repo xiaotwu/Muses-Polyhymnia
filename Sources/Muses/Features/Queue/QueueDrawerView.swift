@@ -16,6 +16,12 @@ struct QueueDrawerView: View {
     @State private var renameTarget: QueueGroup.ID?
     @State private var renameText = ""
     @State private var pendingRemoval: ActionConfirmation?
+    @State private var collectionExpanded = true
+    @State private var upNextExpanded = true
+    @State private var historyExpanded = false
+    @State private var groupsExpanded = false
+    @State private var showsSmartShuffleInfo = false
+    @FocusState private var smartShuffleInfoFocused: Bool
     /// Keep Escape available while painting focus only on the close affordance.
     @FocusState private var focusedTarget: QueueFocusTarget?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -37,7 +43,7 @@ struct QueueDrawerView: View {
                 .focused($focusedTarget, equals: .drawer)
                 .onKeyPress(.escape) {
                     guard renameTarget == nil, pendingRemoval == nil else { return .ignored }
-                    isPresented = false
+                    dismissUnlessRenaming()
                     return .handled
                 }
                 .transition(.move(edge: .trailing))
@@ -48,10 +54,23 @@ struct QueueDrawerView: View {
         .onChange(of: renameTarget) { _, target in
             focusedTarget = target == nil ? .drawer : nil
         }
+        .onChange(of: showsSmartShuffleInfo) { _, shown in
+            if !shown {
+                // Let the native popover finish its dismissal before restoring key focus.
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(150))
+                    if isPresented, !showsSmartShuffleInfo { focusedTarget = .drawer }
+                }
+            }
+        }
         .animation(MusesMotion.drawerAnimation(reduceMotion: reduceMotion), value: isPresented)
     }
 
     private func dismissUnlessRenaming() {
+        if showsSmartShuffleInfo {
+            showsSmartShuffleInfo = false
+            return
+        }
         if renameTarget == nil, pendingRemoval == nil { isPresented = false }
     }
 
@@ -81,17 +100,45 @@ struct QueueDrawerView: View {
                 .padding(.bottom, 10)
                 .accessibilityElement(children: .combine)
             }
-            Toggle(isOn: Binding(get: { playback.queue.smartShuffle.enabled },
-                                 set: { playback.setSmartShuffle($0) })) {
-                Label(tr("Smart Shuffle", "智能随机播放", zhHant: "智慧隨機播放"), systemImage: "sparkles")
+            HStack(spacing: 8) {
+                Toggle(isOn: Binding(get: { playback.queue.smartShuffle.enabled },
+                                     set: { playback.setSmartShuffle($0) })) {
+                    Label(tr("Smart Shuffle", "智能随机播放"), systemImage: "sparkles")
+                }
+                .toggleStyle(.switch)
+                .controlSize(.small)
+                Button {
+                    showsSmartShuffleInfo.toggle()
+                } label: {
+                    Image(systemName: "info.circle")
+                        .frame(width: 28, height: 28)
+                }
+                .buttonStyle(.borderless)
+                .help(tr("About Smart Shuffle", "关于智能随机播放"))
+                .accessibilityLabel(tr("About Smart Shuffle", "关于智能随机播放"))
+                .popover(isPresented: $showsSmartShuffleInfo) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(tr("Smart Shuffle", "智能随机播放"))
+                            .font(MusesTypography.headline)
+                        Text(tr("After three collection songs, insert at most one YouTube Music recommendation. Play Next takes priority. Recommendations never change your saved playlist.",
+                                "每播放三首集合歌曲，最多插入一首 YouTube Music 推荐。手动下一首优先；推荐不会改变已保存的歌单。"))
+                            .font(MusesTypography.callout)
+                            .foregroundStyle(BrandColors.textSecondary)
+                    }
+                    .padding(18)
+                    .frame(width: 300, alignment: .leading)
+                    .focusable()
+                    .focused($smartShuffleInfoFocused)
+                    .onAppear { smartShuffleInfoFocused = true }
+                    .onKeyPress(.escape) {
+                        showsSmartShuffleInfo = false
+                        return .handled
+                    }
+                    .onExitCommand { showsSmartShuffleInfo = false }
+                }
             }
-            .toggleStyle(.switch)
-            .controlSize(.small)
             .padding(.horizontal, 16)
             .padding(.bottom, 10)
-            .help(tr("After three collection songs, insert at most one YouTube Music recommendation. Play Next takes priority.",
-                     "每播放三首集合歌曲，最多插入一首 YouTube Music 推荐。手动下一首优先。",
-                     zhHant: "每播放三首集合歌曲，最多插入一首 YouTube Music 推薦。手動下一首優先。"))
             list
         }
     }
@@ -142,6 +189,7 @@ struct QueueDrawerView: View {
                 Button {
                     let n = playback.queue.groups.count + 1
                     playback.queue.addGroup(tr("Group \(n)", "分组 \(n)", zhHant: "分組 \(n)"))
+                    groupsExpanded = true
                 } label: {
                     Image(systemName: "plus")
                         .font(MusesTypography.body.weight(.semibold))
@@ -172,9 +220,101 @@ struct QueueDrawerView: View {
 
     private var list: some View {
         List {
-            // Advanced Queue: group management (collapse / rename / delete).
-            if advancedQueue, !playback.queue.groups.isEmpty {
-                Section(tr("Groups", "分组")) {
+            nowPlayingSection
+            upNextSection
+            recommendationSection
+            collectionSection
+            groupsSection
+            historySection
+        }
+        .listStyle(.plain)
+        .listRowSeparator(.visible)
+        .scrollContentBackground(.hidden)
+        .background(.clear)
+        .environment(\.defaultMinListRowHeight, 44)
+        .alert(tr("Rename group", "重命名分组"), isPresented: Binding(
+            get: { renameTarget != nil },
+            set: { if !$0 { renameTarget = nil } })) {
+            TextField(tr("Group name", "分组名"), text: $renameText)
+            Button(tr("Rename", "重命名")) {
+                let name = renameText.trimmingCharacters(in: .whitespaces)
+                if !name.isEmpty, let id = renameTarget {
+                    playback.queue.renameGroup(id: id, to: name)
+                }
+                renameTarget = nil
+            }
+            Button(tr("Cancel", "取消"), role: .cancel) { renameTarget = nil }
+        }
+    }
+
+    private var nowPlayingSection: some View {
+        Section(tr("Now Playing", "正在播放")) {
+            if let item = playback.queue.current() {
+                QueueRow(item: item, isCurrent: true)
+                    .queueRowActions {
+                        TrackContextMenuItems(snapshot: item.track, onPlay: { playback.toggle() })
+                    }
+            } else {
+                queueEmptyRow(tr("Choose a song to start listening", "选择歌曲开始收听"))
+            }
+        }
+    }
+
+    private var upNextSection: some View {
+        Section {
+            if upNextExpanded {
+                ForEach(playback.queue.upNext) { item in
+                    QueueRow(item: item, isCurrent: false, showHistoryBadge: advancedQueue)
+                        .queueRowActions { itemContextMenu(for: item, inUpNext: true) }
+                        .onTapGesture(count: 2) { playQueueItem(item) }
+                }
+                .onMove { indices, destination in
+                    guard let from = indices.first else { return }
+                    playback.queue.moveUpNext(from: from,
+                                              to: destination > from ? destination - 1 : destination)
+                }
+                if playback.queue.upNext.isEmpty {
+                    queueEmptyRow(tr("Choose Play Next from any track menu", "在曲目菜单中选择「下一首播放」"))
+                }
+            }
+        } header: {
+            sectionHeading(tr("Up Next", "下一首"), count: playback.queue.upNext.count,
+                           expanded: $upNextExpanded)
+        }
+    }
+
+    private var collectionSection: some View {
+        Section {
+            if collectionExpanded {
+                ForEach(visibleQueueItems) { item in
+                    QueueRow(item: item,
+                             isCurrent: playback.queue.current()?.id == item.id,
+                             showHistoryBadge: advancedQueue)
+                        .queueRowActions { itemContextMenu(for: item, inUpNext: false) }
+                        .onTapGesture(count: 2) { playQueueItem(item) }
+                }
+                .onMove { indices, destination in
+                    guard playback.queue.groups.allSatisfy({ !$0.collapsed }) else { return }
+                    guard let from = indices.first else { return }
+                    playback.queue.move(from: from,
+                                        to: destination > from ? destination - 1 : destination)
+                }
+                if visibleQueueItems.isEmpty {
+                    queueEmptyRow(tr("No collection queued", "尚无当前集合"))
+                }
+            }
+        } header: {
+            sectionHeading(tr("Current Collection", "当前集合"), count: playback.queue.items.count,
+                           expanded: $collectionExpanded)
+        }
+    }
+
+    @ViewBuilder
+    private var groupsSection: some View {
+        // Advanced Queue: group management (collapse / rename / delete).
+        if advancedQueue, !playback.queue.groups.isEmpty {
+            Section {
+                if groupsExpanded {
                     ForEach(playback.queue.groups) { group in
                         HStack {
                             Button {
@@ -183,7 +323,7 @@ struct QueueDrawerView: View {
                                 Image(systemName: group.collapsed ? "chevron.right" : "chevron.down")
                                     .font(MusesTypography.caption2)
                                     .foregroundStyle(BrandColors.textSecondary)
-                                    .frame(width: 14)
+                                    .frame(width: 28, height: 28)
                             }
                             .buttonStyle(.fullAreaPlain)
                             .help(group.collapsed ? tr("Expand group", "展开分组")
@@ -211,9 +351,16 @@ struct QueueDrawerView: View {
                         }
                     }
                 }
+            } header: {
+                sectionHeading(tr("Groups", "分组"), count: playback.queue.groups.count,
+                               expanded: $groupsExpanded)
             }
+        }
+    }
 
-            Section(tr("History", "历史记录")) {
+    private var historySection: some View {
+        Section {
+            if historyExpanded {
                 ForEach(playback.queue.history) { item in
                     QueueRow(item: item, isCurrent: false, showHistoryBadge: advancedQueue)
                         .queueRowActions {
@@ -250,73 +397,54 @@ struct QueueDrawerView: View {
                             }
                         }
                 }
+                if playback.queue.history.isEmpty {
+                    queueEmptyRow(tr("Played songs will appear here", "播放过的歌曲会显示在这里"))
+                }
             }
+        } header: {
+            sectionHeading(tr("History", "历史记录"), count: playback.queue.history.count,
+                           expanded: $historyExpanded)
+        }
+    }
 
-            if let item = playback.queue.insertedCurrent {
-                Section(tr("Now Playing", "正在播放", zhHant: "正在播放")) {
-                    QueueRow(item: item, isCurrent: true)
-                        .queueRowActions {
-                            TrackContextMenuItems(snapshot: item.track, onPlay: { playback.toggle() })
+    @ViewBuilder
+    private var recommendationSection: some View {
+        if let recommendation = playback.queue.smartShuffle.pending {
+            Section(tr("YouTube Music recommendation", "YouTube Music 推荐", zhHant: "YouTube Music 推薦")) {
+                QueueRow(item: recommendation, isCurrent: false, showHistoryBadge: false)
+                    .contextMenu {
+                        Button(tr("Play Next", "下一首播放", zhHant: "下一首播放")) {
+                            playback.queue.playNext(recommendation.track)
                         }
-                }
-            }
-
-            Section(tr("Current Queue", "当前队列")) {
-                ForEach(visibleQueueItems) { item in
-                    QueueRow(item: item,
-                             isCurrent: playback.queue.current()?.id == item.id,
-                             showHistoryBadge: advancedQueue)
-                        .queueRowActions { itemContextMenu(for: item, inUpNext: false) }
-                        .onTapGesture(count: 2) { playQueueItem(item) }
-                }
-                .onMove { indices, destination in
-                    guard playback.queue.groups.allSatisfy({ !$0.collapsed }) else { return }
-                    guard let from = indices.first else { return }
-                    playback.queue.move(from: from,
-                                        to: destination > from ? destination - 1 : destination)
-                }
-            }
-            Section(tr("Up Next", "下一首")) {
-                ForEach(playback.queue.upNext) { item in
-                    QueueRow(item: item, isCurrent: false, showHistoryBadge: advancedQueue)
-                        .queueRowActions { itemContextMenu(for: item, inUpNext: true) }
-                        .onTapGesture(count: 2) { playQueueItem(item) }
-                }
-                .onMove { indices, destination in
-                    guard let from = indices.first else { return }
-                    playback.queue.moveUpNext(from: from,
-                                              to: destination > from ? destination - 1 : destination)
-                }
-            }
-            if let recommendation = playback.queue.smartShuffle.pending {
-                Section(tr("YouTube Music recommendation", "YouTube Music 推荐", zhHant: "YouTube Music 推薦")) {
-                    QueueRow(item: recommendation, isCurrent: false, showHistoryBadge: false)
-                        .contextMenu {
-                            Button(tr("Play Next", "下一首播放", zhHant: "下一首播放")) {
-                                playback.queue.playNext(recommendation.track)
-                            }
-                        }
-                }
+                    }
             }
         }
-        .listStyle(.plain)
-        .listRowSeparator(.visible)
-        .scrollContentBackground(.hidden)
-        .background(.clear)
-        .environment(\.defaultMinListRowHeight, 44)
-        .alert(tr("Rename group", "重命名分组"), isPresented: Binding(
-            get: { renameTarget != nil },
-            set: { if !$0 { renameTarget = nil } })) {
-            TextField(tr("Group name", "分组名"), text: $renameText)
-            Button(tr("Rename", "重命名")) {
-                let name = renameText.trimmingCharacters(in: .whitespaces)
-                if !name.isEmpty, let id = renameTarget {
-                    playback.queue.renameGroup(id: id, to: name)
-                }
-                renameTarget = nil
+    }
+
+    private func sectionHeading(_ title: String, count: Int, expanded: Binding<Bool>) -> some View {
+        Button { expanded.wrappedValue.toggle() } label: {
+            HStack(spacing: 8) {
+                Image(systemName: expanded.wrappedValue ? "chevron.down" : "chevron.right")
+                    .font(MusesTypography.caption2.weight(.semibold))
+                Text(title).font(MusesTypography.callout.weight(.semibold))
+                Spacer(minLength: 4)
+                Text("\(count)").font(MusesTypography.caption.monospacedDigit())
             }
-            Button(tr("Cancel", "取消"), role: .cancel) { renameTarget = nil }
+            .foregroundStyle(BrandColors.textSecondary)
+            .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.borderless)
+        .accessibilityLabel(title)
+        .accessibilityValue(tr("\(count) items, \(expanded.wrappedValue ? "expanded" : "collapsed")",
+                              "\(count) 项，\(expanded.wrappedValue ? "已展开" : "已收起")"))
+    }
+
+    private func queueEmptyRow(_ message: String) -> some View {
+        Text(message)
+            .font(MusesTypography.caption)
+            .foregroundStyle(BrandColors.textSecondary)
+            .padding(.vertical, 8)
     }
 
     /// Hide members of collapsed groups, except the currently playing row.
@@ -346,6 +474,15 @@ struct QueueDrawerView: View {
             showsPlayNext: false,
             showsAddToQueue: false
         )
+        Divider()
+        Button(tr("Move Up", "上移"), systemImage: "arrow.up") {
+            moveQueueItem(item, by: -1, inUpNext: inUpNext)
+        }
+        .disabled(!canMoveQueueItem(item, by: -1, inUpNext: inUpNext))
+        Button(tr("Move Down", "下移"), systemImage: "arrow.down") {
+            moveQueueItem(item, by: 1, inUpNext: inUpNext)
+        }
+        .disabled(!canMoveQueueItem(item, by: 1, inUpNext: inUpNext))
         if advancedQueue {
             Divider()
             Button(item.locked ? tr("Unlock", "解锁") : tr("Lock", "锁定")) {
@@ -378,6 +515,21 @@ struct QueueDrawerView: View {
                 )
             }
         }
+    }
+
+    private func canMoveQueueItem(_ item: QueueItem, by offset: Int, inUpNext: Bool) -> Bool {
+        let items = inUpNext ? playback.queue.upNext : playback.queue.items
+        guard inUpNext || playback.queue.groups.allSatisfy({ !$0.collapsed }),
+              let index = items.firstIndex(where: { $0.id == item.id }) else { return false }
+        return items.indices.contains(index + offset)
+    }
+
+    private func moveQueueItem(_ item: QueueItem, by offset: Int, inUpNext: Bool) {
+        guard canMoveQueueItem(item, by: offset, inUpNext: inUpNext) else { return }
+        let items = inUpNext ? playback.queue.upNext : playback.queue.items
+        guard let index = items.firstIndex(where: { $0.id == item.id }) else { return }
+        if inUpNext { playback.queue.moveUpNext(from: index, to: index + offset) }
+        else { playback.queue.move(from: index, to: index + offset) }
     }
 
     private func playQueueItem(_ item: QueueItem) {

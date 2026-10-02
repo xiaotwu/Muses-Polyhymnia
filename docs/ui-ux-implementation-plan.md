@@ -16,6 +16,20 @@ Verification: all 765 tests in 106 suites passed; the release acceptance bundle 
 
 Remaining phase 1 acceptance: compact windows, full keyboard traversal/focus reveal, VoiceOver naming (including the native catalog menu), light/high-contrast/Reduce Transparency, and the approved shared typography/content-width treatment. This increment does not complete XW-7 or all 64 areas.
 
+### Phase 1 typography and phase 2 first implementation — 2026-10-01
+
+Shared browsing/settings titles now use native SF typography at a consistent 28pt; shared section headings use 20pt. Expressive editorial, hero, song-information and lyric font families remain available. Navigation hover covers the expanded label width. The catalog menu's label now has an explicit accessibility boundary; its semantic name survived repeated runtime state changes in the isolated acceptance instance.
+
+The existing full-height trailing queue now prioritizes a current-song summary, manual Up Next, current collection and optional groups/history. Sections have counts and native disclosure actions; history starts collapsed. Empty sections explain their next action. Native track menus add boundary-checked Move Up/Down through the existing queue service, while drag ordering, groups, locks, restoration and confirmation semantics remain intact. Smart Shuffle has a native explanation popover; Escape dismisses it before closing the queue.
+
+History now has quiet metric summaries, an adaptive range header, an optional heatmap and timestamped listening rows with independent listened-duration/completion values and full track context menus. Completion comes from stored events through an immutable snapshot; unknown remains unknown. No persistence schema or playback engine changed.
+
+Verification: all 766 tests in 106 suites passed after the interaction fixes, including a new stored/unknown completion test. The first signed release bundle passed rendered native inspection of full-height queue composition, 514-item collection disclosure, five-item history disclosure, empty Up Next, the Smart Shuffle explanation, collapsed/expanded history heatmap, its data-table alternative, and unknown completion labels. Playback remained paused at 0:08. Screenshots remain private under `~/.muses/acceptance/queue-history-20261001`.
+
+Additional isolated native verification confirmed idle transport disabling, actionable queue/volume, all empty queue sections, stable catalog menu naming, and the complete Escape sequence: first dismiss the explanation and restore queue focus, then close the queue. Focus returns after the native popover dismissal so the same exit event cannot reach the parent. Group disclosure targets are now 28pt. The final focus repair passed a debug build and rendered interaction inspection. A production review relaunch waited in Keychain access; isolated acceptance used the existing separate credential/data/cache namespace without changing access permissions.
+
+Remaining: compact/light/accessibility matrices; full keyboard traversal, queue menu/reorder/group mutations and clear/replay recovery in an isolated acceptance store. These areas remain In Progress, not complete. Native queue rows currently expose their menu label as the row name in AX, although the track identity is present in the value; include this in XW-12 acceptance.
+
 ## Delivery order and dependencies
 
 | Phase | Linear task | Deliverable | Dependency |
@@ -53,7 +67,7 @@ Use SwiftUI Expert for state/view invalidation, resizable layout, native control
 | 01 窗口与导航 | A + B | XW-7 | Persistent navigation islands implemented; broader acceptance pending |
 | 02 工具栏与返回语义 | A + B + C | XW-7 | Native history retained; sidebar collapse removed; broader acceptance pending |
 | 03 边栏选中与图标轨道 | A + B | XW-7 | Capsule groups and selection implemented; keyboard/VoiceOver acceptance pending |
-| 04 标题、字体与内容宽度 | A + B | XW-7 | Pending production redesign |
+| 04 标题、字体与内容宽度 | A + B | XW-7 | Shared SF page/section titles implemented; editorial F3 retained; content-width/compact acceptance pending |
 | 05 玻璃层级与颜色 | C | XW-7 | Pending production redesign |
 | 06 浅色、深色和辅助显示 | A | XW-7 | Existing foundation; full accessibility matrix pending |
 | 07 首页来源与恢复提示 | B | XW-8 | Pending production redesign |
@@ -80,10 +94,10 @@ Use SwiftUI Expert for state/view invalidation, resizable layout, native control
 | 28 分组结果与目录详情 | A | XW-8 | Pending production redesign |
 | 29 播客关注与节目详情 | C | XW-8 | Pending production redesign |
 | 30 订阅频道与Shorts | B + C | XW-8 | Pending production redesign |
-| 31 历史概览与热力图 | A | XW-13 | Pending production redesign |
-| 32 历史歌曲、清除与回放 | B | XW-13 | Pending production redesign |
-| 33 队列面板和三段结构 | A | XW-13 | Pending production redesign |
-| 34 队列分组、重排与Smart Shuffle | A | XW-13 | Pending production redesign |
+| 31 历史概览与热力图 | A | XW-13 | Quiet metrics/disclosure implemented and rendered; compact/accessibility acceptance pending |
+| 32 历史歌曲、清除与回放 | B | XW-13 | Timestamp/duration/stored completion/context menus implemented; clear/replay acceptance pending |
+| 33 队列面板和三段结构 | A | XW-13 | Full-height shell confirmed; prioritized sections/counts/disclosure implemented and rendered; broader acceptance pending |
+| 34 队列分组、重排与Smart Shuffle | A | XW-13 | Native reorder menus and explanation implemented; mutation/keyboard/focus acceptance pending |
 | 35 PlayerBar布局与闲置 | A | XW-14 | Pending production redesign |
 | 36 进度、随机与重复 | A | XW-14 | Pending production redesign |
 | 37 音量与输出 | C | XW-14 | Pending production redesign |

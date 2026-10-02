@@ -204,6 +204,8 @@ struct ListeningEventSnapshot: Sendable, Equatable, Identifiable {
     let startedAt: Date
     let listenedMs: Int
     let outcome: ListeningOutcome
+    /// Persisted listening fraction; nil means the source duration was unknown.
+    let completionRatio: Double?
 }
 
 /// One consistent read for the History screen. Fetch failures are thrown, so a

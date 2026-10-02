@@ -297,6 +297,26 @@ struct ListeningHistoryTests {
         #expect(dashboard.recent.isEmpty)
     }
 
+    @Test("dashboard exposes stored completion without inventing a duration")
+    func dashboardStoredCompletion() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let now = Date(timeIntervalSince1970: 1_800_003_600)
+        for (title, ratio) in [("Known", Optional(0.37)), ("Unknown", nil)] {
+            context.insert(ListeningEvent(
+                trackId: UUID(), trackTitle: title, artist: "Artist", albumTitle: nil,
+                startedAt: now.addingTimeInterval(-60), endedAt: now.addingTimeInterval(-10),
+                listenedMs: 37_000, completionRatio: ratio, outcome: .stopped
+            ))
+        }
+        try context.save()
+        let service = HistoryService(modelContainer: container, eventBus: PlaybackEventBus(),
+                                     enabledProvider: { true })
+        let rows = try service.dashboard(range: .day, now: now).recent
+        #expect(rows.first(where: { $0.title == "Known" })?.completionRatio == 0.37)
+        #expect(rows.contains { $0.title == "Unknown" && $0.completionRatio == nil })
+    }
+
     @Test("clearAll clears all events and bumps revision")
     func clearAll() throws {
         let container = try makeContainer()
