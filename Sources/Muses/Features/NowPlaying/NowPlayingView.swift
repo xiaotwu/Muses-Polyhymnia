@@ -176,6 +176,7 @@ struct NowPlayingView: View {
     @State private var lyricsInteractionPresented = false
     @State private var chaptersPresented = false
     @State private var seekValue: Double = 0
+    @State private var seekTrackID: UUID?
     @State private var volumePresented = false
     @State private var lastVolumeEscapeTimestamp: TimeInterval?
     @AppStorage(PrefKey.gestureClosePlayer) private var swipeClose = true
@@ -300,7 +301,7 @@ struct NowPlayingView: View {
             }
         }
         .onChange(of: playback.state.track?.id) {
-            seeking = false
+            if !seeking { seekTrackID = nil }
             chaptersPresented = false
         }
         .onChange(of: volumePresented) { _, presented in
@@ -315,6 +316,8 @@ struct NowPlayingView: View {
             )
         }
         .onDisappear {
+            seeking = false
+            seekTrackID = nil
             if let escapeMonitor {
                 NSEvent.removeMonitor(escapeMonitor)
                 self.escapeMonitor = nil
@@ -540,7 +543,7 @@ struct NowPlayingView: View {
         return Button {
             if let id = playback.state.track?.id { library.toggleLike(id: id) }
         } label: {
-            Image(systemName: liked ? "star.fill" : "star")
+            Image(systemName: liked ? "heart.fill" : "heart")
                 .font(MusesTypography.system(size: 13, weight: .semibold))
                 .foregroundStyle(liked ? BrandColors.accent : BrandColors.textPrimary.opacity(0.85))
                 .frame(width: 28, height: 28)
@@ -558,23 +561,28 @@ struct NowPlayingView: View {
         VStack(spacing: 2) {
             Slider(
                 value: Binding(
-                    get: { seeking ? seekValue : playback.state.position },
+                    get: { displayedPosition },
                     set: { value in
-                        seeking = true
+                        guard !seeking || seekTrackID == playback.state.track?.id else { return }
                         seekValue = value
+                        if !seeking { playback.seek(to: value) }
                     }
                 ),
                 in: 0...max(playback.state.duration, 1),
                 onEditingChanged: { editing in
-                    if !editing {
-                        playback.seek(to: seekValue)
+                    if editing {
+                        seekTrackID = playback.state.track?.id
+                        seekValue = playback.state.position
+                        seeking = true
+                    } else {
+                        if seekTrackID == playback.state.track?.id { playback.seek(to: seekValue) }
                         seeking = false
+                        seekTrackID = nil
                     }
                 }
             )
             .controlSize(.mini)
             .tint(BrandColors.playback)
-            .focusEffectDisabled()
             .blocksWindowDrag()
             .accessibilityLabel(tr("Playback position", "播放进度"))
             .accessibilityValue(
@@ -717,7 +725,7 @@ struct NowPlayingView: View {
     }
 
     private var displayedPosition: Double {
-        seeking ? seekValue : playback.state.position
+        seeking && seekTrackID == playback.state.track?.id ? seekValue : playback.state.position
     }
 
     private var subtitleLine: String {

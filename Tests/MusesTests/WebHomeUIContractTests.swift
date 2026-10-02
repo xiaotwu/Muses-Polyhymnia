@@ -76,7 +76,10 @@ struct WebHomeUIContractTests {
         #expect(source.contains(".accessibilityLabel"))
         #expect(source.contains("Load more"))
         #expect(source.contains("Public discovery"))
-        #expect(source.contains("Sign In"))
+        #expect(source.contains("Account and personalized Home settings"))
+        #expect(source.contains("guard youTubeAccount.isConnected"))
+        #expect(source.contains("openHomeAccountSettings()"))
+        #expect(source.contains("section.cachedOrigin ?? section.source"))
         #expect(!source.contains("Make Home yours"))
         #expect(!source.contains("guestBanner"))
     }

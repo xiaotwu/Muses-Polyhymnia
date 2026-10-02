@@ -119,3 +119,24 @@ private struct SettingsActionStyle: ViewModifier {
         }
     }
 }
+
+/// The disclosure header retains native Button focus and a complete row target.
+struct SettingsDisclosureStyle: DisclosureGroupStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button { configuration.isExpanded.toggle() } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: configuration.isExpanded ? "chevron.down" : "chevron.right")
+                        .font(.caption.weight(.semibold)).frame(width: 12)
+                    configuration.label
+                    Spacer(minLength: 0)
+                }
+                .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.fullAreaPlain)
+            .accessibilityValue(configuration.isExpanded ? tr("Expanded", "已展开") : tr("Collapsed", "已收起"))
+            if configuration.isExpanded { configuration.content.padding(.leading, 20) }
+        }
+    }
+}

@@ -15,6 +15,7 @@ struct EQEditorView: View {
     @State private var showSaveDialog = false
     @State private var newPresetName = ""
     @State private var pendingRemoval: ActionConfirmation?
+    @State private var selectedFrequency: Double = 1000
 
     private let gainRange: ClosedRange<Float> = -24...24
 
@@ -23,11 +24,12 @@ struct EQEditorView: View {
             header
             curveView
             bandControls
+            preciseBandControls
             presetSection
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .musesFloatingChrome(cornerRadius: 16)
+        .frame(minWidth: 640, minHeight: 520)
         .actionConfirmation($pendingRemoval)
         .onAppear {
             bands = playback.eqBands
@@ -74,6 +76,14 @@ struct EQEditorView: View {
                 drawGrid(ctx: ctx, size: size)
                 drawCurve(ctx: ctx, size: size)
             }
+            .contentShape(Rectangle())
+            .gesture(DragGesture(minimumDistance: 0).onChanged { value in
+                guard !bands.isEmpty, geo.size.width > 0, geo.size.height > 0 else { return }
+                let index = min(bands.count - 1, max(0, Int((value.location.x / geo.size.width * Double(bands.count - 1)).rounded())))
+                selectedFrequency = bands[index].frequency
+                setGain(Float(24 - 48 * value.location.y / geo.size.height), at: index)
+            })
+            .accessibilityHidden(true)
         }
         .frame(height: 160)
         .background(BrandColors.surface)
@@ -128,7 +138,7 @@ struct EQEditorView: View {
 
     private var bandControls: some View {
         HStack(spacing: 0) {
-            ForEach(Array(bands.enumerated()), id: \.offset) { idx, _ in
+            ForEach(Array(bands.enumerated()), id: \.element.frequency) { idx, _ in
                 VStack(spacing: 4) {
                     Text(String(format: "%.0f", bands[idx].gain))
                         .font(MusesTypography.caption2)
@@ -144,7 +154,6 @@ struct EQEditorView: View {
                     .accessibilityValue(String(format: "%+.1f dB", bands[idx].gain))
                     .labelsHidden()
                     .tint(BrandColors.accent)
-            .focusEffectDisabled()
                     .rotationEffect(.degrees(-90))
                     .frame(width: 30, height: 80)
                     Text(formatFreq(bands[idx].frequency))
@@ -154,6 +163,39 @@ struct EQEditorView: View {
                 .frame(maxWidth: .infinity)
             }
         }
+    }
+
+    private var preciseBandControls: some View {
+        HStack(spacing: 12) {
+            Picker(tr("Band", "频段"), selection: $selectedFrequency) {
+                ForEach(bands, id: \.frequency) { band in
+                    Text(formatFreq(band.frequency) + " Hz").tag(band.frequency)
+                }
+            }.pickerStyle(.menu)
+            if let index = bands.firstIndex(where: { $0.frequency == selectedFrequency }) {
+                TextField(tr("Gain (dB)", "增益（dB）"), value: Binding(
+                    get: { Double(bands[index].gain) },
+                    set: { if $0.isFinite { setGain(Float($0), at: index) } }),
+                    format: .number.precision(.fractionLength(1)))
+                    .textFieldStyle(.roundedBorder).frame(width: 88)
+                    .accessibilityLabel(tr("Gain for \(formatFreq(selectedFrequency)) Hz, in decibels", "\(formatFreq(selectedFrequency)) Hz 频段增益，单位分贝"))
+                Text("dB").foregroundStyle(.secondary)
+                Stepper(tr("Adjust gain", "调整增益"), value: Binding(
+                    get: { Double(bands[index].gain) },
+                    set: { if $0.isFinite { setGain(Float($0), at: index) } }),
+                    in: Double(gainRange.lowerBound)...Double(gainRange.upperBound), step: 0.5)
+                    .labelsHidden()
+                    .accessibilityValue(String(format: "%+.1f dB", bands[index].gain))
+            }
+            Spacer()
+        }
+    }
+
+    private func setGain(_ gain: Float, at index: Int) {
+        guard bands.indices.contains(index), gain.isFinite else { return }
+        bands[index].gain = min(gainRange.upperBound, max(gainRange.lowerBound, gain))
+        activePresetIdRaw = "Custom"
+        applyBands()
     }
 
     // MARK: - Presets
@@ -204,6 +246,7 @@ struct EQEditorView: View {
         .alert(tr("Save Preset", "保存预设"), isPresented: $showSaveDialog) {
             TextField(tr("Name", "名称"), text: $newPresetName)
             Button(tr("Save", "保存")) { savePreset() }
+                .disabled(newPresetName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             Button(tr("Cancel", "取消"), role: .cancel) {}
         }
     }
@@ -226,8 +269,9 @@ struct EQEditorView: View {
     }
 
     private func savePreset() {
-        guard !newPresetName.isEmpty else { return }
-        let preset = EQPreset(name: newPresetName, bandsJSON: EQPreset.encode(bands))
+        let name = newPresetName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+        let preset = EQPreset(name: name, bandsJSON: EQPreset.encode(bands))
         modelContext.insert(preset)
         try? modelContext.save()
         activePresetIdRaw = preset.id.uuidString

@@ -97,13 +97,15 @@ final class LibraryService {
         return Set(snapshots.filter { likedVideos.contains($0.youTubeId) }.map(\.id))
     }
 
+    @discardableResult
     func updateTrack(id: UUID, title: String, artist: String,
                      albumTitle: String?, albumArtist: String?,
                      trackNo: Int?, discNo: Int?, year: Int?,
-                     genre: String?, lyrics: String?) {
+                     genre: String?, lyrics: String?) -> Bool {
         let context = ModelContext(modelContainer)
+        context.autosaveEnabled = false
         guard let track = try? context.fetch(FetchDescriptor<Track>(
-            predicate: #Predicate { $0.id == id })).first else { return }
+            predicate: #Predicate { $0.id == id })).first else { return false }
         track.title = title
         track.artist = artist
         track.albumTitle = albumTitle
@@ -119,9 +121,12 @@ final class LibraryService {
         do {
             try context.save()
             metadataRevision &+= 1
+            return true
         } catch {
+            context.rollback()
             AppLog.for("LibraryService").warning(
                 "updateTrack save failed: \(error.localizedDescription)")
+            return false
         }
     }
 

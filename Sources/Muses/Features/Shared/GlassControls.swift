@@ -67,11 +67,11 @@ struct MusesSegmentButtonStyle: ButtonStyle {
     }
 }
 
-/// T3 clear playback core, with a restrained champagne-gold tint and a luminous rim.
+/// Neutral playback core with a high-contrast glyph and a restrained system rim.
 struct PlaybackCoreSurface: ViewModifier {
     func body(content: Content) -> some View {
         content.foregroundStyle(BrandColors.playback)
-            .musesGlass(in: Circle(), tint: BrandColors.accent.opacity(0.14), role: .artworkControl)
+            .musesGlass(in: Circle(), tint: BrandColors.playback.opacity(0.08), role: .artworkControl)
     }
 }
 

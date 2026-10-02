@@ -14,6 +14,7 @@ struct LiquidGlassVolumeBar: View {
     var width: CGFloat = 220
     var height: CGFloat = 36
     var drawsGlass = true
+    var showsOutput = true
     var focusesScaleOnAppear = false
     var scaleStyle: ScaleStyle = .graduated
     var onDeviceSelected: (() -> Void)? = nil
@@ -54,7 +55,7 @@ struct LiquidGlassVolumeBar: View {
             Text("\(Int((currentVolume * 100).rounded()))%")
                 .font(MusesTypography.caption.monospacedDigit()).frame(width: 34)
                 .accessibilityHidden(true)
-            outputMenu
+            if showsOutput { outputMenu }
         }
         .padding(.horizontal, 10)
         .frame(width: width, height: height)

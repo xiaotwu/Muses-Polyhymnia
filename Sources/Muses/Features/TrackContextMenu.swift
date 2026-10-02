@@ -11,6 +11,8 @@ struct TrackContextMenu: ViewModifier {
     var track: Track? = nil
     var playlists: [Playlist] = []
     let onPlay: () -> Void
+    var showsMenuButton = false
+    var menuButtonAlignment: Alignment = .topTrailing
     var onRemoveFromContainer: (() -> Void)? = nil
     @Environment(LibraryService.self) private var library
     @Environment(PlaylistService.self) private var playlistService
@@ -21,6 +23,13 @@ struct TrackContextMenu: ViewModifier {
     func body(content: Content) -> some View {
         if let snapshot {
             content
+                .overlay(alignment: menuButtonAlignment) {
+                    if showsMenuButton {
+                        ChromeIconMenu(systemName: "ellipsis", title: tr("Options for \(snapshot.title)", "\(snapshot.title) 的选项")) {
+                            menu(snapshot)
+                        }.padding(8).padding(.trailing, 40)
+                    }
+                }
                 .contextMenu { menu(snapshot) }
                 .sheet(isPresented: $showEditTrack) {
                     if let t = resolvedTrack(for: snapshot) { EditTrackSheet(track: t) }
@@ -66,6 +75,8 @@ private struct YouTubeEntryContextMenu: ViewModifier {
     let entry: YTDlpBridge.YTDlpPlaylistEntry
     let mediaKind: TrackMediaKind
     let onPlay: () -> Void
+    var showsMenuButton = false
+    var menuButtonAlignment: Alignment = .topTrailing
     @State private var saveFailed = false
 
     @Environment(YouTubeSearchService.self) private var search
@@ -74,50 +85,62 @@ private struct YouTubeEntryContextMenu: ViewModifier {
     private var isCurrent: Bool { playback.transportState.track?.youTubeId == entry.id }
 
     func body(content: Content) -> some View {
-        content.contextMenu {
-            Button(isCurrent ? playback.primaryAction.title : tr("Play", "播放"),
-                   systemImage: isCurrent ? playback.primaryAction.symbol : "play.fill") {
-                if isCurrent { playback.toggle() } else { onPlay() }
-            }
-            Button(tr("Play Next", "下一首播放"), systemImage: "text.insert") {
-                resolve { playback.queue.playNext($0) }
-            }
-            Button(tr("Save to Library", "保存到资料库", zhHant: "儲存至資料庫"), systemImage: "plus") {
-                Task {
-                    do { _ = try await search.resolveTrack(entry: entry,
-                                                          saveToLibrary: true,
-                                                          mediaKindOverride: mediaKind) }
-                    catch { saveFailed = true }
+        content.contextMenu { menuItems }
+        .overlay(alignment: menuButtonAlignment) {
+            if showsMenuButton {
+                ChromeIconMenu(systemName: "ellipsis", title: tr("More for \(entry.title)", "更多：\(entry.title)")) {
+                    menuItems
                 }
-            }
-            Button(tr("Add to Queue", "加入队列"), systemImage: "text.badge.plus") {
-                resolve { playback.queue.addToQueue($0) }
-            }
-            if let url = YouTubeContextMenuLink.watchURL(videoID: entry.id) {
-                if let target = YouTubeShareTarget(url: url) {
-                    YouTubeShareMenu(target: target)
-                }
-                Button(tr("Copy Link", "复制链接"), systemImage: "link") {
-                    NSPasteboard.general.clearContents()
-                    NSPasteboard.general.setString(url.absoluteString, forType: .string)
-                }
-                Button {
-                    resolve { PlaybackPresentation.video($0, playback: playback) }
-                } label: {
-                    Label {
-                        Text(tr("Floating video", "悬浮视频"))
-                    } icon: {
-                        YouTubeMark(size: 12)
-                            .accessibilityHidden(true)
-                    }
-                }
-                .accessibilityLabel(tr("Floating video", "悬浮视频"))
+                .padding(6)
+                .padding(.trailing, 40)
             }
         }
         .alert(tr("Could not save to Library", "无法保存到资料库", zhHant: "無法儲存至資料庫"), isPresented: $saveFailed) {
             Button(tr("OK", "好", zhHant: "好"), role: .cancel) {}
         } message: {
             Text(tr("Try saving this item again.", "请重试保存此项目。", zhHant: "請重試儲存此項目。"))
+        }
+    }
+
+    @ViewBuilder
+    private var menuItems: some View {
+        Button(isCurrent ? playback.primaryAction.title : tr("Play", "播放"),
+               systemImage: isCurrent ? playback.primaryAction.symbol : "play.fill") {
+            if isCurrent { playback.toggle() } else { onPlay() }
+        }
+        Button(tr("Play Next", "下一首播放"), systemImage: "text.insert") {
+            resolve { playback.queue.playNext($0) }
+        }
+        Button(tr("Save to Library", "保存到资料库", zhHant: "儲存至資料庫"), systemImage: "plus") {
+            Task {
+                do { _ = try await search.resolveTrack(entry: entry,
+                                                      saveToLibrary: true,
+                                                      mediaKindOverride: mediaKind) }
+                catch { saveFailed = true }
+            }
+        }
+        Button(tr("Add to Queue", "加入队列"), systemImage: "text.badge.plus") {
+            resolve { playback.queue.addToQueue($0) }
+        }
+        if let url = YouTubeContextMenuLink.watchURL(videoID: entry.id) {
+            if let target = YouTubeShareTarget(url: url) {
+                YouTubeShareMenu(target: target)
+            }
+            Button(tr("Copy Link", "复制链接"), systemImage: "link") {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(url.absoluteString, forType: .string)
+            }
+            Button {
+                resolve { PlaybackPresentation.video($0, playback: playback) }
+            } label: {
+                Label {
+                    Text(tr("Floating video", "悬浮视频"))
+                } icon: {
+                    YouTubeMark(size: 12)
+                        .accessibilityHidden(true)
+                }
+            }
+            .accessibilityLabel(tr("Floating video", "悬浮视频"))
         }
     }
 
@@ -273,9 +296,13 @@ extension View {
                           track: Track? = nil,
                           playlists: [Playlist] = [],
                           onPlay: @escaping () -> Void,
+                          showsMenuButton: Bool = false,
+                          menuButtonAlignment: Alignment = .topTrailing,
                           onRemoveFromContainer: (() -> Void)? = nil) -> some View {
         modifier(TrackContextMenu(snapshot: snapshot, track: track,
                                   playlists: playlists, onPlay: onPlay,
+                                  showsMenuButton: showsMenuButton,
+                                  menuButtonAlignment: menuButtonAlignment,
                                   onRemoveFromContainer: onRemoveFromContainer))
     }
 
@@ -284,14 +311,19 @@ extension View {
     func youTubeEntryContextMenu(
         entry: YTDlpBridge.YTDlpPlaylistEntry,
         mediaKind: TrackMediaKind = .song,
+        showsMenuButton: Bool = false,
+        menuButtonAlignment: Alignment = .topTrailing,
         onPlay: @escaping () -> Void
     ) -> some View {
-        modifier(YouTubeEntryContextMenu(entry: entry, mediaKind: mediaKind, onPlay: onPlay))
+        modifier(YouTubeEntryContextMenu(entry: entry, mediaKind: mediaKind, onPlay: onPlay,
+                                        showsMenuButton: showsMenuButton, menuButtonAlignment: menuButtonAlignment))
     }
 
     @ViewBuilder
     func youTubeEntryContextMenu(
         card: YouTubeDiscoveryCard,
+        showsMenuButton: Bool = false,
+        menuButtonAlignment: Alignment = .topTrailing,
         onPlay: @escaping () -> Void
     ) -> some View {
         if let videoID = card.playableVideoID {
@@ -302,6 +334,8 @@ extension View {
                     uploader: card.uploader,
                     duration: card.duration
                 ),
+                showsMenuButton: showsMenuButton,
+                menuButtonAlignment: menuButtonAlignment,
                 onPlay: onPlay
             )
         } else {

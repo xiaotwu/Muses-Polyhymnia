@@ -31,6 +31,16 @@ enum YouTubeImportError: LocalizedError, Equatable {
     }
 }
 
+/// Immutable, occurrence-preserving data shown before an import writes library truth.
+struct YouTubePlaylistImportPreview: Sendable {
+    let url: String
+    let playlistID: String
+    let title: String
+    let channel: String
+    let artworkURL: String?
+    let entries: [YTDlpBridge.YTDlpPlaylistEntry]
+}
+
 /// YouTube playlist import service.
 ///
 /// Mirrors the `MetadataEnricherService` pattern: `@MainActor`, a fresh
@@ -157,6 +167,16 @@ final class YouTubeImportService {
             return existing.id
         }
 
+        return try await importPlaylist(preview: try await prepareImport(url: url), selectedIndices: nil)
+    }
+
+    /// Fetches display data only. Cancellation never creates an import or tracks.
+    func prepareImport(url: String) async throws -> YouTubePlaylistImportPreview {
+        activeOperations += 1
+        defer { activeOperations -= 1 }
+        guard let playlistId = extractPlaylistId(from: url) else {
+            throw YouTubeImportError.invalidURL
+        }
         // 2. Fetch entries.
         let entries: [YTDlpBridge.YTDlpPlaylistEntry]
         do {
@@ -179,8 +199,42 @@ final class YouTubeImportService {
         let channel = meta?.channel ?? entries.first?.uploader ?? "Unknown"
         let oembedArtwork = meta?.artworkURL
 
+        try Task.checkCancellation()
+        return YouTubePlaylistImportPreview(url: url, playlistID: playlistId,
+            title: title, channel: channel, artworkURL: oembedArtwork, entries: entries)
+    }
+
+    /// Commit the reviewed occurrences in their original relative order; never write YouTube.
+    func importPlaylist(preview: YouTubePlaylistImportPreview,
+                        selectedIndices: Set<Int>?) async throws -> UUID {
+        activeOperations += 1
+        defer { activeOperations -= 1 }
+        try Task.checkCancellation()
+        let url = preview.url
+        let playlistId = preview.playlistID
+        guard extractPlaylistId(from: url) == playlistId else { throw YouTubeImportError.invalidURL }
+        let existingCtx = ModelContext(modelContainer)
+        if let existing = fetchImportByPlaylistId(playlistId, context: existingCtx) { return existing.id }
+        let entries = preview.entries.enumerated().compactMap { index, entry in
+            selectedIndices.map { $0.contains(index) } ?? true ? entry : nil
+        }
+        guard entries.allSatisfy({ $0.resourceKind == .video }) else { throw YouTubeImportError.invalidURL }
+        guard !entries.isEmpty else { throw YouTubeImportError.emptyPlaylist }
+        let title = preview.title
+        let channel = preview.channel
+        let oembedArtwork = preview.artworkURL
+        // Finish awaits before creating a mutation context; concurrent imports may have committed meanwhile.
+        let artworkURLString = oembedArtwork ?? entries.first.map { thumbnailURL(forVideoId: $0.id) }
+        if let artworkURLString, let artworkURL = URL(string: artworkURLString),
+           let imageData = await get(artworkURL) {
+            _ = try? artworkCache.store(imageData)
+        }
+        try Task.checkCancellation()
+        if let existing = fetchImportByPlaylistId(playlistId, context: ModelContext(modelContainer)) { return existing.id }
+
         // 5. Create a fresh ModelContext.
         let ctx = ModelContext(modelContainer)
+        ctx.autosaveEnabled = false
 
         // 6. Create the import.
         let imp = YouTubeImport(
@@ -194,7 +248,9 @@ final class YouTubeImportService {
         // 7. Create an item + lazy track per entry (reusing existing rows for the same youTubeId).
         var items: [YouTubeImportItem] = []
         for (index, entry) in entries.enumerated() {
-            let durationMs = Int((entry.duration ?? 0) * 1000)
+            let duration = entry.duration ?? 0
+            let durationMs = duration.isFinite && duration > 0 && duration < Double(Int.max / 1000)
+                ? Int(duration * 1000) : 0
             let artist = entry.artist ?? entry.uploader ?? tr("Unknown Artist", "未知艺人")
 
             let item = YouTubeImportItem(
@@ -215,18 +271,9 @@ final class YouTubeImportService {
         // 8. Record the first sync time.
         imp.lastSyncedAt = Date()
 
-        // 9. Playlist cover: prefer the oEmbed thumbnail, fall back to the first video's hqdefault; download and cache (non-blocking).
-        let artworkURLString = oembedArtwork
-            ?? (entries.first.map { thumbnailURL(forVideoId: $0.id) })
-        if let artworkURLString {
-            imp.artworkUrl = artworkURLString
-            if let artworkURL = URL(string: artworkURLString) {
-                if let imageData = await get(artworkURL) {
-                    _ = try? artworkCache.store(imageData)
-                }
-            }
-        }
+        imp.artworkUrl = artworkURLString
 
+        try Task.checkCancellation()
         try attachCatalogMetadata(for: imp, context: ctx)
 
         // 10. Save.
@@ -345,7 +392,10 @@ final class YouTubeImportService {
     @discardableResult
     func addRemoteVideo(importId: UUID, videoId: String, title: String, artist: String,
                         durationMs: Int = 0) -> Bool {
+        guard YTDlpBridge.YTDlpPlaylistEntry(id: videoId, title: title).resourceKind == .video,
+              durationMs >= 0 else { return false }
         let ctx = ModelContext(modelContainer)
+        ctx.autosaveEnabled = false
         guard let imp = fetchImportById(importId, context: ctx) else { return false }
         if (imp.items ?? []).contains(where: { $0.youTubeId == videoId }) { return true }
         let nextOrder = (imp.items ?? []).map(\.order).max() ?? -1
@@ -363,8 +413,8 @@ final class YouTubeImportService {
         } else {
             imp.items = [item]
         }
-        try? ctx.save()
-        return true
+        do { try ctx.save(); return true }
+        catch { ctx.rollback(); return false }
     }
 
     // MARK: - Helpers

@@ -75,6 +75,7 @@ enum SettingsDestination: String, Hashable, Codable {
 }
 
 struct SettingsPage: View {
+    @Environment(\.openWindow) private var openWindow
     @Binding var path: [SettingsDestination]
     @AppStorage(PrefKey.settingsLastPane) private var paneRaw = SettingsCategory.general.rawValue
     @AppStorage(PrefKey.language) private var languageRaw = AppLanguage.system.rawValue
@@ -113,8 +114,14 @@ struct SettingsPage: View {
                             LyricsSettingsView()
                             LyricsSupportView(availability: LyricsIntelligence.availability)
                         case .diagnostics:
-                            GPUSettingsView()
-                            YouTubeSettingsView(destination: .diagnostics)
+                            Section {
+                                LabeledContent(tr("Troubleshooting", "故障排查")) {
+                                    Button(tr("Open diagnostics…", "打开诊断…")) { openWindow(id: "muses-diagnostics") }
+                                        .settingsAction()
+                                }
+                                Text(tr("Playback, import and account guidance are available in a separate window. Listening and browsing continue in this window.", "在独立窗口查看播放、导入及账号故障向导。本窗口可继续浏览与收听。"))
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
                         case .about, .updates:
                             AboutSettingsView()
                             UpdatesSettingsView()

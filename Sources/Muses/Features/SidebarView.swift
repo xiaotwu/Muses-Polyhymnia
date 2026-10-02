@@ -14,7 +14,7 @@ struct SidebarView: View {
     @FocusState private var focusedItem: String?
 
     var body: some View {
-        VStack(spacing: 16) {
+        GeometryReader { geometry in
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     if selection == .settings {
@@ -37,33 +37,27 @@ struct SidebarView: View {
                             destination(.playlists, icon: "rectangle.stack.fill", expanded: expanded)
                         }
                     }
+                    settingsAction
                 }
                 .padding(.vertical, 8)
                 .padding(.horizontal, 16)
+                .frame(minHeight: geometry.size.height, alignment: .center)
             }
             .scrollIndicators(.hidden)
             .scrollClipDisabled()
-
-            Button {
-                navigate(selection == .settings ? .home : .settings)
-            } label: {
-                Image(systemName: selection == .settings ? "house.fill" : "gearshape.fill")
-                    .font(MusesTypography.system(size: 18, weight: .semibold))
-                    .foregroundStyle(BrandColors.textPrimary)
-                    .frame(width: 56, height: 56)
-                    .contentShape(Circle())
-            }
-            .buttonStyle(.fullAreaPlain)
-            .musesGlass(in: Circle(), role: .navigationIsland)
-            .focused($focusedItem, equals: "footer")
-            .overlay(Circle().stroke(BrandColors.accent, lineWidth: focusedItem == "footer" ? 2 : 0))
-            .help(selection == .settings ? SidebarSection.home.title : SidebarSection.settings.title)
-            .accessibilityLabel(selection == .settings ? SidebarSection.home.title : SidebarSection.settings.title)
         }
-        .padding(.top, 12)
-        .padding(.bottom, 16)
+        .padding(.vertical, 12)
         .frame(width: AppleMusicTokens.sidebarCollapsedWidth)
-        .frame(maxHeight: .infinity, alignment: .top)
+        .frame(maxHeight: .infinity)
+        .onReceive(NotificationCenter.default.publisher(for: .musesFocusNavigation)) { _ in
+            if selection == .settings {
+                focusedItem = (SettingsCategory(rawValue: settingsPane) ?? .general).destination.rawValue
+            } else {
+                let key = selection == .albums || selection == .artists ? "catalog" : selection.rawValue
+                let destinations = ["search", "home", "new", "songs", "catalog", "liked", "musicVideos", "podcasts", "subscriptions", "history", "playlists"]
+                focusedItem = destinations.contains(key) ? key : SidebarSection.home.rawValue
+            }
+        }
         .onChange(of: focusedItem) { _, item in
             onKeyboardFocusChange(item != nil)
         }
@@ -77,6 +71,25 @@ struct SidebarView: View {
                 selectedYouTubeImport = nil
             }
         }
+    }
+
+    /// The settings/home circle shares the same spacing and centered group as the capsules.
+    private var settingsAction: some View {
+        Button {
+            navigate(selection == .settings ? .home : .settings)
+        } label: {
+            Image(systemName: selection == .settings ? "house.fill" : "gearshape.fill")
+                .font(MusesTypography.system(size: 18, weight: .semibold))
+                .foregroundStyle(BrandColors.textPrimary)
+                .frame(width: 56, height: 56)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.fullAreaPlain)
+        .musesGlass(in: Circle(), role: .navigationIsland)
+        .focused($focusedItem, equals: "footer")
+        .overlay(Circle().stroke(BrandColors.accent, lineWidth: focusedItem == "footer" ? 2 : 0))
+        .help(selection == .settings ? SidebarSection.home.title : SidebarSection.settings.title)
+        .accessibilityLabel(selection == .settings ? SidebarSection.home.title : SidebarSection.settings.title)
     }
 
     private func island<Content: View>(key: String, focusKeys: [String], @ViewBuilder content: (Bool) -> Content) -> some View {
@@ -175,6 +188,7 @@ struct SidebarView: View {
 }
 
 extension Notification.Name {
+    static let musesFocusNavigation = Notification.Name("muses.focusNavigation")
     static let musesSelectPlaylist = Notification.Name("muses.selectPlaylist")
     static let musesPlaylistsChanged = Notification.Name("muses.playlistsChanged")
 }

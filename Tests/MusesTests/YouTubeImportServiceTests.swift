@@ -45,6 +45,44 @@ struct YouTubeImportServiceTests {
         #expect(try ModelContext(container).fetch(FetchDescriptor<YouTubeImportItem>()).first?.artist == "Publisher")
     }
 
+    @Test("Preview is read-only; commit preserves selected duplicate occurrences without refetching")
+    func reviewedOccurrenceImport() async throws {
+        let container = try makeModelContainer(inMemory: true)
+        let bridge = MockImportBridge()
+        bridge.entries = [
+            .init(id: "abcdefghijk", title: "First occurrence"),
+            .init(id: "track_b0000", title: "Omitted"),
+            .init(id: "abcdefghijk", title: "Second occurrence")
+        ]
+        let service = makeService(bridge: bridge, container: container)
+        let preview = try await service.prepareImport(url: "https://www.youtube.com/playlist?list=PLreview")
+        let before = ModelContext(container)
+        #expect(try before.fetch(FetchDescriptor<YouTubeImport>()).isEmpty)
+        #expect(try before.fetch(FetchDescriptor<Track>()).isEmpty)
+        let id = try await service.importPlaylist(preview: preview, selectedIndices: [0, 2])
+        let after = ModelContext(container)
+        let imported = try #require(after.fetch(FetchDescriptor<YouTubeImport>()).first)
+        #expect(imported.id == id)
+        let items = (imported.items ?? []).sorted { $0.order < $1.order }
+        #expect(items.map(\.title) == ["First occurrence", "Second occurrence"])
+        #expect(items.map(\.order) == [0, 1])
+        #expect(try after.fetch(FetchDescriptor<Track>()).count == 1)
+        #expect(bridge.fetchCallCount == 1)
+    }
+
+    @Test("An empty reviewed selection does not create library truth")
+    func emptyReviewedSelection() async throws {
+        let container = try makeModelContainer(inMemory: true)
+        let service = makeService(bridge: MockImportBridge(), container: container)
+        let preview = YouTubePlaylistImportPreview(url: "https://www.youtube.com/playlist?list=PLreview",
+            playlistID: "PLreview", title: "Reviewed", channel: "Publisher", artworkURL: nil,
+            entries: [.init(id: "abcdefghijk", title: "Song")])
+        await #expect(throws: YouTubeImportError.emptyPlaylist) {
+            _ = try await service.importPlaylist(preview: preview, selectedIndices: [])
+        }
+        #expect(try ModelContext(container).fetch(FetchDescriptor<YouTubeImport>()).isEmpty)
+    }
+
     // MARK: - 1. importPlaylist creates import + items + tracks
 
     @Test("importPlaylist creates import, items, and tracks")

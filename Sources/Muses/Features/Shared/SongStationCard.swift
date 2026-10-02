@@ -19,9 +19,12 @@ struct SongStationCard: View {
     var isYouTube: Bool = false
     var nowPlayingID: UUID? = nil
     var style: SongStationCardStyle = .portraitOverlay
+    var showsHoverPlay = true
     var onOpen: () -> Void
     var onPlay: () -> Void
 
+    private enum Control: Hashable { case artwork, play }
+    @FocusState private var focusedControl: Control?
     @State private var hovering = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -45,7 +48,7 @@ struct SongStationCard: View {
         .overlay(alignment: .topTrailing) { youTubeBadge }
         .onHover { hovering = $0 }
         .animation(MusesMotion.hoverAnimation(reduceMotion: reduceMotion), value: hovering)
-        .accessibilityLabel("\(title) — \(subtitle)")
+        .accessibilityElement(children: .contain)
     }
 
     private func cardButton<Content: View>(
@@ -55,6 +58,10 @@ struct SongStationCard: View {
             content()
         }
         .buttonStyle(.fullAreaPlain)
+        .focused($focusedControl, equals: .artwork)
+        .accessibilityLabel(tr("Open \(title)", "打开 \(title)"))
+        .accessibilityValue(subtitle)
+        .overlay(alignment: .bottomTrailing) { hoverPlay(padding: 10) }
     }
 
     private func portraitContent(
@@ -94,7 +101,6 @@ struct SongStationCard: View {
                     .padding(12)
                 }
             }
-            .overlay(alignment: .bottomTrailing) { hoverPlay(padding: 10) }
             .clipShape(shape)
             .contentShape(shape)
     }
@@ -111,7 +117,6 @@ struct SongStationCard: View {
                 presentation: .fitOnAmbient
             )
             .overlay(alignment: .bottomLeading) { nowPlayingBadge }
-            .overlay(alignment: .bottomTrailing) { hoverPlay(padding: 9) }
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
@@ -157,8 +162,10 @@ struct SongStationCard: View {
 
     @ViewBuilder
     private func hoverPlay(padding: CGFloat) -> some View {
-        if hovering {
+        if showsHoverPlay && (hovering || focusedControl != nil) {
             HoverPlayButton(onPlay: onPlay)
+                .focused($focusedControl, equals: .play)
+                .accessibilityLabel(tr("Play \(title)", "播放 \(title)"))
                 .padding(padding)
         }
     }

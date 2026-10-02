@@ -10,6 +10,7 @@ struct FloatingVolumePanel: View {
     var width: CGFloat
     var height: CGFloat
     var style: LiquidGlassVolumeBar.ScaleStyle = .graduated
+    var showsOutput = true
     var dismiss: () -> Void
 
     var body: some View {
@@ -21,7 +22,7 @@ struct FloatingVolumePanel: View {
             }
         }) {
             LiquidGlassVolumeBar(width: width, height: height,
-                                 focusesScaleOnAppear: true, scaleStyle: style)
+                                 showsOutput: showsOutput, focusesScaleOnAppear: true, scaleStyle: style)
                 .environment(playback)
                 .environment(audioDevices)
                 .preferredColorScheme(colorScheme)

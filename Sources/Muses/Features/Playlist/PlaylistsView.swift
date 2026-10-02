@@ -14,7 +14,6 @@ struct PlaylistsView: View {
     private var gridLayout: Bool { overviewLayout == "grid" }
     @State private var playlists: [Playlist] = []
     @State private var showCreateSheet = false
-    @State private var showAddChoice = false
     @State private var showImportSheet = false
     @State private var showCreateYouTubeSheet = false
     @State private var createYouTubePreview: YouTubePlaylistCreatePreview?
@@ -47,11 +46,23 @@ struct PlaylistsView: View {
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 .frame(width: 150)
-                ChromeIconButton(
-                    systemName: "plus",
-                    help: tr("New Playlist", "新建歌单"),
-                    accessibility: tr("New Playlist", "新建歌单")
-                ) { showAddChoice = true }
+                Menu {
+                    Button(tr("New Muses Playlist", "新建 Muses 歌单"), systemImage: "plus.square.on.square") {
+                        showCreateSheet = true
+                    }
+                    Button(tr("Import YouTube Playlist", "导入 YouTube 歌单"), systemImage: "square.and.arrow.down") {
+                        showImportSheet = true
+                    }
+                    Button(tr("Create on YouTube", "在 YouTube 上创建"), systemImage: "play.rectangle.on.rectangle") {
+                        showCreateYouTubeSheet = true
+                    }
+                } label: {
+                    Image(systemName: "plus").frame(width: 28, height: 28)
+                        .accessibilityLabel(tr("Add Playlist", "添加歌单"))
+                }
+                .menuIndicator(.hidden)
+                .help(tr("Add Playlist", "添加歌单"))
+                .accessibilityLabel(tr("Add Playlist", "添加歌单"))
             }
             .padding(.horizontal, AppleMusicTokens.contentPaddingX)
             .padding(.top, AppleMusicSpacing.browseTitleTop)
@@ -161,18 +172,6 @@ struct PlaylistsView: View {
                 refresh()
             }
         }
-        .sheet(isPresented: $showAddChoice) {
-            PlaylistAddChoiceSheet {
-                showAddChoice = false
-                DispatchQueue.main.async { showCreateSheet = true }
-            } onImport: {
-                showAddChoice = false
-                DispatchQueue.main.async { showImportSheet = true }
-            } onCreateYouTube: {
-                showAddChoice = false
-                DispatchQueue.main.async { showCreateYouTubeSheet = true }
-            }
-        }
         .sheet(isPresented: $showCreateYouTubeSheet) {
             NewYouTubePlaylistSheet { title, description, privacy in
                 createYouTubePreview = try playlistSync.prepareCreatePlaylist(
@@ -190,37 +189,19 @@ struct PlaylistsView: View {
             }
         }
         .sheet(isPresented: $showImportSheet) {
-            YouTubeImportSheet { url in
-                Task {
-                    do {
-                        _ = try await importService.importPlaylist(url: url)
-                        addError = nil
-                        showImportSheet = false
-                    } catch {
-                        addError = error.localizedDescription
-                    }
-                }
+            YouTubeImportSheet {
+                addError = nil
+                showImportSheet = false
+                refresh()
             }
         }
         .sheet(item: $revisionImport) { imported in
             PlaylistRevisionBrowserSheet(importID: imported.id,
                                          playlistTitle: imported.title)
         }
-        .alert(
-            pendingDeletion?.title ?? "",
-            isPresented: Binding(
-                get: { pendingDeletion != nil },
-                set: { if !$0 { pendingDeletion = nil } }
-            )
-        ) {
-            Button(tr("Delete", "删除"), role: .destructive) {
-                confirmDeletion()
-            }
-            Button(tr("Cancel", "取消"), role: .cancel) {
-                pendingDeletion = nil
-            }
-        } message: {
-            Text(pendingDeletion?.message ?? "")
+        .sheet(item: $pendingDeletion) { target in
+            PlaylistDeletionPreview(title: target.title, explanation: target.message,
+                itemTitles: target.itemTitles, onCancel: { pendingDeletion = nil }, onDelete: confirmDeletion)
         }
         .alert(tr("Clear deleted playlist records?", "清除已删除歌单记录？"),
             isPresented: Binding(get: { !pendingPurgeIDs.isEmpty },
@@ -572,9 +553,25 @@ struct PlaylistsView: View {
     }
 }
 
-private enum PlaylistDeletionTarget {
+private enum PlaylistDeletionTarget: Identifiable {
     case playlist(Playlist)
     case youTubeImport(YouTubeImport)
+
+    var id: UUID {
+        switch self {
+        case .playlist(let playlist): playlist.id
+        case .youTubeImport(let imported): imported.id
+        }
+    }
+
+    var itemTitles: [String] {
+        switch self {
+        case .playlist(let playlist):
+            (playlist.items ?? []).sorted { $0.order < $1.order }.map { $0.track?.title ?? tr("Unavailable track", "不可用曲目") }
+        case .youTubeImport(let imported):
+            (imported.items ?? []).sorted { $0.order < $1.order }.map(\.title)
+        }
+    }
 
     var title: String {
         switch self {
@@ -594,76 +591,6 @@ private enum PlaylistDeletionTarget {
             return tr("The local import moves to Recently Deleted for 30 days. YouTube is not changed.",
                       "本地导入会移入“最近删除”并保留 30 天；YouTube 不会被修改。")
         }
-    }
-}
-
-struct PlaylistAddChoiceSheet: View {
-    let onNew: () -> Void
-    let onImport: () -> Void
-    var onCreateYouTube: (() -> Void)? = nil
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text(tr("Add Playlist", "添加歌单"))
-                    .font(MusesTypography.title2.weight(.semibold))
-                Spacer()
-                ChromeIconButton(systemName: "xmark",
-                                 help: tr("Close", "关闭"),
-                                 accessibility: tr("Close", "关闭")) {
-                    dismiss()
-                }
-            }
-            choiceButton(
-                title: tr("New Playlist", "新建歌单"),
-                subtitle: tr("Create an empty Muses playlist", "创建一个空的 Muses 歌单"),
-                systemName: "plus.square.on.square",
-                action: onNew
-            )
-            choiceButton(
-                title: tr("Import YouTube Playlist", "导入 YouTube 歌单"),
-                subtitle: tr("Paste a YouTube or YouTube Music playlist link", "粘贴 YouTube 或 YouTube Music 歌单链接"),
-                systemName: "square.and.arrow.down",
-                action: onImport
-            )
-            if let onCreateYouTube {
-                choiceButton(
-                    title: tr("Create on YouTube", "在 YouTube 上创建"),
-                    subtitle: tr(
-                        "Create a new owned playlist after an exact review",
-                        "核对确切信息后创建一个归你所有的新歌单"),
-                    systemName: "play.rectangle.on.rectangle",
-                    action: onCreateYouTube
-                )
-            }
-        }
-        .padding(20)
-        .frame(width: 420)
-        .musesFloatingChrome(cornerRadius: 18)
-    }
-
-    private func choiceButton(title: String, subtitle: String,
-                              systemName: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 14) {
-                Image(systemName: systemName)
-                    .font(MusesTypography.system(size: 20, weight: .semibold))
-                    .frame(width: 30)
-                    .foregroundStyle(BrandColors.accent)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(title).font(MusesTypography.headline).foregroundStyle(BrandColors.textPrimary)
-                    Text(subtitle).font(MusesTypography.caption).foregroundStyle(BrandColors.textSecondary)
-                }
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .foregroundStyle(BrandColors.textSecondary)
-            }
-            .padding(14)
-            .background(BrandColors.surface,
-                        in: Capsule())
-        }
-        .buttonStyle(.fullAreaPlain)
     }
 }
 

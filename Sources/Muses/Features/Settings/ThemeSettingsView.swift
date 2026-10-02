@@ -10,13 +10,12 @@ struct ThemeSettingsView: View {
     var body: some View {
         @Bindable var typography = typography
         Section {
-            LabeledContent(tr("Theme", "主题")) {
-                SettingsGlassChoice(title: tr("Theme", "主题"), selection: $themeRaw, options: [
-                    .init(id: AppTheme.system.rawValue, title: tr("System", "系统"), symbol: "desktopcomputer"),
-                    .init(id: AppTheme.light.rawValue, title: tr("Light", "浅色"), symbol: "sun.max"),
-                    .init(id: AppTheme.dark.rawValue, title: tr("Dark", "深色"), symbol: "moon")
-                ])
+            Picker(tr("Theme", "主题"), selection: $themeRaw) {
+                Text(tr("System", "系统")).tag(AppTheme.system.rawValue)
+                Text(tr("Light", "浅色")).tag(AppTheme.light.rawValue)
+                Text(tr("Dark", "深色")).tag(AppTheme.dark.rawValue)
             }
+            .pickerStyle(.segmented)
             LabeledContent(tr("Now Playing", "正在播放")) {
                 SettingsGlassChoice(title: tr("Now Playing", "正在播放"), selection: $modeRaw, options: [
                     .init(id: NowPlayingMode.cover.rawValue, title: tr("Cover", "封面"), symbol: "square"),
@@ -25,18 +24,25 @@ struct ThemeSettingsView: View {
             }
         } header: { Text(tr("Theme & artwork", "主题与封面")) }
         Section {
-            LabeledContent(tr("Text size", "字号")) {
-                SettingsGlassChoice(title: tr("Text size", "字号"), selection: Binding(
-                    get: { typography.size.rawValue },
-                    set: { if let size = InterfaceTextSize(rawValue: $0) { typography.size = size } }
-                ), options: InterfaceTextSize.allCases.map {
-                    .init(id: $0.rawValue, title: $0.label, symbol: "textformat.size")
-                })
+            Picker(tr("Text size", "字号"), selection: $typography.size) {
+                ForEach(InterfaceTextSize.allCases) { Text($0.label).tag($0) }
             }
+            .pickerStyle(.segmented)
+            Picker(tr("Font style", "字体风格"), selection: Binding(
+                get: { typography.family == "system" ? "system" : typography.family.isEmpty ? "classic" : "custom" },
+                set: { if $0 != "custom" { typography.family = $0 == "system" ? "system" : "" } }
+            )) {
+                Text(tr("System", "系统")).tag("system")
+                Text(tr("Classic", "经典")).tag("classic")
+                if !typography.family.isEmpty && typography.family != "system" {
+                    Text(tr("Custom", "自选")).tag("custom")
+                }
+            }
+            .pickerStyle(.segmented)
             LabeledContent(tr("Font", "字体")) {
                 Button { showFonts = true } label: {
                     Label(typography.family.isEmpty
-                          ? tr("Muses default", "Muses 默认字体") : typography.family,
+                          ? tr("Classic Muses", "Muses 经典") : typography.family == "system" ? tr("System", "系统") : typography.family,
                           systemImage: "textformat")
                         .lineLimit(1)
                 }
@@ -45,16 +51,14 @@ struct ThemeSettingsView: View {
                     SettingsFontPicker(typography: typography)
                 }
             }
-            Text(tr("Music title · Spring Prelude", "音乐标题 · 春日序曲"))
-                .font(MusesTypography.song(size: 15))
-                .foregroundStyle(BrandColors.textSecondary)
-                .accessibilityLabel(tr("Font preview", "字体预览"))
+            TypographyLiveSamples()
         } header: { Text(tr("Text", "文字")) }
     }
 }
 
 /// Load the complete system font list only while its native popover is visible.
 private struct SettingsFontPicker: View {
+    @Environment(\.dismiss) private var dismiss
     @Bindable var typography: TypographyPreferences
     @State private var families: [String] = []
     @State private var query = ""
@@ -72,16 +76,16 @@ private struct SettingsFontPicker: View {
                 .focused($searching)
             ScrollView {
                 LazyVStack(spacing: 2) {
-                    fontRow("", title: tr("Muses default", "Muses 默认字体"))
+                    fontRow("system", title: tr("System", "系统"))
+                    fontRow("", title: tr("Classic Muses", "Muses 经典"))
                     ForEach(filtered, id: \.self) { family in fontRow(family, title: family) }
                 }
             }
-            Text(tr("Aa · Music and poetry", "Aa · 音乐与诗篇"))
-                .font(MusesTypography.song(size: 15))
-                .accessibilityLabel(tr("Font preview", "字体预览"))
+            TypographyLiveSamples(compact: true)
         }
         .padding(16)
-        .frame(width: 360, height: 360)
+        .frame(width: 380, height: 360)
+        .onExitCommand { dismiss() }
         .task {
             families = NSFontManager.shared.availableFontFamilies.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
             searching = true
@@ -102,5 +106,35 @@ private struct SettingsFontPicker: View {
         }
         .buttonStyle(.fullAreaPlain)
         .accessibilityAddTraits(typography.family == family ? .isSelected : [])
+    }
+}
+
+/// The three semantic roles react to the same live size and family preference.
+private struct TypographyLiveSamples: View {
+    var compact = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: compact ? 8 : 14) {
+            sample(tr("Title", "标题")) {
+                Text(tr("Spring Prelude", "春日序曲"))
+                    .font(MusesTypography.heading(tr("Spring Prelude", "春日序曲"), size: 22))
+            }
+            sample(tr("Track", "曲目")) {
+                Text(tr("Music in the evening · Muses", "晚间音乐 · Muses"))
+                    .font(MusesTypography.song(size: 15))
+            }
+            sample(tr("Lyrics", "歌词")) {
+                Text(tr("A little light across the sky", "天边映出一缕光"))
+                    .font(MusesTypography.lyric(size: 20, current: true))
+            }
+        }
+        .padding(.vertical, 8)
+    }
+    private func sample<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title).font(.caption).foregroundStyle(.secondary)
+            content().foregroundStyle(.primary).fixedSize(horizontal: false, vertical: true)
+        }
+        .accessibilityElement(children: .combine)
     }
 }

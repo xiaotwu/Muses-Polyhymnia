@@ -4,7 +4,7 @@ struct LyricsTranslationPicker: View {
     @Binding var selection: String
 
     var body: some View {
-        Picker(tr("Translation", "翻译"), selection: $selection) {
+        Picker(tr("Default translation", "默认翻译"), selection: $selection) {
             Text(tr("Off", "关闭")).tag("off")
             Text("English").tag("en")
             Text("简体中文").tag("zh-Hans")
@@ -18,30 +18,37 @@ struct LyricsSettingsView: View {
     @AppStorage(PrefKey.lyricsIntelligence) private var intelligentMatching = true
     @AppStorage(PrefKey.lyricsTranslationLanguage) private var translationTarget = "off"
     @AppStorage(PrefKey.lyricsRomanization) private var romanization = false
+    @State private var showSources = false
     @State private var availability = LyricsIntelligence.availability
 
     var body: some View {
         Section {
             LyricsTranslationPicker(selection: $translationTarget)
                 .disabled(!supportsTranslation)
-            Toggle(tr("Romanization", "音译"), isOn: $romanization)
+            Toggle(tr("Default romanization", "默认音译"), isOn: $romanization)
                 .disabled(availability != .available && !romanization)
         } header: { Text(tr("Display", "显示")).font(MusesTypography.headline.weight(.semibold)) }
         Section {
-            Picker(tr("Preferred source", "优先来源", zhHant: "優先來源"), selection: $lyricsSource) {
-                Text(tr("Automatic", "自动", zhHant: "自動")).tag("auto")
-                Text("LRCLIB").tag("lrclib")
-                Text("Musixmatch").tag("musixmatch")
-                Text("Lyrics.ovh").tag("lyricsOVH")
+            HStack(spacing: 8) {
+                Toggle(tr("Intelligent matching", "智能匹配"), isOn: $intelligentMatching)
+                    .disabled(availability != .available && !intelligentMatching)
+                SettingsInfoButton(title: tr("Intelligent matching", "智能匹配"), message: availability.message)
             }
-            .pickerStyle(.menu)
-            .help(tr("Try other sources when no lyrics are found", "未找到歌词时尝试其他来源", zhHant: "未找到歌詞時嘗試其他來源"))
-            Toggle(tr("Intelligent matching", "智能匹配"), isOn: $intelligentMatching)
-                .disabled(availability != .available && !intelligentMatching)
-            LabeledContent("Apple Intelligence", value: availability.message)
-                .font(MusesTypography.caption).foregroundStyle(.secondary)
+            SettingsStatus(title: availability.message,
+                           symbol: availability == .available ? "checkmark.circle" : "info.circle")
+            DisclosureGroup(tr("Advanced sources", "高级来源"), isExpanded: $showSources) {
+                Picker(tr("Preferred source", "优先来源"), selection: $lyricsSource) {
+                    Text(tr("Automatic", "自动")).tag("auto")
+                    Text("LRCLIB").tag("lrclib")
+                    Text("Musixmatch").tag("musixmatch")
+                    Text("Lyrics.ovh").tag("lyricsOVH")
+                }.pickerStyle(.menu)
+                Text(tr("Automatic tries supported sources. This is a preference, not a guarantee of timing or availability. The reading menu shows the actual source and controls translation for the current song.",
+                        "自动尝试支持的来源。此为偏好，不保证时序或可用性。阅读菜单显示实际来源，并控制当前歌曲的翻译。"))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
         } header: { Text(tr("Matching", "匹配")).font(MusesTypography.headline.weight(.semibold)) }
-        .onAppear { availability = LyricsIntelligence.availability }
+        .onAppear { showSources = lyricsSource != "auto"; availability = LyricsIntelligence.availability }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             availability = LyricsIntelligence.availability
         }

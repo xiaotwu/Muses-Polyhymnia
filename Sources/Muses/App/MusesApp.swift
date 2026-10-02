@@ -309,7 +309,7 @@ struct MusesApp: App {
             NotificationCenter.default.post(name: .musesToggleNowPlaying, object: nil)
         }, enabled: { [weak playbackService] in playbackService?.transportState.track != nil })
         registry.register(CommandRegistry.focusSearch) {
-            NotificationCenter.default.post(name: .musesFocusSearch, object: nil)
+            NotificationCenter.default.post(name: .musesQuickSearch, object: nil)
         }
         self.commandRegistry = registry
 
@@ -494,6 +494,17 @@ struct MusesApp: App {
         .commands {
             MusesAppCommands(commandRegistry: commandRegistry, sleepTimer: sleepTimer, updater: updateService)
         }
+        Window(tr("Diagnostics", "诊断"), id: "muses-diagnostics") {
+            ThemeApplier {
+                SettingsDiagnosticsWindow()
+                    .environment(\.ytDlpBridge, ytDlpBridge)
+                    .environment(youTubeAccountService)
+                    .environment(youTubePlaylistSyncService)
+                    .environment(webHomeSessionController)
+                    .environment(homeDiscoveryService)
+            }
+        }
+        .defaultSize(width: 720, height: 660)
         // Mini player scene (its own WindowGroup, opened on demand via openWindow(id:)). Shares the same PlaybackService — no second engine.
         WindowGroup("MiniPlayer", id: "mini-player") {
             ThemeApplier {
@@ -518,7 +529,6 @@ private struct MusesAppCommands: Commands {
     let sleepTimer: SleepTimerService
     let updater: UpdateService
     @Environment(\.openWindow) private var openWindow
-    @AppStorage(PrefKey.sidebarCollapsed) private var isSidebarCollapsed = false
     @AppStorage(PrefKey.ffMiniPlayer) private var miniEnabled = false
     @AppStorage(PrefKey.language) private var languageRaw = AppLanguage.system.rawValue
 
@@ -562,10 +572,8 @@ private struct MusesAppCommands: Commands {
         }
 
         CommandGroup(replacing: .sidebar) {
-            Button(isSidebarCollapsed
-                   ? tr("Show Sidebar", "显示边栏")
-                   : tr("Hide Sidebar", "隐藏边栏")) {
-                isSidebarCollapsed.toggle()
+            Button(tr("Focus Navigation", "聚焦导航", zhHant: "聚焦導覽")) {
+                NotificationCenter.default.post(name: .musesFocusNavigation, object: nil)
             }
             .keyboardShortcut("s", modifiers: [.command, .control])
 

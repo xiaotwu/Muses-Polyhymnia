@@ -48,6 +48,7 @@ struct SettingsHelpView: View {
             } header: { Text(tr("Support", "支持")) }
         }
 
+        .disclosureGroupStyle(SettingsDisclosureStyle())
         .textSelection(.enabled)
     }
 }

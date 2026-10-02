@@ -42,6 +42,9 @@ extension MusesTypography {
     static func preferredNative(size: CGFloat, emphasized: Bool = false) -> NSFont? {
         let family = TypographyPreferences.shared.family
         guard !family.isEmpty else { return nil }
+        if family == "system" {
+            return NSFont.systemFont(ofSize: size, weight: emphasized ? .semibold : .regular)
+        }
         let key = "\(family):\(size):\(emphasized)"
         if let font = customFonts[key] { return font }
         guard let font = NSFontManager.shared.font(withFamily: family,
@@ -54,9 +57,6 @@ extension MusesTypography {
 
     static func system(size: CGFloat, weight: Font.Weight = .regular, design: Font.Design = .default) -> Font {
         let scaled = size * TypographyPreferences.shared.size.scale
-        if design != .monospaced, let font = preferredNative(size: scaled, emphasized: weight != .regular && weight != .light) {
-            return Font(font).weight(weight)
-        }
         return .system(size: scaled, weight: weight, design: design)
     }
 

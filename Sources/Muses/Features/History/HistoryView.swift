@@ -369,6 +369,7 @@ private struct HistoryTimelineRow: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .combine)
             Button(action: onPlay) {
                 Image(systemName: "play.fill").frame(width: 28, height: 28)
             }
@@ -377,20 +378,33 @@ private struct HistoryTimelineRow: View {
             .disabled(!isPlayable)
             .help(isPlayable ? tr("Play", "播放") : tr("This song is no longer available in the library", "此歌曲已无法从资料库播放"))
             .accessibilityLabel(tr("Play \(event.title)", "播放 \(event.title)"))
+            Menu { historyActions } label: {
+                Image(systemName: "ellipsis").frame(width: 28, height: 28)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(tr("Options for \(event.title)", "\(event.title) 的选项"))
+            }
+            .menuStyle(.borderlessButton).menuIndicator(.hidden)
+            .frame(width: 28, height: 28)
+            .accessibilityLabel(tr("Options for \(event.title)", "\(event.title) 的选项"))
+            .help(tr("Options for \(event.title)", "\(event.title) 的选项"))
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .background(isCurrent ? BrandColors.accent.opacity(0.09) : Color.clear,
                     in: RoundedRectangle(cornerRadius: 8))
         .accessibilityElement(children: .contain)
-        .contextMenu {
+        .contextMenu { historyActions }
+    }
+
+    @ViewBuilder private var historyActions: some View {
+
             if let track, isPlayable {
                 TrackContextMenuItems(snapshot: track, onPlay: onPlay)
             } else {
                 Button(tr("Play", "播放"), systemImage: "play.fill", action: onPlay)
                     .disabled(true)
             }
-        }
+
     }
 
     private var time: some View {

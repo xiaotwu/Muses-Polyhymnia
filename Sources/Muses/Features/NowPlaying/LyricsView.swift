@@ -155,12 +155,13 @@ struct LyricsView: View {
         VStack(spacing: 8) {
             HStack {
                 if loading { ProgressView().controlSize(.small) }
-                if let lines, !lines.isEmpty, !lines.contains(where: { $0.time != nil }) {
-                    Image(systemName: "clock.badge.questionmark")
-                        .foregroundStyle(.secondary)
-                        .help(tr("No timing data. Use Match Lyrics to choose a synchronized version.",
-                                 "此版本没有时间轴，可通过匹配歌词选择同步版本。", zhHant: "此版本沒有時間軸，可透過配對歌詞選擇同步版本。"))
-                        .accessibilityLabel(tr("Unsynced lyrics", "非同步歌词", zhHant: "非同步歌詞"))
+                if let source {
+                    Text(source.displayName).font(.caption).foregroundStyle(.secondary)
+                }
+                if let lines, !lines.isEmpty {
+                    Text(lines.contains(where: { $0.time != nil })
+                        ? tr("Synced", "同步歌词") : tr("Plain text · no timing", "纯文本 · 无时间轴"))
+                        .font(.caption).foregroundStyle(.secondary)
                 }
                 if translationTarget != "off", lines?.contains(where: { $0.translation != nil }) == true {
                     Text(tr("Machine translation", "机器翻译")).font(MusesTypography.caption2).foregroundStyle(.secondary)
@@ -169,15 +170,6 @@ struct LyricsView: View {
                     Text(tr("Auto romanization", "自动音译")).font(MusesTypography.caption2).foregroundStyle(.secondary)
                 }
                 Spacer()
-                if lines?.contains(where: { $0.time != nil }) == true {
-                    Button { showTiming.toggle() } label: {
-                        Image(systemName: "timer").chromeActionCircle()
-                    }
-                    .buttonStyle(.fullAreaPlain)
-                    .help(tr("Adjust lyric timing", "调整歌词时间", zhHant: "調整歌詞時間"))
-                    .accessibilityLabel(tr("Adjust lyric timing", "调整歌词时间", zhHant: "調整歌詞時間"))
-                    .popover(isPresented: $showTiming) { timingControls }
-                }
                 if let processingMessage {
                     Image(systemName: "info.circle").help(processingMessage)
                         .accessibilityLabel(processingMessage)
@@ -191,8 +183,8 @@ struct LyricsView: View {
                         }
                         Divider()
                     }
-                    if let source {
-                        Text(tr("Source: ", "来源：", zhHant: "來源：") + source.displayName)
+                    if lines?.contains(where: { $0.time != nil }) == true {
+                        Button(tr("Adjust timing…", "调整时间…")) { showTiming = true }
                         Divider()
                     }
                     LyricsTranslationPicker(selection: $translationTarget)
@@ -204,6 +196,7 @@ struct LyricsView: View {
                         NotificationCenter.default.post(name: .musesOpenSettings, object: SettingsCategory.lyrics)
                     }
                 }
+                .popover(isPresented: $showTiming) { timingControls }
                 .help(tr("Lyrics options", "歌词选项"))
                 .accessibilityLabel(tr("Lyrics options", "歌词选项"))
             }
@@ -214,8 +207,9 @@ struct LyricsView: View {
             }
             else { placeholder }
         }
-        .environment(\.lyricPalette, artworkHues.isEmpty ? [BrandColors.textPrimary] : artworkHues.map {
-            Color(hue: $0[0], saturation: min($0[1], 0.72), brightness: colorScheme == .dark ? max(0.82, $0[2]) : min(0.42, $0[2]))
+        .environment(\.lyricPalette, layout == .fullscreen ? [BrandColors.accent] : prioritizeLegibility || artworkHues.isEmpty ? [BrandColors.textPrimary] : artworkHues.map {
+            Color(hue: $0[0], saturation: min($0[1], colorScheme == .dark ? 0.35 : 0.72),
+                  brightness: colorScheme == .dark ? max(0.92, $0[2]) : min(0.34, $0[2]))
         })
         .task(id: playback.transportState.track?.id) {
             artworkHues = []
@@ -462,7 +456,8 @@ struct LyricsView: View {
     private func lineFont(isCurrent: Bool, text: String) -> Font {
         let size: CGFloat = layout == .fullscreen ? (isCurrent ? 40 : 26)
             : (layout.isImmersive ? (isCurrent ? 34 : 26) : (isCurrent ? 22 : 17))
-        return MusesTypography.lyric(size: size, current: isCurrent, text: text)
+        return layout == .fullscreen ? .system(size: size, weight: isCurrent ? .semibold : .regular)
+            : MusesTypography.lyric(size: size, current: isCurrent, text: text)
     }
 
     /// Word-level row: renders the current line's `LyricWord` sequence as one

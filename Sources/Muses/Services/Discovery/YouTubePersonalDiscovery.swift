@@ -18,7 +18,8 @@ enum YouTubePersonalDiscovery {
             subtitle: tr("From your account", "来自你的账号"),
             kind: .youTubeCarousel,
             items: Array(items),
-            status: .loaded)
+            status: .loaded,
+            source: .officialAccount)
     }
 
     static func mixSection(title: String, entries: [YTDlpBridge.YTDlpPlaylistEntry]) -> HomeSection? {
@@ -44,7 +45,7 @@ enum YouTubePersonalDiscovery {
         return HomeSection(
             id: "yt-subs",
             title: tr("From \(title)", "来自 \(title)", zhHant: "來自 \(title)"),
-            subtitle: tr("From your subscriptions", "来自你的订阅"),
+            subtitle: tr("Public search inspired by your subscriptions", "受你的订阅启发的公共搜索"),
             kind: .youTubeCarousel,
             items: Array(items),
             status: .loaded)

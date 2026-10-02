@@ -199,7 +199,7 @@ enum SettingsChromePolicy {
 enum MenuBarPolicy {
     static let playbackCommandsLiveInPlaybackMenu = true
     static let playbackCommandsAreNotInViewMenu = true
-    static let viewMenuIncludesSidebarToggle = true
+    static let viewMenuIncludesFocusNavigation = true
     static let viewMenuIncludesLibraryDestinations = true
     static let fileMenuOmitsDuplicateLibraryWindow = true
     static let fileMenuIncludesMiniPlayerWindow = true
@@ -213,7 +213,7 @@ enum MenuBarPolicy {
 }
 
 enum SettingsPanePolicy {
-    static let gpuAccelerationLivesInAppearance = true
+    static let gpuAccelerationLivesInDiagnostics = true
     static let gpuAccelerationLivesInGeneral = false
 }
 
@@ -302,7 +302,7 @@ enum NowPlayingChromePolicy {
 
 enum SidebarGlassPolicy {
     static let usesLiquidGlass = true
-    static let touchesTopLeadingAndBottomEdges = true
+    static let touchesTopLeadingAndBottomEdges = false
 }
 
 enum StationCardHitPolicy {

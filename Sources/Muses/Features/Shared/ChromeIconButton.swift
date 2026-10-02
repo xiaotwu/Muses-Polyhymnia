@@ -55,7 +55,7 @@ private struct ChromeActionCircle: ViewModifier {
             .foregroundStyle(prominent ? (colorScheme == .dark ? Color.black.opacity(0.88) : Color.white) : BrandColors.textPrimary)
             .frame(width: diameter, height: diameter, alignment: .center)
             .contentShape(Circle())
-            .background(prominent ? BrandColors.accent : .clear, in: Circle())
+            .background(prominent ? BrandColors.textPrimary : .clear, in: Circle())
             .modifier(CompactChromeSurface())
     }
 }
@@ -75,18 +75,16 @@ struct ChromeIconMenu<Items: View>: View {
 
     var body: some View {
         Menu(content: items) {
-            Color.clear.frame(width: diameter, height: diameter)
+            Image(systemName: systemName)
+                .font(MusesTypography.system(size: ChromeActionMetrics.glyphSize, weight: .semibold))
+                .foregroundStyle(foreground)
+                .frame(width: diameter, height: diameter)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(title)
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .frame(width: diameter, height: diameter)
-        .overlay {
-            Image(systemName: systemName)
-                .font(MusesTypography.system(size: ChromeActionMetrics.glyphSize, weight: .semibold))
-                .foregroundStyle(foreground)
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
-        }
         .contentShape(Circle())
         .modifier(CompactChromeSurface())
         .help(title)

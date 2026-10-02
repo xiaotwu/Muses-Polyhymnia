@@ -370,6 +370,63 @@ final class YTDlpBridge {
         return entries
     }
 
+    /// Reads the explicit Videos tab, not the combined uploads playlist.
+    /// The envelope and every entry are validated before the UI labels them Videos.
+    func fetchChannelVideosPage(channelID: String, offset: Int, count: Int = 20,
+                                timeout: TimeInterval = 45) async throws -> [YTDlpPlaylistEntry] {
+        guard channelID.count == 24, channelID.hasPrefix("UC"),
+              channelID.utf8.allSatisfy({ (65...90).contains($0) || (97...122).contains($0)
+                  || (48...57).contains($0) || $0 == 45 || $0 == 95 }),
+              offset >= 0, offset < 500, (1...50).contains(count) else {
+            throw YTDlpError.parseFailed("Invalid channel Videos page request")
+        }
+        let bin = try await resolveBinary()
+        let args = cookieArgs() + ["--flat-playlist", "--playlist-start", String(offset + 1),
+            "--playlist-end", String(min(offset + count, 500)), "--dump-single-json",
+            "https://www.youtube.com/channel/\(channelID)/videos"]
+        let (stdout, _) = try await runInternal(executablePath: bin, args: args, timeout: timeout)
+        try Task.checkCancellation()
+        return try Self.parseChannelVideosPage(stdout, channelID: channelID)
+    }
+
+    static func parseChannelVideosPage(_ stdout: String, channelID: String) throws -> [YTDlpPlaylistEntry] {
+        struct SourceEntry: Decodable {
+            let id: String
+            let url: String?
+            let webpageURL: String?
+            enum CodingKeys: String, CodingKey { case id, url; case webpageURL = "webpage_url" }
+        }
+        struct Envelope: Decodable {
+            let webpageURL: String
+            let entries: [YTDlpPlaylistEntry]
+            let sourceEntries: [SourceEntry]
+            enum CodingKeys: String, CodingKey { case entries; case webpageURL = "webpage_url" }
+            init(from decoder: Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                webpageURL = try container.decode(String.self, forKey: .webpageURL)
+                entries = try container.decode([YTDlpPlaylistEntry].self, forKey: .entries)
+                sourceEntries = try container.decode([SourceEntry].self, forKey: .entries)
+            }
+        }
+        guard let data = stdout.data(using: .utf8),
+              let envelope = try? JSONDecoder().decode(Envelope.self, from: data),
+              let source = URL(string: envelope.webpageURL), source.scheme == "https",
+              source.host == "www.youtube.com", source.path == "/channel/\(channelID)/videos" else {
+            throw YTDlpError.parseFailed("Response is not the requested channel Videos tab")
+        }
+        for (entry, sourceEntry) in zip(envelope.entries, envelope.sourceEntries) {
+            guard entry.resourceKind == .video,
+                  entry.channelID == nil || entry.channelID == channelID,
+                  let url = URL(string: sourceEntry.webpageURL ?? sourceEntry.url ?? ""),
+                  url.scheme == "https", url.host == "www.youtube.com", url.path == "/watch",
+                  URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?
+                    .first(where: { $0.name == "v" })?.value == entry.id else {
+                throw YTDlpError.parseFailed("Videos tab contains an unverified or mismatched entry")
+            }
+        }
+        return envelope.entries
+    }
+
     /// Reads a channel's actual Shorts tab. The URL on every entry is checked so
     /// extractor fallback to ordinary uploads cannot silently relabel videos.
     func fetchShortsPage(channelID: String, offset: Int, count: Int = 20,

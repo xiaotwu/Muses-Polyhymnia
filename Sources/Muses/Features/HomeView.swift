@@ -13,6 +13,8 @@ struct HomeView: View {
     @Environment(GlobalSearchService.self) var globalSearch
     @Query(sort: \YouTubeImport.importedAt, order: .reverse) var imports: [YouTubeImport]
 
+    @State var galleryPreview: GalleryMediaPreview?
+    @State var homeSourceSelection: HomeSourceSelection = .recommended
     @State var recentlyPlayed: [TrackSnapshot] = []
     @State var fallbackEntries: [YTDlpBridge.YTDlpPlaylistEntry] = []
     @State var fallbackLoading = false
@@ -30,7 +32,7 @@ struct HomeView: View {
     }
 
     var remoteTopPickItems: [DiscoveryItem] {
-        let remote = discovery.sections.flatMap(\.items).filter(isPlayableDiscoveryItem)
+        let remote = visibleDiscoverySections.flatMap(\.items).filter(isPresentableDiscoveryItem)
         let fallback = fallbackEntries.map {
             DiscoveryItem.youTube(YouTubeDiscoveryCard(entry: $0))
         }
@@ -41,7 +43,7 @@ struct HomeView: View {
         TopPicksResolver.picks(
             hero: nil,
             mixed: remoteTopPickItems,
-            recent: supportedRecent.map(DiscoveryItem.track),
+            recent: homeSourceSelection == .recommended ? supportedRecent.map(DiscoveryItem.track) : [],
             max: 6
         )
     }
@@ -81,17 +83,54 @@ struct HomeView: View {
                     .padding(.horizontal, AppleMusicTokens.contentPaddingX)
                 }
 
-                discoveryShelves
+                if homeSourceSelection != .imports {
+                    if visibleDiscoverySections.isEmpty,
+                       homeSourceSelection == .account || homeSourceSelection == .publicDiscovery,
+                       !discovery.isRefreshing {
+                        ContentUnavailableView {
+                            Label(homeSourceSelection.title, systemImage: homeSourceSelection == .account ? "person.crop.circle" : "globe")
+                        } description: {
+                            Text(homeSourceSelection == .account
+                                 ? tr("No account recommendations are available. Personalized Web Home requires its own browser consent.",
+                                      "暂无可用的账号推荐。个性化 Web 首页需要独立的浏览器同意。")
+                                 : tr("No public recommendations are available right now.", "暂时没有可用的公共推荐。"))
+                        } actions: {
+                            Button(homeSourceSelection == .account ? tr("Account Settings", "账号设置") : tr("Retry", "重试")) {
+                                if homeSourceSelection == .account { openHomeAccountSettings() }
+                                else { discovery.reload() }
+                            }
+                        }
+                    } else {
+                        homeSpotlight
+                        topPicks
+                        discoveryShelves
+                    }
+                    PodcastContinueShelf()
+                }
 
-                if !activeImports.isEmpty {
-                    importedPlaylistsShelf
+                if homeSourceSelection == .imports || (homeSourceSelection == .recommended && !activeImports.isEmpty) {
+                    if activeImports.isEmpty {
+                        ContentUnavailableView {
+                            Label(tr("No imported playlists", "暂无已导入歌单"), systemImage: "music.note.list")
+                        } description: {
+                            Text(tr("Import a YouTube playlist from All Playlists.", "从全部歌单导入 YouTube 歌单。"))
+                        } actions: {
+                            Button(tr("Open Playlists", "打开歌单")) {
+                                NotificationCenter.default.post(name: .musesNavigateFromSearch, object: GlobalSearchRoute.section(.playlists))
+                            }
+                        }
+                    } else { importedPlaylistsShelf }
                 }
             }
             .padding(.top, AppleMusicSpacing.browseTitleTop)
             .padding(.bottom, AppleMusicTokens.scrollBottomInset)
         }
         .background(BrowseBackground())
+        .sheet(item: $galleryPreview) { GalleryMediaPreviewSheet(preview: $0) }
         .onAppear {
+            if discovery.recommendationMode == .youtubeMusic {
+                homeSourceSelection = .publicDiscovery
+            }
             refreshRecentlyPlayed()
             if discovery.isEnabled {
                 discovery.load()

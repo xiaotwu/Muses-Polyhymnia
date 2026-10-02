@@ -42,7 +42,7 @@ struct YouTubeChannelShortsView: View {
                     ForEach(state.value ?? [], id: \.id) { entry in
                         AlbumObjectView(title: entry.title, subtitle: entry.uploader ?? channel.title,
                                         artwork: .resolve(remoteURL: nil, youTubeId: entry.id),
-                                        size: 180, role: .play, artworkHeight: 260,
+                                        size: 180, role: .play, artworkHeight: 320,
                                         isYouTube: true, showsHoverPlay: true,
                                         onSelect: { playRequest = entry }, onPlay: { playRequest = entry })
                             .youTubeEntryContextMenu(entry: entry) {

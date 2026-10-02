@@ -17,6 +17,7 @@ struct GlobalSearchView: View {
     @Environment(PlaybackService.self) private var playback
     @Environment(LibraryService.self) private var library
     @FocusState private var searchFieldFocused: Bool
+    @State private var expandedResultSections = Set<String>()
     @State private var savedYouTubeIDs = Set<String>()
 
     private var trimmedQuery: String {
@@ -76,6 +77,7 @@ struct GlobalSearchView: View {
         .onReceive(NotificationCenter.default.publisher(for: .musesFocusSearch)) { _ in
             searchFieldFocused = true
         }
+        .onChange(of: search.query) { _, _ in expandedResultSections.removeAll() }
         .onDisappear { if search.isSearchingYouTube { search.cancelSearch() } }
         .onAppear {
             if search.wasCancelled { search.retrySearch() }
@@ -203,9 +205,9 @@ struct GlobalSearchView: View {
         if search.hasResults {
             LazyVStack(alignment: .leading, spacing: 30) {
                 if !search.trackResults.isEmpty {
-                    resultSection(title: tr("Songs", "歌曲")) {
+                    resultSection(key: "songs", title: tr("Songs", "歌曲"), count: search.trackResults.count, previewCount: 6) {
                         LazyVStack(spacing: 0) {
-                            ForEach(search.trackResults.prefix(12)) { snapshot in
+                            ForEach(search.trackResults.prefix(expandedResultSections.contains("songs") ? search.trackResults.count : 6)) { snapshot in
                                 GlobalSearchTrackRow(snapshot: snapshot,
                                                      isCurrent: playback.state.track?.id == snapshot.id) {
                                     play(snapshot, context: search.trackResults)
@@ -219,10 +221,10 @@ struct GlobalSearchView: View {
                 }
 
                 if !search.releaseResults.isEmpty {
-                    resultSection(title: tr("Albums", "专辑")) {
+                    resultSection(key: "albums", title: tr("Albums", "专辑"), count: search.releaseResults.count, previewCount: 5) {
                         ScrollView(.horizontal, showsIndicators: false) {
                             LazyHStack(alignment: .top, spacing: 18) {
-                                ForEach(search.releaseResults.prefix(10)) { release in
+                                ForEach(search.releaseResults.prefix(expandedResultSections.contains("albums") ? search.releaseResults.count : 5)) { release in
                                     AlbumObjectView(
                                         title: release.title,
                                         subtitle: release.artistName,
@@ -250,10 +252,10 @@ struct GlobalSearchView: View {
                 }
 
                 if !search.catalogArtistResults.isEmpty {
-                    resultSection(title: tr("Artists", "艺术家")) {
+                    resultSection(key: "artists", title: tr("Artists", "艺术家"), count: search.catalogArtistResults.count, previewCount: 5) {
                         ScrollView(.horizontal, showsIndicators: false) {
                             LazyHStack(alignment: .top, spacing: 18) {
-                                ForEach(search.catalogArtistResults.prefix(10)) { artist in
+                                ForEach(search.catalogArtistResults.prefix(expandedResultSections.contains("artists") ? search.catalogArtistResults.count : 5)) { artist in
                                     ArtistObjectView(
                                         name: artist.name,
                                         detail: tr("\(artist.tracks.count) songs", "\(artist.tracks.count) 首歌曲", zhHant: "\(artist.tracks.count) 首歌曲"),
@@ -280,9 +282,9 @@ struct GlobalSearchView: View {
                 }
 
                 if !search.noteResults.isEmpty {
-                    resultSection(title: tr("Notes", "笔记")) {
+                    resultSection(key: "notes", title: tr("Notes", "笔记"), count: search.noteResults.count, previewCount: 4) {
                         LazyVStack(spacing: 0) {
-                            ForEach(search.noteResults.prefix(8)) { hit in
+                            ForEach(search.noteResults.prefix(expandedResultSections.contains("notes") ? search.noteResults.count : 4)) { hit in
                                 GlobalSearchNoteRow(hit: hit) { openNote(hit) }
                                     .trackContextMenu(
                                         snapshot: noteSnapshot(for: hit),
@@ -294,9 +296,9 @@ struct GlobalSearchView: View {
                 }
 
                 if !search.youtubeResults.isEmpty {
-                    resultSection(title: tr("YouTube · Additional results", "YouTube · 补充结果", zhHant: "YouTube · 補充結果")) {
+                    resultSection(key: "youtube", title: tr("YouTube · Additional results", "YouTube · 补充结果", zhHant: "YouTube · 補充結果"), count: search.youtubeResults.count, previewCount: 6) {
                         LazyVStack(spacing: 0) {
-                            ForEach(search.youtubeResults, id: \.id) { entry in
+                            ForEach(search.youtubeResults.prefix(expandedResultSections.contains("youtube") ? search.youtubeResults.count : 6), id: \.id) { entry in
                                 if entry.resourceKind == .video {
                                 GlobalSearchYouTubeRow(entry: entry,
                                                        isSaved: savedYouTubeIDs.contains(entry.id)) {
@@ -336,13 +338,29 @@ struct GlobalSearchView: View {
     }
 
     private func resultSection<Content: View>(
+        key: String,
         title: String,
+        count: Int,
+        previewCount: Int,
         @ViewBuilder content: () -> Content
     ) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(title)
-                .font(MusesTypography.sectionTitle)
-                .foregroundStyle(BrandColors.textPrimary)
+            HStack(alignment: .firstTextBaseline) {
+                Text(title)
+                    .font(MusesTypography.sectionTitle)
+                    .foregroundStyle(BrandColors.textPrimary)
+                Spacer()
+                if count > previewCount {
+                    Button(expandedResultSections.contains(key)
+                           ? tr("Show less", "收起") : tr("See all (\(count))", "查看全部（\(count)）")) {
+                        if expandedResultSections.contains(key) { expandedResultSections.remove(key) }
+                        else { expandedResultSections.insert(key) }
+                    }
+                    .accessibilityLabel(expandedResultSections.contains(key)
+                        ? tr("Collapse \(title) results", "收起\(title)结果")
+                        : tr("Show all \(title) results", "查看全部\(title)结果"))
+                }
+            }
             content()
         }
     }

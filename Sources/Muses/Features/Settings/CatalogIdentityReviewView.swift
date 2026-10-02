@@ -9,6 +9,9 @@ struct CatalogIdentityReviewView: View {
     @State private var failed = false
     @State private var loading = false
     @State private var query = ""
+    @State private var showConfirmed = false
+    @State private var showEvidenceList = false
+    @State private var selectedID: UUID?
     @State private var candidateCount = 0
     @State private var unresolvedCount = 0
     @State private var resolvedCount = 0
@@ -22,8 +25,9 @@ struct CatalogIdentityReviewView: View {
     private var visibleRows: [CatalogIdentityPreview.Row] {
         guard let preview else { return [] }
         let text = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        return text.isEmpty ? preview.rows : preview.rows.filter {
-            $0.title.localizedStandardContains(text) || $0.id.uuidString.localizedStandardContains(text)
+        return preview.rows.filter { row in
+            (showConfirmed ? row.resolution == .alreadyResolved : row.resolution != .alreadyResolved)
+            && (text.isEmpty || row.title.localizedStandardContains(text) || row.id.uuidString.localizedStandardContains(text))
         }
     }
 
@@ -41,7 +45,16 @@ struct CatalogIdentityReviewView: View {
                 SettingsIconButton(title: tr("Refresh preview", "刷新预览", zhHant: "重新整理預覽"), symbol: "arrow.clockwise") {
                     Task { await refresh() }
                 }.disabled(loading)
-                applyButton
+            }
+            HStack {
+                Picker(tr("Review status", "核对状态"), selection: $showConfirmed) {
+                    Text(tr("Pending", "待处理")).tag(false)
+                    Text(tr("Confirmed", "已确认")).tag(true)
+                }.pickerStyle(.segmented)
+                Picker(tr("Evidence layout", "证据布局"), selection: $showEvidenceList) {
+                    Text(tr("Table", "表格")).tag(false)
+                    Text(tr("Problems", "问题列表")).tag(true)
+                }.pickerStyle(.menu).frame(maxWidth: 140)
             }
             migrationControls
             if loading {
@@ -56,8 +69,27 @@ struct CatalogIdentityReviewView: View {
             } else if preview != nil {
                 if visibleRows.isEmpty {
                     ContentUnavailableView(tr("No tracks to review", "没有可核对的曲目", zhHant: "沒有可核對的曲目"), systemImage: "music.note.list")
+                } else if !showEvidenceList {
+                    GeometryReader { geometry in
+                        if geometry.size.width > 640 {
+                            HStack(spacing: 16) {
+                                evidenceTable
+                                evidencePreview.frame(width: 250)
+                            }
+                        } else {
+                            VStack(spacing: 12) {
+                                evidenceTable
+                                evidencePreview.frame(maxHeight: 200)
+                            }
+                        }
+                    }
                 } else {
-                    List(visibleRows) { row in
+                    List {
+                        ForEach(["arrow.down.circle", "exclamationmark.triangle", "questionmark.circle", "checkmark.circle"], id: \.self) { symbol in
+                            let rows = visibleRows.filter { $0.resolution.reviewSymbol == symbol }
+                            if !rows.isEmpty {
+                                Section {
+                                    ForEach(rows) { row in
                         DisclosureGroup {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text(row.id.uuidString).font(MusesTypography.caption.monospaced()).textSelection(.enabled)
@@ -96,6 +128,10 @@ struct CatalogIdentityReviewView: View {
                             .padding(.vertical, 4)
                         }
                         .disclosureGroupStyle(CatalogReviewDisclosureStyle())
+                                    }
+                                } header: { Text(rows.first?.resolution.reviewLabel ?? "") }
+                            }
+                        }
                     }
                     .listStyle(.inset)
                     .scrollContentBackground(.hidden)
@@ -105,6 +141,16 @@ struct CatalogIdentityReviewView: View {
             }
         }
         .padding(20)
+        .safeAreaInset(edge: .bottom) {
+            HStack(spacing: 12) {
+                Text(tr("Verified relationships · \(candidateCount)", "已核实关系 · \(candidateCount)"))
+                    .font(.caption).foregroundStyle(.secondary)
+                Spacer()
+                applyButton
+            }
+            .padding(.horizontal, 20).padding(.vertical, 12)
+            .background(.background)
+        }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .task { await refresh() }
         .confirmationDialog(
@@ -121,6 +167,59 @@ struct CatalogIdentityReviewView: View {
             Text(undoRequested
                  ? tr("Only identities changed by this migration are restored. Later likes, notes and history are retained. Conflicting identities stop the operation.", "只恢复本次迁移改动的身份，保留之后的收藏、笔记和历史。身份冲突时停止操作。", zhHant: "只復原本次移轉變更的身分，保留之後的喜愛項目、筆記和歷史。身分衝突時停止操作。")
                  : tr("An independent recovery snapshot is saved first. Every direct source-backed relationship in this preview is applied, including those hidden by search. Unsupported or indirect candidates stay unresolved.", "先保存独立恢复快照，再应用本预览中全部有直接来源证据的关系，包括搜索隐藏的条目。不受支持或间接候选保持未解析。", zhHant: "先儲存獨立復原快照，再套用本預覽中全部有直接來源證據的關係，包括搜尋隱藏的項目。不受支援或間接候選保持未解析。"))
+        }
+    }
+
+    private var evidenceTable: some View {
+        Table(visibleRows, selection: $selectedID) {
+            TableColumn(tr("Track", "曲目")) { row in
+                Text(row.title).lineLimit(2)
+            }.width(min: 140, ideal: 220)
+            TableColumn(tr("Confidence", "可信状态")) { row in
+                Label(row.resolution.reviewLabel, systemImage: row.resolution.reviewSymbol)
+                    .font(.caption)
+            }.width(min: 100, ideal: 140)
+            TableColumn(tr("Evidence", "证据")) { row in
+                Text(row.evidence.count.formatted()).monospacedDigit()
+                    .accessibilityLabel(tr("\(row.evidence.count) direct evidence items", "\(row.evidence.count) 条直接证据"))
+            }.width(70)
+        }
+        .onChange(of: showConfirmed) { _, _ in selectedID = nil }
+        .onChange(of: query) { _, _ in
+            if !visibleRows.contains(where: { $0.id == selectedID }) { selectedID = nil }
+        }
+    }
+
+    private var evidencePreview: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                if let row = visibleRows.first(where: { $0.id == selectedID }) {
+                    Text(row.title).font(.headline).fixedSize(horizontal: false, vertical: true)
+                    SettingsStatus(title: row.resolution.reviewLabel, symbol: row.resolution.reviewSymbol)
+                    DisclosureGroup(tr("Current relationships", "现有关系")) {
+                        ForEach(row.currentReleaseIDs, id: \.self) { Text($0).font(.caption.monospaced()).textSelection(.enabled) }
+                        if row.currentReleaseIDs.isEmpty { Text(tr("None", "无")) }
+                    }
+                    DisclosureGroup(tr("Direct source evidence", "直接来源证据")) {
+                        ForEach(row.evidence, id: \.itemID) { evidence in
+                            VStack(alignment: .leading, spacing: 4) {
+                                if let url = YouTubeCatalogLink.releaseURL(stableID: evidence.releaseID) {
+                                    Link(evidence.releaseID, destination: url)
+                                } else { Text(evidence.releaseID) }
+                                Text(tr("Playlist position: \(evidence.order + 1)", "歌单位置：\(evidence.order + 1)"))
+                            }.font(.caption).textSelection(.enabled).padding(.vertical, 4)
+                        }
+                        if row.evidence.isEmpty {
+                            Text(tr("Names and upload channels do not establish album identity. Direct source evidence is required.", "名称与上传频道不构成专辑身份，需要直接来源证据。"))
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    Text(row.id.uuidString).font(.caption.monospaced()).textSelection(.enabled).foregroundStyle(.secondary)
+                } else {
+                    ContentUnavailableView(tr("Select a track", "选择曲目"), systemImage: "checklist",
+                                           description: Text(tr("Inspect the current relationships and direct evidence before applying.", "应用前检查现有关系及直接证据。")))
+                }
+            }.frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 

@@ -28,6 +28,8 @@ struct YouTubeSettingsView: View {
     @State private var checkingVersion = false
     @State private var showFilePicker = false
     @State private var showWebHomeConsent = false
+    @State private var consentBrowserName = ""
+    @State private var consentMessage = ""
     @State private var webHomeConfigurationError: String?
     @State private var pendingRemoval: ActionConfirmation?
 
@@ -94,31 +96,21 @@ struct YouTubeSettingsView: View {
                 cookiePath = url.path
             }
         }
-        .alert(
-            tr("Allow Web Home to use the default browser session?",
-               "允许 Web 首页使用默认浏览器会话吗？"),
-            isPresented: $showWebHomeConsent
-        ) {
-            Button(tr("Cancel", "取消"), role: .cancel) {
-                webHomeConfigurationError = nil
-                webHome.cancelPendingConsent()
-            }
-            Button(tr("Allow and Check", "允许并检查")) {
+        .sheet(isPresented: $showWebHomeConsent, onDismiss: { webHome.cancelPendingConsent() }) {
+            WebHomeConsentSheet(browserName: consentBrowserName, explanation: consentMessage) {
                 do {
                     try webHome.enableUsingDefaultBrowser()
+                    showWebHomeConsent = false
                     Task {
                         await webHome.probeSession()
-                        if case .available = webHome.status {
-                            homeDiscovery.webConfigurationDidChange()
-                        }
+                        if case .available = webHome.status { homeDiscovery.webConfigurationDidChange() }
                     }
                 } catch {
                     webHomeConfigurationError = webHomeConfigurationMessage(error)
                     webHome.cancelPendingConsent()
+                    showWebHomeConsent = false
                 }
             }
-        } message: {
-            Text(webHomeConsentMessage)
         }
     }
 
@@ -161,7 +153,7 @@ struct YouTubeSettingsView: View {
                     .foregroundStyle(BrandColors.accent)
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 5) {
-                    Text(account.account?.channel?.title ?? (account.connectionState == .expired
+                    Text(!account.isOAuthConfigured ? tr("Sign-in unavailable in this build", "此构建无法登录") : account.account?.channel?.title ?? (account.connectionState == .expired
                          ? tr("Session expired", "登录已过期")
                          : account.isConnected
                              ? tr("Saved YouTube session", "已保存 YouTube 会话")
@@ -169,7 +161,7 @@ struct YouTubeSettingsView: View {
                         .font(MusesTypography.headline)
                     Text(account.isConnected
                          ? (account.account?.channel == nil
-                            ? tr("Channel details unavailable", "频道信息暂不可用")
+                            ? tr("Session saved · channel pending", "会话已保存 · 频道待确认")
                             : tr("YouTube connected", "已连接 YouTube"))
                          : tr("Connect your account to import playlists.", "连接账号以导入歌单。"))
                         .font(MusesTypography.caption).foregroundStyle(.secondary)
@@ -182,8 +174,9 @@ struct YouTubeSettingsView: View {
             }
             .padding(.vertical, 8)
             if let error = account.lastError {
-                Label(error, systemImage: "exclamationmark.triangle")
-                    .font(MusesTypography.caption).foregroundStyle(.red)
+                DisclosureGroup(tr("Connection details", "连接详情")) {
+                    Text(error).font(MusesTypography.caption).foregroundStyle(.secondary).textSelection(.enabled)
+                }
             }
         } header: { Text(tr("Connection", "连接状态")) }
         Section {
@@ -229,16 +222,7 @@ struct YouTubeSettingsView: View {
     }
 
     private var webHomeRecoveryMessage: String {
-        switch webHome.status {
-        case .accountMismatch, .unavailable(.identityUnavailable):
-            tr("Open YouTube Music in the approved browser, select the channel shown above, then check the session again. Public recommendations remain available.",
-               "请在已批准的浏览器中打开 YouTube Music，选择上方频道后重新检查会话。公共推荐仍可使用。")
-        case .expired:
-            tr("Sign in to YouTube Music in the approved browser, then check again.", "请在已批准的浏览器中登录 YouTube Music 后重新检查。")
-        default:
-            tr("Personalized Home is temporarily unavailable. Retry the session or use Muses as the Home source.",
-               "个性化首页暂不可用，可重试会话或将首页来源切换为 Muses。")
-        }
+        WebHomeRecoveryCopy.message(for: webHome.status)
     }
 
     private func officialPageLink(_ title: String, url: URL) -> some View {
@@ -303,15 +287,20 @@ struct YouTubeSettingsView: View {
         Task {
             await account.connect()
             if account.isConnected {
-                enableWebHomeFlow()
+                if webHome.isEnabled { checkSession() }
+                else { enableWebHomeFlow() }
             }
         }
     }
 
     private func enableWebHomeFlow() {
+        // Reconnecting OAuth must not replace an already approved browser.
+        guard !webHome.isEnabled else { checkSession(); return }
         webHomeConfigurationError = nil
         do {
             try webHome.prepareDefaultBrowserConsent()
+            consentBrowserName = webHomeConsentBrowserName
+            consentMessage = webHomeConsentMessage
             showWebHomeConsent = true
         } catch {
             webHomeConfigurationError = webHomeConfigurationMessage(error)
@@ -446,7 +435,7 @@ struct YouTubeSettingsView: View {
             ForEach(YTCookieSource.settingsCases, id: \.rawValue) { src in
                 Text(src.displayName).tag(src.rawValue)
             }
-        }
+        }.pickerStyle(.menu)
 
         if cookieSource == .file {
             HStack {
@@ -663,5 +652,48 @@ struct YouTubeSettingsView: View {
         versionString = await bridge.version()
         // Refresh the binary path alongside the version check.
         if let p = await bridge.locateBinary() { binaryPath = p }
+    }
+}
+
+/// Consent is a dedicated source-pinned workflow; opening it grants nothing.
+private struct WebHomeConsentSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    let browserName: String
+    let explanation: String
+    let allow: () -> Void
+    @State private var confirming = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text(confirming ? tr("Confirm browser access", "确认浏览器访问") : tr("Preview browser access", "预览浏览器访问"))
+                .font(.title2.weight(.semibold)).accessibilityAddTraits(.isHeader)
+            LabeledContent(tr("Fixed source", "固定来源"), value: browserName)
+            if confirming {
+                ScrollView { Text(explanation).font(.body).textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading) }
+            } else {
+                VStack(alignment: .leading, spacing: 12) {
+                    Label(tr("Read-only personalized Home", "只读个性化首页"), systemImage: "house")
+                    Label(tr("Temporary session removed when the helper exits", "辅助进程退出后移除临时会话"), systemImage: "trash")
+                    Label(tr("Must match the connected YouTube channel", "必须匹配已连接的 YouTube 频道"), systemImage: "person.crop.circle.badge.checkmark")
+                    Text(tr("This does not grant playback cookies or playlist-write access.", "此操作不会授予播放 Cookie 或歌单写入权限。"))
+                        .foregroundStyle(.secondary)
+                }
+                .font(.body)
+                Spacer(minLength: 0)
+            }
+            HStack {
+                Button(tr("Cancel", "取消")) { dismiss() }.keyboardShortcut(.cancelAction)
+                Spacer()
+                if confirming {
+                    Button(tr("Back", "返回")) { confirming = false }
+                    Button(tr("Allow and check", "允许并检查"), action: allow)
+                        .buttonStyle(.glassProminent).keyboardShortcut(.defaultAction)
+                } else {
+                    Button(tr("Review consent", "查看同意说明")) { confirming = true }
+                        .buttonStyle(.glassProminent).keyboardShortcut(.defaultAction)
+                }
+            }
+        }
+        .padding(24).frame(width: 540, height: 420)
     }
 }

@@ -1,9 +1,9 @@
 import SwiftUI
 
-/// Track note + bookmark editing sheet (Final Spec §10.7 Feature 7).
-/// Top half: the track note (TextEditor, upserted; empty deletes the row). Bottom half: the
-/// bookmark list (ascending by time), with add/edit/delete and a quick add at the current
-/// playback position. With the ffNotes flag off, everything is read-only (buttons disabled).
+/// One local draft for a track note and its bookmarks, committed by Save.
+/// Text and bookmark edits remain value drafts until Save commits them together;
+/// an empty note deletes its persisted row only during that commit. Cancel discards
+/// the draft. With ffNotes off, existing notes and bookmarks remain read-only.
 struct TrackNotesSheet: View {
     let track: Track
     @Environment(NotesService.self) private var notes
@@ -14,9 +14,11 @@ struct TrackNotesSheet: View {
     @State private var followsPlaybackPosition = true
     @State private var saveError: String?
     @State private var noteText: String = ""
-    @State private var bookmarks: [TrackBookmark] = []
+    @State private var bookmarks: [TrackBookmarkDraft] = []
+    @State private var originalBookmarks: [TrackBookmarkDraft] = []
+    @State private var originalContent = ""
     @State private var newBookmarkTitle: String = ""
-    @State private var editingBookmark: TrackBookmark?
+    @State private var editingBookmark: TrackBookmarkDraft?
     @State private var editTitle: String = ""
     @State private var editNote: String = ""
 
@@ -37,106 +39,114 @@ struct TrackNotesSheet: View {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(track.title).font(MusesTypography.headline)
+                        .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityLabel(track.title)
+                        .help(track.title)
                     Text(track.artist).font(MusesTypography.caption).foregroundStyle(BrandColors.textSecondary)
+                        .lineLimit(1)
                 }
                 Spacer()
                 Button(tr("Cancel", "取消")) { dismiss() }
+                    .fixedSize()
                     .keyboardShortcut(.cancelAction)
                 Button(enabled ? tr("Save", "保存") : tr("Done", "完成")) {
                     guard enabled else { dismiss(); return }
-                    if notes.setTrackNote(trackId: track.id, content: noteText) { dismiss() }
+                    if notes.saveDraft(trackId: track.id, content: noteText, bookmarks: bookmarks,
+                        originalContent: originalContent, originalBookmarks: originalBookmarks) { dismiss() }
                     else { saveError = notes.lastError }
                 }
+                .fixedSize()
                 .keyboardShortcut(.defaultAction)
             }
             Divider()
-
-            if !enabled { Text(tr("Notes are read-only.", "笔记为只读。", zhHant: "筆記為唯讀。")) .foregroundStyle(.secondary) }
-
-            // Track note
-            Text(tr("Note", "笔记")).font(MusesTypography.subheadline).foregroundStyle(BrandColors.textSecondary)
-            Group {
-                if enabled {
-                    TextEditor(text: $noteText)
-                } else {
-                    ScrollView {
-                        Text(noteText.isEmpty ? tr("No note", "无笔记", zhHant: "沒有筆記") : noteText)
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
-            }
-                .font(MusesTypography.body)
-                .frame(minHeight: 100)
-                .padding(6)
-                .background(BrandColors.surface)
-                .cornerRadius(6)
-                .overlay(RoundedRectangle(cornerRadius: 6).stroke(BrandColors.hairline, lineWidth: 1))
-                .disabled(!enabled)
-
-            if let saveError {
-                Text(saveError).font(MusesTypography.callout).foregroundStyle(.red)
-            }
-
-            // Bookmarks
-            HStack {
-                Text(tr("Bookmarks", "书签")).font(MusesTypography.subheadline).foregroundStyle(BrandColors.textSecondary)
-                Spacer()
-                Button {
-                    addBookmark()
-                } label: { Label(tr("Add", "添加"), systemImage: "plus") }
-                    .musesAction().disabled(!enabled)
-            }
-            HStack {
-                Text(tr("Time (seconds)", "时间（秒）", zhHant: "時間（秒）"))
-                TextField("", value: bookmarkTime, format: .number.precision(.fractionLength(0...1)))
-                    .textFieldStyle(.roundedBorder).frame(width: 90)
-                    .accessibilityLabel(tr("Bookmark time in seconds", "书签时间（秒）", zhHant: "書籤時間（秒）"))
-                    .disabled(!enabled)
-                if playback.transportState.track?.id == track.id {
-                    Button(tr("Current Position", "当前位置", zhHant: "目前位置")) {
-                        followsPlaybackPosition = true
-                        bookmarkSeconds = playback.transportState.position
-                    }.disabled(!enabled)
-                }
-            }
-            Text(tr("Bookmarks save immediately.", "书签会立即保存。", zhHant: "書籤會立即儲存。"))
-                .font(MusesTypography.caption).foregroundStyle(.secondary)
             ScrollView {
-                LazyVStack {
-                    if bookmarks.isEmpty {
-                        Text(tr("No bookmarks", "无书签")).font(MusesTypography.caption)
-                            .foregroundStyle(BrandColors.textSecondary)
-                            .padding(.vertical, 8)
-                    } else {
-                        ForEach(bookmarks, id: \.id) { bm in
-                            bookmarkRow(bm)
+                VStack(alignment: .leading, spacing: 16) {
+                    if !enabled { Text(tr("Notes are read-only.", "笔记为只读。", zhHant: "筆記為唯讀。")) .foregroundStyle(.secondary) }
+
+                    // Track note
+                    Text(tr("Note", "笔记")).font(MusesTypography.subheadline).foregroundStyle(BrandColors.textSecondary)
+                    Group {
+                        if enabled {
+                            TextEditor(text: $noteText)
+                        } else {
+                            ScrollView {
+                                Text(noteText.isEmpty ? tr("No note", "无笔记", zhHant: "沒有筆記") : noteText)
+                                    .textSelection(.enabled)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
                         }
                     }
-                }
-            }.frame(maxHeight: 200)
+                        .font(MusesTypography.body)
+                        .frame(height: 120)
+                        .padding(6)
+                        .background(BrandColors.surface)
+                        .cornerRadius(6)
+                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(BrandColors.hairline, lineWidth: 1))
+                        .disabled(!enabled)
 
-            // New bookmark title input
-            HStack {
-                TextField(tr("Bookmark title (optional)", "书签标题(可选)"), text: $newBookmarkTitle)
-                    .disabled(!enabled)
-                    .textFieldStyle(.roundedBorder)
-                Button {
-                    addBookmark()
-                } label: { Image(systemName: "plus.circle.fill") }
-                    .buttonStyle(.fullAreaPlain).foregroundStyle(BrandColors.accent)
-                    .help(tr("Add bookmark", "添加书签", zhHant: "新增書籤"))
-                    .accessibilityLabel(tr("Add bookmark", "添加书签", zhHant: "新增書籤"))
-                    .disabled(!enabled)
+                    if let saveError {
+                        Text(saveError).font(MusesTypography.callout).foregroundStyle(.red)
+                    }
+
+                    // Bookmarks
+                    Text(tr("Bookmarks", "书签")).font(MusesTypography.subheadline)
+                        .foregroundStyle(BrandColors.textSecondary)
+                    HStack {
+                        Text(tr("Time (seconds)", "时间（秒）", zhHant: "時間（秒）"))
+                        TextField("", value: bookmarkTime, format: .number.precision(.fractionLength(0...1)))
+                            .textFieldStyle(.roundedBorder).frame(width: 90)
+                            .accessibilityLabel(tr("Bookmark time in seconds", "书签时间（秒）", zhHant: "書籤時間（秒）"))
+                            .disabled(!enabled)
+                        if playback.transportState.track?.id == track.id {
+                            Button(tr("Current Position", "当前位置", zhHant: "目前位置")) {
+                                followsPlaybackPosition = true
+                                bookmarkSeconds = playback.transportState.position
+                            }.disabled(!enabled)
+                        }
+                    }
+                    Text(tr("Notes and bookmarks are saved together. Cancel discards this draft.", "笔记与书签一并保存。取消将放弃本次暂存修改。"))
+                        .font(MusesTypography.caption).foregroundStyle(.secondary)
+                    ScrollView {
+                        LazyVStack {
+                            if bookmarks.isEmpty {
+                                Text(tr("No bookmarks", "无书签")).font(MusesTypography.caption)
+                                    .foregroundStyle(BrandColors.textSecondary)
+                                    .padding(.vertical, 8)
+                            } else {
+                                ForEach(bookmarks, id: \.id) { bm in
+                                    bookmarkRow(bm)
+                                }
+                            }
+                        }
+                    }.frame(height: 160)
+
+                    // New bookmark title input
+                    HStack {
+                        TextField(tr("Bookmark title (optional)", "书签标题(可选)"), text: $newBookmarkTitle)
+                            .disabled(!enabled)
+                            .textFieldStyle(.roundedBorder)
+                        Button {
+                            addBookmark()
+                        } label: { Label(tr("Add", "添加"), systemImage: "plus") }
+                            .buttonStyle(.bordered)
+                            .help(tr("Add bookmark", "添加书签", zhHant: "新增書籤"))
+                            .accessibilityLabel(tr("Add bookmark", "添加书签", zhHant: "新增書籤"))
+                            .disabled(!enabled)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.bottom, 4)
             }
         }
         .padding(20)
-        .frame(width: 460)
-        .frame(minHeight: 420)
+        .frame(minWidth: 460, idealWidth: 560, minHeight: 480, idealHeight: 600, maxHeight: 700)
         .onAppear {
             noteText = notes.note(forTrack: track.id)?.content ?? ""
             bookmarkSeconds = playback.transportState.track?.id == track.id ? playback.transportState.position : 0
-            reloadBookmarks()
+            originalContent = noteText
+            bookmarks = notes.bookmarks(forTrack: track.id).map(TrackBookmarkDraft.init)
+            originalBookmarks = bookmarks
         }
         .sheet(item: $editingBookmark) { bm in
             VStack(alignment: .leading, spacing: 12) {
@@ -155,11 +165,7 @@ struct TrackNotesSheet: View {
         }
     }
 
-    private func reloadBookmarks() {
-        bookmarks = notes.bookmarks(forTrack: track.id)
-    }
-
-    private func bookmarkRow(_ bm: TrackBookmark) -> some View {
+    private func bookmarkRow(_ bm: TrackBookmarkDraft) -> some View {
         HStack(spacing: 8) {
             Image(systemName: "bookmark.fill").foregroundStyle(BrandColors.accent)
             Button(formatTimestamp(bm.timestampMs)) {
@@ -176,12 +182,12 @@ struct TrackNotesSheet: View {
             }
             Spacer()
             Button { editingBookmark = bm; editTitle = bm.title ?? ""; editNote = bm.note ?? "" } label: {
-                Image(systemName: "pencil")
+                Image(systemName: "pencil").frame(width: 28, height: 28)
             }.buttonStyle(.fullAreaPlain).foregroundStyle(BrandColors.textSecondary).disabled(!enabled)
             .help(tr("Edit bookmark", "编辑书签", zhHant: "編輯書籤"))
             .accessibilityLabel(tr("Edit bookmark", "编辑书签", zhHant: "編輯書籤"))
             Button { deleteBookmark(bm) } label: {
-                Image(systemName: "trash")
+                Image(systemName: "trash").frame(width: 28, height: 28)
             }.buttonStyle(.fullAreaPlain).foregroundStyle(BrandColors.textSecondary).disabled(!enabled)
             .help(tr("Delete bookmark", "删除书签", zhHant: "刪除書籤"))
             .accessibilityLabel(tr("Delete bookmark", "删除书签", zhHant: "刪除書籤"))
@@ -192,31 +198,27 @@ struct TrackNotesSheet: View {
     private func addBookmark() {
         let ts = bookmarkTime.wrappedValue
         let title = newBookmarkTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard notes.addBookmark(trackId: track.id, timestampMs: ts, title: title.isEmpty ? nil : title, note: nil) != nil else {
-            saveError = notes.lastError
+        guard ts.isFinite, ts >= 0, ts < Double(Int.max) else {
+            saveError = tr("Enter a valid bookmark time.", "请输入有效的书签时间。")
             return
         }
+        bookmarks.append(TrackBookmarkDraft(timestampMs: ts, title: title.isEmpty ? nil : title))
+        bookmarks.sort { $0.timestampMs < $1.timestampMs }
         saveError = nil
         newBookmarkTitle = ""
-        reloadBookmarks()
     }
 
-    private func saveEdit(_ bm: TrackBookmark) {
-        guard notes.updateBookmark(id: bm.id,
-                             title: editTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : editTitle,
-                             note: editNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : editNote) else {
-            saveError = notes.lastError
-            return
-        }
+    private func saveEdit(_ bm: TrackBookmarkDraft) {
+        guard let index = bookmarks.firstIndex(where: { $0.id == bm.id }) else { return }
+        bookmarks[index].title = editTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : editTitle
+        bookmarks[index].note = editNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : editNote
         saveError = nil
         editingBookmark = nil
-        reloadBookmarks()
     }
 
-    private func deleteBookmark(_ bm: TrackBookmark) {
-        guard notes.removeBookmark(id: bm.id) else { saveError = notes.lastError; return }
+    private func deleteBookmark(_ bm: TrackBookmarkDraft) {
+        bookmarks.removeAll { $0.id == bm.id }
         saveError = nil
-        reloadBookmarks()
     }
 
     private func formatTimestamp(_ s: Double) -> String {

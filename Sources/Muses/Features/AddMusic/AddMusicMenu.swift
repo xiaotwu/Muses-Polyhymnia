@@ -25,6 +25,8 @@ struct AddYouTubeLinkSheet: View {
     @Environment(\.dismiss) private var dismiss
     var isPresented: Binding<Bool>? = nil
     var initialURL: String = ""
+    @State private var showPlaylistPreview = false
+    @State private var operation: Task<Void, Never>?
     @State private var url: String = ""
     @State private var importing = false
     @State private var error: String?
@@ -53,8 +55,10 @@ struct AddYouTubeLinkSheet: View {
 
             HStack {
                 Spacer()
-                Button(tr("Cancel", "取消")) { close() }.disabled(importing)
-                Button(tr("Import", "导入")) { performImport() }
+                Button(tr("Cancel", "取消")) { operation?.cancel(); close() }.keyboardShortcut(.cancelAction)
+                Button(detectedKind == .playlist ? tr("Preview Playlist", "预览歌单") : tr("Import", "导入")) {
+                    if detectedKind == .playlist { showPlaylistPreview = true } else { performImport() }
+                }
                     .musesAction(prominent: true)
                     .tint(BrandColors.accent)
                     .disabled(url.isEmpty || importing || detectedKind == nil)
@@ -65,8 +69,11 @@ struct AddYouTubeLinkSheet: View {
         }
         .padding(20)
         .frame(width: 480)
-        .musesFloatingChrome(cornerRadius: 16)
         .onAppear { if url.isEmpty { url = initialURL } }
+        .onDisappear { operation?.cancel() }
+        .sheet(isPresented: $showPlaylistPreview) {
+            YouTubeImportSheet(initialURL: url) { showPlaylistPreview = false; close() }
+        }
     }
 
     private enum DetectedKind { case video, playlist }
@@ -87,7 +94,7 @@ struct AddYouTubeLinkSheet: View {
     private func performImport() {
         importing = true
         error = nil
-        Task {
+        operation = Task {
             do {
                 switch YouTubeLinkKind.detect(url) {
                 case .playlist:

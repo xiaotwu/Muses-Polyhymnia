@@ -343,6 +343,52 @@ struct WebHomeSessionControllerTests {
         #expect(defaults.string(forKey: PrefKey.webHomeBrowserSource) == "safari")
     }
 
+    @Test("consent dismissal preserves an approved source after the default browser changes")
+    func consentDismissalPreservesApprovedSession() async throws {
+        let defaults = makeDefaults()
+        let recorder = WebHomeRequestRecorder(response: probeResponse())
+        let resolution = BrowserResolutionBox(supported(.safari))
+        let controller = makeController(defaults: defaults, recorder: recorder,
+                                        resolveDefaultBrowser: { resolution.value })
+        try controller.prepareDefaultBrowserConsent()
+        try controller.enableUsingDefaultBrowser()
+        await controller.probeSession()
+        let originalStatus = controller.status
+        let version = defaults.integer(forKey: PrefKey.webHomeConsentVersion)
+
+        resolution.value = supported(.chrome)
+        controller.refreshDefaultBrowserSource()
+        controller.cancelPendingConsent()
+
+        #expect(controller.isEnabled)
+        #expect(controller.approvedBrowserSource == .safari)
+        #expect(controller.status == originalStatus)
+        #expect(defaults.integer(forKey: PrefKey.webHomeConsentVersion) == version)
+        await controller.probeSession()
+        #expect(await recorder.requests.allSatisfy { $0.cookieSource.browserName == "safari" })
+    }
+
+    @Test("cancelling a consent preview leaves no pending authority to enable or read cookies")
+    func cancelledConsentCannotEnableSession() async throws {
+        let defaults = makeDefaults()
+        let recorder = WebHomeRequestRecorder(response: probeResponse())
+        let controller = makeController(defaults: defaults, recorder: recorder)
+        try controller.prepareDefaultBrowserConsent()
+        controller.cancelPendingConsent()
+        #expect(!controller.isEnabled)
+        #expect(controller.approvedBrowserSource == nil)
+        #expect(await recorder.requests.isEmpty)
+        do {
+            try controller.enableUsingDefaultBrowser()
+            Issue.record("Dismissed consent must not remain enableable")
+        } catch let error as WebHomeConfigurationError {
+            #expect(error == .defaultBrowserUnavailable)
+        }
+        #expect(!controller.isEnabled)
+        #expect(defaults.integer(forKey: PrefKey.webHomeConsentVersion) == 0)
+        #expect(await recorder.requests.isEmpty)
+    }
+
     private func input() -> HomeDiscoveryInput {
         HomeDiscoveryInput(
             topArtistNames: [], recentlyPlayedArtistNames: [], likedArtistNames: [],

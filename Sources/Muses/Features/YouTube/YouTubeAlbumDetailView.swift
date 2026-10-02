@@ -91,23 +91,23 @@ struct YouTubeAlbumDetailView: View {
                 try playlistSync.discardResourceOperation(operationID: preview.id)
             }
         }
-        .alert(
-            tr("Delete this YouTube playlist import?",
-               "删除此 YouTube 歌单导入?"),
-            isPresented: $showDeleteConfirm
-        ) {
-            Button(tr("Delete", "删除"), role: .destructive) {
-                do {
-                    try playlistSync.moveToRecentlyDeleted(importID: youTubeImport.id)
-                    NotificationCenter.default.post(name: .musesCloseYouTubeAlbum, object: nil)
-                } catch {
-                    writeError = error.localizedDescription
+        .sheet(isPresented: $showDeleteConfirm) {
+            PlaylistDeletionPreview(
+                title: tr("Delete this YouTube playlist import?", "删除此 YouTube 歌单导入？"),
+                explanation: tr("The local playlist moves to Recently Deleted for 30 days. YouTube is not changed.",
+                                "本地歌单会移入“最近删除”并保留 30 天；YouTube 不会被修改。"),
+                itemTitles: items.map { $0.track?.title ?? $0.title },
+                onCancel: { showDeleteConfirm = false },
+                onDelete: {
+                    showDeleteConfirm = false
+                    do {
+                        try playlistSync.moveToRecentlyDeleted(importID: youTubeImport.id)
+                        NotificationCenter.default.post(name: .musesCloseYouTubeAlbum, object: nil)
+                    } catch {
+                        writeError = error.localizedDescription
+                    }
                 }
-            }
-            Button(tr("Cancel", "取消"), role: .cancel) {}
-        } message: {
-            Text(tr("The local playlist moves to Recently Deleted for 30 days. YouTube is not changed.",
-                    "本地歌单会移入“最近删除”并保留 30 天；YouTube 不会被修改。"))
+            )
         }
     }
 
@@ -127,22 +127,18 @@ struct YouTubeAlbumDetailView: View {
                         ChromeIconButton(systemName: "plus", help: tr("Add Tracks", "添加曲目"),
                             accessibility: tr("Add Tracks", "添加曲目")) { showAddTrack = true }
                     }
-                    ChromeIconButton(systemName: "arrow.down.to.line",
-                        help: tr("Pull from YouTube", "从 YouTube 拉取"),
-                        accessibility: tr("Pull from YouTube", "从 YouTube 拉取")) {
-                            Task { await previewPull() }
-                        }
-                        .disabled(!youTubeAccount.isConnected || syncing)
-                    if isOwned {
-                        ChromeIconButton(systemName: "arrow.up.to.line",
-                            help: tr("Push local changes to YouTube", "推送本地修改到 YouTube"),
-                            accessibility: tr("Push to YouTube", "推送到 YouTube")) {
-                                Task { await previewPush() }
-                            }
-                            .disabled(syncing)
-                    }
+
                 }
                 ChromeIconMenu(systemName: "ellipsis", title: tr("Playlist options", "歌单选项")) {
+                    Button(tr("Pull from YouTube", "从 YouTube 拉取"), systemImage: "arrow.down.to.line") {
+                        Task { await previewPull() }
+                    }.disabled(!youTubeAccount.isConnected || syncing)
+                    if isOwned {
+                        Button(tr("Push local changes to YouTube", "推送本地修改到 YouTube"), systemImage: "arrow.up.to.line") {
+                            Task { await previewPush() }
+                        }.disabled(syncing)
+                    }
+                    Divider()
                     Button(tr("Delete from Muses", "从 Muses 删除"), systemImage: "trash", role: .destructive) {
                         showDeleteConfirm = true
                     }

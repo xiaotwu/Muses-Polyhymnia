@@ -1,73 +1,74 @@
 import SwiftUI
 import AppKit
 
-/// Guided writer for `~/.config/yt-dlp/config`. yt-dlp reads this itself,
-/// so the app no longer injects `--cookies-from-browser`.
+/// Stages Muses' playback preference without overwriting an external yt-dlp file.
 struct YTDlpConfigWizard: View {
-    @State private var browser: Browser = .safari
+    @AppStorage(PrefKey.ytCookieSource) private var currentSource = YTCookieSource.none.rawValue
+    @State private var browser = YTCookieSource.none.rawValue
+    @State private var showPreview = false
     @State private var status: String?
 
-    enum Browser: String, CaseIterable {
-        case safari, chrome, firefox, none
-        var label: String {
-            switch self {
-            case .safari: return "Safari"
-            case .chrome: return "Chrome"
-            case .firefox: return "Firefox"
-            case .none: return tr("None", "无")
-            }
-        }
+    private var externalConfig: URL {
+        FileManager.default.homeDirectoryForCurrentUser.appending(path: ".config/yt-dlp/config")
     }
 
     var body: some View {
         Section {
-            DisclosureGroup(tr("Advanced configuration", "高级配置")) {
+            DisclosureGroup(tr("Muses playback configuration", "Muses 播放配置")) {
                 Picker(tr("Browser", "浏览器"), selection: $browser) {
-                    ForEach(Browser.allCases, id: \.self) { Text($0.label).tag($0) }
-                }
-                .pickerStyle(.menu)
+                    if currentSource == YTCookieSource.file.rawValue {
+                        Text(tr("Existing cookie file", "现有 Cookie 文件")).tag(YTCookieSource.file.rawValue)
+                    }
+                    ForEach(YTCookieSource.settingsCases.filter { $0 != .file }, id: \.rawValue) {
+                        Text($0.displayName).tag($0.rawValue)
+                    }
+                }.pickerStyle(.menu)
+                Text(tr("This panel changes only Muses' playback and import cookie source. Personalized Home requires its own browser consent. Existing external yt-dlp configuration is retained.",
+                        "此面板仅更改 Muses 播放与导入的 Cookie 来源。个性化首页需单独授权浏览器；保留既有外部 yt-dlp 配置。"))
+                    .font(MusesTypography.caption).foregroundStyle(.secondary)
                 HStack {
                     Spacer()
-                    Button(tr("Write configuration…", "写入配置…")) { status = writeConfig() }
-                        .settingsAction()
+                    Button(tr("Preview changes…", "预览更改…")) { showPreview = true }
+                        .settingsAction().disabled(browser == currentSource)
                 }
-                if let status {
-                    Text(status).font(MusesTypography.caption).foregroundStyle(BrandColors.textSecondary)
-                        .textSelection(.enabled)
+                if let status { Text(status).font(MusesTypography.caption).foregroundStyle(.secondary) }
+            }
+            DisclosureGroup(tr("External configuration", "外部配置")) {
+                LabeledContent(tr("Source", "来源")) {
+                    Text(externalConfig.path).font(MusesTypography.caption.monospaced()).textSelection(.enabled)
                 }
+                Text(tr("Production yt-dlp can read its external user configuration. Isolated acceptance runs ignore it. This panel does not display cookie contents or change that file.",
+                        "生产版 yt-dlp 可以读取外部用户配置，隔离验收运行忽略该配置。此面板不显示 Cookie 内容或修改该文件。"))
+                    .font(MusesTypography.caption).foregroundStyle(.secondary)
+                Button(tr("Show location", "显示所在位置")) {
+                    NSWorkspace.shared.activateFileViewerSelecting([externalConfig.deletingLastPathComponent()])
+                }.settingsAction()
             }
         } header: { Text(tr("Configuration", "配置")) }
+        .onAppear { browser = currentSource }
+        .sheet(isPresented: $showPreview) {
+            VStack(alignment: .leading, spacing: 16) {
+                Text(tr("Playback configuration preview", "播放配置预览")).font(.title2.weight(.semibold))
+                LabeledContent(tr("Target", "目标"), value: tr("Muses playback preference on this Mac", "本机 Muses 播放偏好"))
+                LabeledContent(tr("Current source", "当前来源"), value: sourceName(currentSource))
+                LabeledContent(tr("New source", "新来源"), value: sourceName(browser))
+                Text(tr("External configuration, Web Home consent and account tokens are retained. The selected browser session is used only when a future playback/import request needs it.",
+                        "保留外部配置、Web 首页授权及账号令牌。未来播放／导入请求需要时才使用所选浏览器会话。"))
+                    .foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                HStack {
+                    Button(tr("Cancel", "取消")) { showPreview = false }.keyboardShortcut(.cancelAction)
+                    Spacer()
+                    Button(tr("Apply", "应用")) {
+                        currentSource = browser
+                        status = tr("Muses playback preference updated", "已更新 Muses 播放偏好")
+                        showPreview = false
+                    }.buttonStyle(.glassProminent).keyboardShortcut(.defaultAction)
+                }
+            }.padding(24).frame(width: 520)
+        }
     }
 
-    private func writeConfig() -> String {
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        let dir = home.appendingPathComponent(".config/yt-dlp", isDirectory: true)
-        let file = dir.appendingPathComponent("config")
-        do {
-            try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-            var lines = [
-                "# Written by Muses",
-                "--geo-bypass"
-            ]
-            let cookieSource: YTCookieSource
-            switch browser {
-            case .safari:
-                lines.append("--cookies-from-browser safari")
-                cookieSource = .safari
-            case .chrome:
-                lines.append("--cookies-from-browser chrome")
-                cookieSource = .chrome
-            case .firefox:
-                lines.append("--cookies-from-browser firefox")
-                cookieSource = .firefox
-            case .none:
-                cookieSource = .none
-            }
-            try lines.joined(separator: "\n").appending("\n").write(to: file, atomically: true, encoding: .utf8)
-            UserDefaults.standard.set(cookieSource.rawValue, forKey: PrefKey.ytCookieSource)
-            return tr("Wrote \(file.path)", "已写入 \(file.path)", zhHant: "已寫入 \(file.path)")
-        } catch {
-            return error.localizedDescription
-        }
+    private func sourceName(_ value: String) -> String {
+        (YTCookieSource(rawValue: value) ?? .none).displayName
     }
 }

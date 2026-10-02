@@ -36,7 +36,8 @@ struct AlbumObjectView: View {
 
     @State private var hovering = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @FocusState private var focused: Bool
+    private enum Control: Hashable { case artwork, play }
+    @FocusState private var focusedControl: Control?
 
     private var isHeroCard: Bool {
         if case .heroCard = style { return true }
@@ -56,9 +57,11 @@ struct AlbumObjectView: View {
             objectContent
         }
         .buttonStyle(AlbumObjectPressStyle(scale: pressedScale, reduceMotion: reduceMotion))
+        .accessibilityLabel(role == .play ? tr("Play \(title)", "播放 \(title)") : tr("Open \(title)", "打开 \(title)"))
+        .accessibilityValue(subtitle)
         .overlay(alignment: .topTrailing) { sourceBadge }
         .overlay(alignment: .topLeading) {
-            if style == .standard {
+            if !isHeroCard {
                 hoverPlayOverlay
                     .frame(width: size, height: resolvedArtworkHeight, alignment: .bottomTrailing)
             }
@@ -67,18 +70,15 @@ struct AlbumObjectView: View {
         .offset(y: (style == .home || isHeroCard) && hovering && !reduceMotion ? -resolvedHoverLift : 0)
         .zIndex(hovering ? 2 : 0)
         .animation(MusesMotion.hoverAnimation(reduceMotion: reduceMotion), value: hovering)
-        .focusable()
-        .focusEffectDisabled()
-        .focused($focused)
+        .focused($focusedControl, equals: .artwork)
         .overlay {
-            if style == .home, focused {
+            if style == .home, focusedControl != nil {
                 homeShape
-                    .stroke(Color.white.opacity(0.92), lineWidth: 2)
-                    .shadow(color: Color.white.opacity(0.34), radius: 6)
+                    .stroke(BrandColors.accent, lineWidth: 2)
                     .allowsHitTesting(false)
             }
         }
-        .accessibilityLabel("\(title) — \(subtitle)")
+        .accessibilityElement(children: .contain)
         .accessibilityAction(named: Text(
             role == .play
                 ? tr("Play \(title)", "播放 \(title)", zhHant: "播放 \(title)")
@@ -103,7 +103,7 @@ struct AlbumObjectView: View {
                 Text(title)
                     .font(MusesTypography.song(size: size >= 160 ? 13 : 12, text: title))
                     .foregroundStyle(BrandColors.textPrimary)
-                    .lineLimit(1)
+                    .lineLimit(2)
                 Text(subtitle)
                     .font(MusesTypography.song(size: size >= 160 ? 12 : 11, text: subtitle))
                     .foregroundStyle(BrandColors.textSecondary)
@@ -255,10 +255,6 @@ struct AlbumObjectView: View {
             targetHeight: resolvedArtworkHeight,
             presentation: style == .home ? .fitOnAmbient : .fill
         )
-            .scaleEffect(
-                style == .standard && showsHoverPlay && hovering && !reduceMotion ? 1.08 : 1.0
-            )
-            .shadow(radius: style == .standard && hovering && showsHoverPlay ? 18 : 0)
             .overlay(alignment: .bottomLeading) { nowPlayingBadge }
     }
 
@@ -278,12 +274,12 @@ struct AlbumObjectView: View {
 
     @ViewBuilder
     private var hoverPlayOverlay: some View {
-        if showsHoverPlay, hovering {
+        if showsHoverPlay, hovering || focusedControl != nil {
             HoverPlayButton(onPlay: onPlay)
                 .padding(8)
                 .transition(.opacity)
-                .focusable(false)
-                .accessibilityHidden(true)
+                .focused($focusedControl, equals: .play)
+                .accessibilityLabel(tr("Play \(title)", "播放 \(title)"))
         }
     }
 

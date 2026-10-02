@@ -47,6 +47,49 @@ struct NotesFeatureTests {
         #expect(readOnly.lastError != nil)
     }
 
+    @Test("A sheet draft commits note and bookmark changes once, with rollback on failure")
+    func completeDraftCommit() throws {
+        let container = try makeContainer()
+        let track = try seedTrack(container)
+        let service = NotesService(modelContainer: container, enabledProvider: { true })
+        #expect(service.setTrackNote(trackId: track.id, content: "Original"))
+        _ = service.addBookmark(trackId: track.id, timestampMs: 5, title: "Original", note: nil)
+        let original = service.bookmarks(forTrack: track.id).map(TrackBookmarkDraft.init)
+        let next = [TrackBookmarkDraft(timestampMs: 20, title: "New")]
+        enum Failure: Error { case diskFull }
+        let failing = NotesService(modelContainer: container, enabledProvider: { true },
+            saveContext: { _ in throw Failure.diskFull })
+        #expect(!failing.saveDraft(trackId: track.id, content: "New note", bookmarks: next,
+            originalContent: "Original", originalBookmarks: original))
+        #expect(service.note(forTrack: track.id)?.content == "Original")
+        #expect(service.bookmarks(forTrack: track.id).map(TrackBookmarkDraft.init) == original)
+        let revision = service.revision
+        #expect(service.saveDraft(trackId: track.id, content: "New note", bookmarks: next,
+            originalContent: "Original", originalBookmarks: original))
+        #expect(service.revision == revision + 1)
+        #expect(service.note(forTrack: track.id)?.content == "New note")
+        #expect(service.bookmarks(forTrack: track.id).map(TrackBookmarkDraft.init) == next)
+    }
+
+    @Test("A stale sheet cannot overwrite newer edits or steal another track's bookmarks")
+    func draftOwnershipAndStaleness() throws {
+        let container = try makeContainer()
+        let first = try seedTrack(container)
+        let second = try seedTrack(container)
+        let service = NotesService(modelContainer: container, enabledProvider: { true })
+        #expect(service.setTrackNote(trackId: first.id, content: "Newer"))
+        #expect(!service.saveDraft(trackId: first.id, content: "Stale", bookmarks: [],
+            originalContent: "", originalBookmarks: []))
+        #expect(service.note(forTrack: first.id)?.content == "Newer")
+        _ = service.addBookmark(trackId: second.id, timestampMs: 40, title: nil, note: nil)
+        let other = service.bookmarks(forTrack: second.id).map(TrackBookmarkDraft.init)
+        #expect(!service.saveDraft(trackId: first.id, content: "Overwrite", bookmarks: other,
+            originalContent: "Newer", originalBookmarks: []))
+        #expect(service.bookmarks(forTrack: first.id).isEmpty)
+        #expect(service.bookmarks(forTrack: second.id).map(TrackBookmarkDraft.init) == other)
+        #expect(service.note(forTrack: first.id)?.content == "Newer")
+    }
+
     private func makeContainer() throws -> ModelContainer {
         try makeModelContainer(inMemory: true)
     }

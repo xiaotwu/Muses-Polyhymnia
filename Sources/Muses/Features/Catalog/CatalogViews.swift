@@ -142,7 +142,6 @@ struct CatalogReleasesView: View {
                                 subtitle: releaseSubtitle(release),
                                 artwork: releaseArtwork(release),
                                 size: 200,
-                                style: .heroCard(tag: release.kind == .single ? tr("SINGLE", "单曲") : (release.kind == .ep ? tr("EP", "EP") : tr("ALBUM", "专辑"))),
                                 showsHoverPlay: !release.tracks.isEmpty,
                                 onSelect: { selection = release },
                                 onPlay: { play(release.tracks, from: .album) }

@@ -18,6 +18,7 @@ struct PlayerBar: View {
     @State private var presentationRow: CollectionTrackRow?
     @State private var songMetadata: YTDlpBridge.YTDlpPlaylistEntry?
     @Environment(PlaybackService.self) private var playback
+    @Environment(AudioDeviceService.self) private var audioDevices: AudioDeviceService?
     var lyricsActive: Bool = false
     var queueActive: Bool = false
     var onArtworkTap: () -> Void = {}
@@ -29,7 +30,6 @@ struct PlayerBar: View {
     @State private var isDraggingScrubber = false
     @State private var scrubFraction: Double = 0
     @State private var scrubTrackID: UUID?
-    @State private var isTrackHovered = false
     @FocusState private var artworkFocused: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -60,7 +60,9 @@ struct PlayerBar: View {
             .padding(.horizontal, 14)
             .frame(maxWidth: AppleMusicTokens.capsuleWidth)
             .frame(height: PlayerDockMetrics.height)
-            .musesGlass(in: shape, role: .browsingPlayer)
+            .background(BrandColors.surface, in: shape)
+            .overlay(shape.stroke(BrandColors.hairline, lineWidth: 0.5))
+            .shadow(color: .black.opacity(0.08), radius: 8, y: 3)
             .overlay(alignment: .top) {
                 if PlayerIdlePolicy.showsProgress(hasTrack: hasTrack) {
                     progressTrack
@@ -85,11 +87,12 @@ struct PlayerBar: View {
             Button(tr("Queue", "队列")) { onQueueTap() }
         }
         .onChange(of: playback.state.track?.id) { _, _ in
-            isDraggingScrubber = false
-            scrubFraction = 0
-            scrubTrackID = nil
-            isTrackHovered = false
+            if !isDraggingScrubber {
+                scrubFraction = 0
+                scrubTrackID = nil
+            }
         }
+        .onDisappear { isDraggingScrubber = false; scrubTrackID = nil }
         .onReceive(NotificationCenter.default.publisher(for: .musesRestorePlayerArtworkFocus)) { _ in
             guard playback.state.track != nil else { return }
             artworkFocused = true
@@ -97,69 +100,37 @@ struct PlayerBar: View {
     }
 
     private var progressTrack: some View {
-        GeometryReader { geo in
-            let liveFraction = playback.state.duration > 0
-                ? max(0, min(1, playback.state.position / playback.state.duration)) : 0
-            let fraction = isDraggingScrubber ? scrubFraction : liveFraction
-            let trackHeight: CGFloat = (isTrackHovered || isDraggingScrubber) ? 4.5 : PlayerDockMetrics.progressHeight
-
-            ZStack(alignment: .leading) {
-                Capsule()
-                    .fill(BrandColors.textPrimary.opacity(0.18))
-                    .frame(height: trackHeight)
-                Capsule()
-                    .fill(BrandColors.playback)
-                    .frame(width: geo.size.width * fraction, height: trackHeight)
-
-                if (isTrackHovered || isDraggingScrubber) && playback.state.duration > 0 {
-                    Circle()
-                        .fill(BrandColors.textPrimary)
-                        .frame(width: 8, height: 8)
-                        .shadow(color: .black.opacity(0.35), radius: 2, y: 1)
-                        .offset(x: max(0, min(geo.size.width - 8, geo.size.width * fraction - 4)))
+        Slider(value: Binding(
+            get: {
+                isDraggingScrubber && scrubTrackID == playback.state.track?.id ? scrubFraction : max(0, min(1, playback.state.duration > 0
+                    ? playback.state.position / playback.state.duration : 0))
+            },
+            set: { value in
+                guard !isDraggingScrubber || scrubTrackID == playback.state.track?.id else { return }
+                scrubFraction = value
+                if !isDraggingScrubber, playback.state.duration > 0 {
+                    playback.seek(to: value * playback.state.duration)
                 }
-            }
-            .frame(height: 12, alignment: .top)
-            .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { gesture in
-                        guard playback.state.duration > 0 else { return }
-                        if !isDraggingScrubber { scrubTrackID = playback.state.track?.id }
-                        isDraggingScrubber = true
-                        let f = max(0, min(1, gesture.location.x / geo.size.width))
-                        scrubFraction = f
+            }), in: 0...1, onEditingChanged: { editing in
+                if editing {
+                    scrubTrackID = playback.state.track?.id
+                    scrubFraction = playback.state.duration > 0
+                        ? max(0, min(1, playback.state.position / playback.state.duration)) : 0
+                    isDraggingScrubber = true
+                } else {
+                    if scrubTrackID == playback.state.track?.id, playback.state.duration > 0 {
+                        playback.seek(to: scrubFraction * playback.state.duration)
                     }
-                    .onEnded { gesture in
-                        defer { isDraggingScrubber = false; scrubTrackID = nil }
-                        guard isDraggingScrubber, scrubTrackID == playback.state.track?.id,
-                              playback.state.duration > 0 else { return }
-                        let f = max(0, min(1, gesture.location.x / geo.size.width))
-                        playback.seek(to: f * playback.state.duration)
-                        isDraggingScrubber = false
-                    }
-            )
-            .onHover { isTrackHovered = $0 }
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: isTrackHovered)
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: isDraggingScrubber)
-        }
-        .frame(height: 12)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(tr("Playback position", "播放进度"))
-        .accessibilityValue(
-            "\(format(isDraggingScrubber ? scrubFraction * playback.state.duration : playback.state.position)) / \(format(playback.state.duration))"
-        )
-        .accessibilityAdjustableAction { direction in
-            guard playback.state.duration > 0 else { return }
-            switch direction {
-            case .increment:
-                playback.seek(to: min(playback.state.duration, playback.state.position + 10))
-            case .decrement:
-                playback.seek(to: max(0, playback.state.position - 10))
-            @unknown default:
-                break
-            }
-        }
+                    isDraggingScrubber = false
+                    scrubTrackID = nil
+                }
+            })
+            .controlSize(.mini)
+            .tint(BrandColors.playback)
+            .disabled(playback.state.duration <= 0)
+            .frame(height: 12)
+            .accessibilityLabel(tr("Playback position", "播放进度"))
+            .accessibilityValue("\(format(playback.state.position)) / \(format(playback.state.duration))")
     }
 
     private var hasTrack: Bool { playback.state.track != nil }
@@ -229,8 +200,11 @@ struct PlayerBar: View {
             .layoutPriority(1)
             .accessibilityElement(children: .combine)
             Spacer(minLength: 8)
-            let currentPos = isDraggingScrubber ? scrubFraction * playback.state.duration : playback.state.position
-            Text("\(format(currentPos))  /  \(format(playback.state.duration))")
+            let currentPos = isDraggingScrubber && scrubTrackID == playback.state.track?.id
+                ? scrubFraction * playback.state.duration : playback.state.position
+            Text("\(format(currentPos))  /  −\(format(max(0, playback.state.duration - currentPos)))")
+                .accessibilityLabel(tr("Elapsed and remaining time", "已播放与剩余时间"))
+                .accessibilityValue("\(format(currentPos)) / −\(format(max(0, playback.state.duration - currentPos)))")
                 .font(MusesTypography.caption2.monospacedDigit())
                 .foregroundStyle(isDraggingScrubber ? AnyShapeStyle(BrandColors.accent) : AnyShapeStyle(.primary))
                 .opacity(isDraggingScrubber ? 1 : 0.78)
@@ -261,10 +235,26 @@ struct PlayerBar: View {
                 .accessibilityValue("\(Int((playback.volume * 100).rounded()))%")
                 .overlay(alignment: .bottomTrailing) {
                     if showVolume {
-                        FloatingVolumePanel(width: 230, height: 44) { showVolume = false }
+                        FloatingVolumePanel(width: 230, height: 44, showsOutput: false) { showVolume = false }
                             .offset(y: -44)
                     }
                 }
+            }
+            if let audioDevices {
+                ChromeIconMenu(systemName: "hifispeaker.and.homepod", title: tr("Audio output", "音频输出")) {
+                    Text(tr("Output for all apps on this Mac", "此 Mac 所有应用的输出设备"))
+                    Divider()
+                    let devices = NowPlayingOutputDevicePolicy.visibleDevices(audioDevices.devices)
+                    if devices.isEmpty { Text(tr("No audio outputs available", "无可用音频输出")) }
+                    ForEach(devices) { device in
+                        Button { _ = audioDevices.setDefault(device.id) } label: {
+                            Label(device.name, systemImage: device.id == audioDevices.defaultDeviceID ? "checkmark" : "hifispeaker")
+                        }
+                    }
+                    if audioDevices.lastError != nil {
+                        Text(tr("Unable to switch output. Try again.", "无法切换输出，请重试。"))
+                    }
+                }.onAppear { audioDevices.refresh() }
             }
             if PlayerIdlePolicy.showsYouTube(hasTrack: hasTrack) {
                 youtubeButton
@@ -332,17 +322,6 @@ struct PlaybackTransport: View {
             }
             Button { playback.toggle() } label: {
                 ZStack {
-                    if playback.state.duration > 0 {
-                        let fraction = CGFloat(min(1.0, max(0.0, playback.state.position / playback.state.duration)))
-                        Circle()
-                            .stroke(Color.white.opacity(0.14), lineWidth: 2)
-                            .frame(width: playHit + 5, height: playHit + 5)
-                        Circle()
-                            .trim(from: 0, to: fraction)
-                            .stroke(BrandColors.playback, style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                            .rotationEffect(.degrees(-90))
-                            .frame(width: playHit + 5, height: playHit + 5)
-                    }
                     Circle().fill(Color.clear)
                     Image(systemName: playback.state.isPlaying ? "pause.fill" : "play.fill")
                         .font(MusesTypography.system(size: 13, weight: .semibold))

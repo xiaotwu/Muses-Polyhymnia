@@ -21,6 +21,7 @@ struct QueueDrawerView: View {
     @State private var historyExpanded = false
     @State private var groupsExpanded = false
     @State private var showsSmartShuffleInfo = false
+    @State private var smartShuffleFocusTask: Task<Void, Never>?
     @FocusState private var smartShuffleInfoFocused: Bool
     /// Keep Escape available while painting focus only on the close affordance.
     @FocusState private var focusedTarget: QueueFocusTarget?
@@ -54,11 +55,15 @@ struct QueueDrawerView: View {
         .onChange(of: renameTarget) { _, target in
             focusedTarget = target == nil ? .drawer : nil
         }
+        .onDisappear { smartShuffleFocusTask?.cancel(); smartShuffleFocusTask = nil }
         .onChange(of: showsSmartShuffleInfo) { _, shown in
+            smartShuffleFocusTask?.cancel()
+            smartShuffleFocusTask = nil
             if !shown {
                 // Let the native popover finish its dismissal before restoring key focus.
-                Task { @MainActor in
+                smartShuffleFocusTask = Task { @MainActor in
                     try? await Task.sleep(for: .milliseconds(150))
+                    guard !Task.isCancelled else { return }
                     if isPresented, !showsSmartShuffleInfo { focusedTarget = .drawer }
                 }
             }
@@ -251,9 +256,12 @@ struct QueueDrawerView: View {
         Section(tr("Now Playing", "正在播放")) {
             if let item = playback.queue.current() {
                 QueueRow(item: item, isCurrent: true)
-                    .queueRowActions {
+                    .queueRowActions(title: item.track.title) {
                         TrackContextMenuItems(snapshot: item.track, onPlay: { playback.toggle() })
                     }
+                    .focusable()
+                    .onKeyPress(.return) { playback.toggle(); return .handled }
+                    .accessibilityAction(named: Text(tr("Play or pause", "播放或暂停"))) { playback.toggle() }
             } else {
                 queueEmptyRow(tr("Choose a song to start listening", "选择歌曲开始收听"))
             }
@@ -265,8 +273,11 @@ struct QueueDrawerView: View {
             if upNextExpanded {
                 ForEach(playback.queue.upNext) { item in
                     QueueRow(item: item, isCurrent: false, showHistoryBadge: advancedQueue)
-                        .queueRowActions { itemContextMenu(for: item, inUpNext: true) }
+                        .queueRowActions(title: item.track.title) { itemContextMenu(for: item, inUpNext: true) }
                         .onTapGesture(count: 2) { playQueueItem(item) }
+                        .focusable()
+                        .onKeyPress(.return) { playQueueItem(item); return .handled }
+                        .accessibilityAction(named: Text(tr("Play", "播放"))) { playQueueItem(item) }
                 }
                 .onMove { indices, destination in
                     guard let from = indices.first else { return }
@@ -290,8 +301,11 @@ struct QueueDrawerView: View {
                     QueueRow(item: item,
                              isCurrent: playback.queue.current()?.id == item.id,
                              showHistoryBadge: advancedQueue)
-                        .queueRowActions { itemContextMenu(for: item, inUpNext: false) }
+                        .queueRowActions(title: item.track.title) { itemContextMenu(for: item, inUpNext: false) }
                         .onTapGesture(count: 2) { playQueueItem(item) }
+                        .focusable()
+                        .onKeyPress(.return) { playQueueItem(item); return .handled }
+                        .accessibilityAction(named: Text(tr("Play", "播放"))) { playQueueItem(item) }
                 }
                 .onMove { indices, destination in
                     guard playback.queue.groups.allSatisfy({ !$0.collapsed }) else { return }
@@ -336,19 +350,7 @@ struct QueueDrawerView: View {
                             Text("\(itemsInGroup(group.id))")
                                 .font(MusesTypography.caption2).foregroundStyle(BrandColors.textSecondary)
                         }
-                        .contextMenu {
-                            Button(tr("Rename", "重命名")) {
-                                renameTarget = group.id
-                                renameText = group.name
-                            }
-                            Button(tr("Delete group", "删除分组"), role: .destructive) {
-                                pendingRemoval = ActionConfirmation(
-                                    title: tr("Delete group?", "删除分组？"),
-                                    message: tr("Remove \(group.name). Its songs remain in the queue.", "删除「\(group.name)」，歌曲仍保留在队列中。"),
-                                    action: { playback.queue.removeGroup(id: group.id) }
-                                )
-                            }
-                        }
+                        .queueRowActions(title: group.name) { groupActions(group) }
                     }
                 }
             } header: {
@@ -358,12 +360,44 @@ struct QueueDrawerView: View {
         }
     }
 
+    @ViewBuilder private func groupActions(_ group: QueueGroup) -> some View {
+        Button(tr("Move group up", "上移分组"), systemImage: "arrow.up") { moveGroup(group, by: -1) }
+            .disabled(!canMoveGroup(group, by: -1))
+        Button(tr("Move group down", "下移分组"), systemImage: "arrow.down") { moveGroup(group, by: 1) }
+            .disabled(!canMoveGroup(group, by: 1))
+        Divider()
+
+        Button(tr("Rename", "重命名")) {
+            renameTarget = group.id
+            renameText = group.name
+        }
+        Button(tr("Delete group", "删除分组"), role: .destructive) {
+            pendingRemoval = ActionConfirmation(
+                title: tr("Delete group?", "删除分组？"),
+                message: tr("Remove \(group.name). Its songs remain in the queue.", "删除「\(group.name)」，歌曲仍保留在队列中。"),
+                action: { playback.queue.removeGroup(id: group.id) }
+            )
+        }
+
+    }
+
+    private func canMoveGroup(_ group: QueueGroup, by offset: Int) -> Bool {
+        guard let index = playback.queue.groups.firstIndex(where: { $0.id == group.id }) else { return false }
+        return playback.queue.groups.indices.contains(index + offset)
+    }
+
+    private func moveGroup(_ group: QueueGroup, by offset: Int) {
+        guard canMoveGroup(group, by: offset),
+              let index = playback.queue.groups.firstIndex(where: { $0.id == group.id }) else { return }
+        playback.queue.moveGroup(from: index, to: index + offset)
+    }
+
     private var historySection: some View {
         Section {
             if historyExpanded {
                 ForEach(playback.queue.history) { item in
                     QueueRow(item: item, isCurrent: false, showHistoryBadge: advancedQueue)
-                        .queueRowActions {
+                        .queueRowActions(title: item.track.title) {
                             TrackContextMenuItems(
                                 snapshot: item.track,
                                 onPlay: {
@@ -412,7 +446,7 @@ struct QueueDrawerView: View {
         if let recommendation = playback.queue.smartShuffle.pending {
             Section(tr("YouTube Music recommendation", "YouTube Music 推荐", zhHant: "YouTube Music 推薦")) {
                 QueueRow(item: recommendation, isCurrent: false, showHistoryBadge: false)
-                    .contextMenu {
+                    .queueRowActions(title: recommendation.track.title) {
                         Button(tr("Play Next", "下一首播放", zhHant: "下一首播放")) {
                             playback.queue.playNext(recommendation.track)
                         }
@@ -595,8 +629,6 @@ private struct QueueRow: View {
                     .font(MusesTypography.caption2)
                     .foregroundStyle(BrandColors.textSecondary)
             }
-            Color.clear.frame(width: 24, height: 28)
-                .accessibilityHidden(true)
         }
         .padding(.vertical, 4)
         .contentShape(Rectangle())
@@ -606,8 +638,23 @@ private struct QueueRow: View {
                     .fill(BrandColors.textPrimary.opacity(0.08))
             }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(item.track.title + ", " + SongCreditCache.shared.artist(snapshot: item.track))
+        .accessibilityValue([isCurrent ? tr("Now Playing", "正在播放") : nil,
+                             item.locked ? tr("Locked", "已锁定") : nil,
+                             showHistoryBadge ? historyLabel : nil]
+            .compactMap { $0 }.joined(separator: ", "))
         .accessibilityAddTraits(isCurrent ? .isSelected : [])
         .task(id: item.track.youTubeId) { _ = await importService.songMetadata(videoID: item.track.youTubeId) }
+    }
+
+    private var historyLabel: String? {
+        switch item.historyState {
+        case .played: tr("Played", "已播放")
+        case .skipped: tr("Skipped", "已跳过")
+        case .removed: tr("Removed", "已移除")
+        case nil: nil
+        }
     }
 
     /// Current playback uses play.fill; history entries get an icon from their state label; otherwise music.note.
@@ -639,22 +686,25 @@ private struct QueueRow: View {
 
 private extension View {
     /// Pointer menus and visible actions expose the same complete track operations.
-    func queueRowActions<Actions: View>(@ViewBuilder _ actions: @escaping () -> Actions) -> some View {
-        self.contextMenu(menuItems: actions)
-            .overlay(alignment: .trailing) {
-                Menu(content: actions) {
-                    Image(systemName: "ellipsis")
-                        .font(MusesTypography.system(size: 13, weight: .semibold))
-                        .foregroundStyle(BrandColors.textSecondary)
-                        .chromeActionCircle()
-                }
-                .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
-                .chromeActionCircle()
-                .tint(BrandColors.textSecondary)
-                .help(tr("Track options", "曲目选项", zhHant: "曲目選項"))
-                .accessibilityLabel(tr("Track options", "曲目选项", zhHant: "曲目選項"))
+    func queueRowActions<Actions: View>(title: String, @ViewBuilder _ actions: @escaping () -> Actions) -> some View {
+        HStack(spacing: 6) {
+            self.contextMenu(menuItems: actions)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Menu(content: actions) {
+                Image(systemName: "ellipsis")
+                    .font(MusesTypography.system(size: 13, weight: .semibold))
+                    .foregroundStyle(BrandColors.textSecondary)
+                    .frame(width: 28, height: 28)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel(tr("Options for \(title)", "\(title) 的选项"))
             }
-            .listRowBackground(Color.clear)
+            .menuStyle(.borderlessButton).menuIndicator(.hidden)
+            .frame(width: 28, height: 28)
+            .help(tr("Options for \(title)", "\(title) 的选项"))
+            .accessibilityLabel(tr("Options for \(title)", "\(title) 的选项"))
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(title)
+        .listRowBackground(Color.clear)
     }
 }

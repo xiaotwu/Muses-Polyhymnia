@@ -171,7 +171,7 @@ struct YouTubeVideoOverlay: View {
                     }
                 }
                 .frame(width: size.width, height: size.height)
-                .overlay(alignment: .top) {
+                .overlay(alignment: .topTrailing) {
                     let revealed = closeHovered || closeKeyboardRevealed || closeFocused
                         || chaptersPresented || commentsPresented || NSWorkspace.shared.isVoiceOverEnabled
                     ZStack {
@@ -183,9 +183,7 @@ struct YouTubeVideoOverlay: View {
                             action: close
                         )
                         .focused($closeFocused)
-                        .opacity(revealed ? 1 : 0)
-                        .offset(y: revealed || reduceMotion ? 0 : -8)
-                        .allowsHitTesting(revealed)
+                        .offset(y: 0)
                         ChromeIconButton(
                             systemName: "arrow.up.left.and.arrow.down.right",
                             help: tr("Floating video window", "悬浮视频窗口", zhHant: "浮動影片視窗"),
@@ -229,25 +227,19 @@ struct YouTubeVideoOverlay: View {
                     }
                     .frame(width: 256, height: 56)
                     .contentShape(Rectangle())
+                    .padding(.trailing, 100)
                     .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: revealed)
                 }
                 if commentsPresented {
-                    Color.black.opacity(0.45)
-                        .ignoresSafeArea()
-                        .onTapGesture { commentsPresented = false }
-                    YouTubeCommentsView(videoID: videoId) {
-                        commentsPresented = false
+                    HStack(spacing: 0) {
+                        Spacer(minLength: 0)
+                        YouTubeCommentsView(videoID: videoId) { commentsPresented = false }
+                            .frame(width: min(420, max(280, geometry.size.width * 0.36)),
+                                   height: geometry.size.height)
+                            .background(Color(nsColor: .windowBackgroundColor))
+                            .overlay(alignment: .leading) { Divider() }
                     }
-                    .frame(width: min(520, max(0, geometry.size.width - 48)),
-                           height: min(640, max(0, geometry.size.height - 48)))
-                    .background {
-                        RoundedRectangle(cornerRadius: 20)
-                            .fill(reduceTransparency ? AnyShapeStyle(Color(nsColor: .windowBackgroundColor))
-                                                     : AnyShapeStyle(.regularMaterial))
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: 20))
-                    .shadow(color: .black.opacity(0.35), radius: 28, y: 16)
-                    .accessibilityAddTraits(.isModal)
+
                 }
             }
             .frame(width: geometry.size.width, height: geometry.size.height)

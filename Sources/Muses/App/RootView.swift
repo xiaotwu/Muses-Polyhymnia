@@ -27,6 +27,7 @@ struct RootView: View {
     @State private var selectedYouTubeImport: YouTubeImport?
     @State private var selectedCatalogRelease: CatalogReleaseProjection?
     @State private var selectedCatalogArtist: CatalogArtistProjection?
+    @State private var showQuickSearch = false
     @State private var showYouTubeLink = false
     @State private var droppedYouTubeLink = ""
     @State private var showNowPlaying = false
@@ -285,6 +286,9 @@ struct RootView: View {
                     openNowPlaying()
                 }
             }
+            .onReceive(NotificationCenter.default.publisher(for: .musesQuickSearch)) { _ in
+                showQuickSearch = true
+            }
             .onReceive(NotificationCenter.default.publisher(for: .musesFocusSearch)) { _ in
                 showNowPlaying = false
                 showYouTubeVideo = false
@@ -370,6 +374,15 @@ struct RootView: View {
 
     private var sheetHost: some View {
         alertHost
+            .sheet(isPresented: $showQuickSearch) {
+                QuickSearchPanel { query in
+                    showQuickSearch = false
+                    globalSearch.query = query
+                    NotificationCenter.default.post(name: .musesFocusSearch, object: nil)
+                } onDismiss: {
+                    showQuickSearch = false
+                }
+            }
             .sheet(item: $lyricsSearchRequest) { request in
                 if let track = playback.transportState.track {
                     LyricsMatchPicker(track: track, initialQuery: request.query).id(track.id)
@@ -859,6 +872,7 @@ extension Notification.Name {
     static let musesToggleNowPlaying = Notification.Name("muses.toggleNowPlaying")
     static let musesOpenNowPlaying = Notification.Name("muses.openNowPlaying")
     static let musesSearchLyrics = Notification.Name("muses.searchLyrics")
+    static let musesQuickSearch = Notification.Name("muses.quickSearch")
     static let musesFocusSearch = Notification.Name("muses.focusSearch")
     static let musesNavigateFromSearch = Notification.Name("muses.navigateFromSearch")
     static let musesNavigateToRelease = Notification.Name("muses.navigateToRelease")

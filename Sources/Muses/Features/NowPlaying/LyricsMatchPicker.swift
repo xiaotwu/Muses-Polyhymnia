@@ -34,15 +34,12 @@ struct LyricsMatchPicker: View {
             Divider()
             recordingSummary
             Divider()
-            HStack(alignment: .top, spacing: 0) {
-                queryPane.frame(width: 264)
-                Divider()
-                resultsPane.frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
+            compactQuery
+            Divider()
+            resultsPane.frame(maxWidth: .infinity, maxHeight: .infinity)
             Divider()
             confirmationBar
         }
-        .background(BrandColors.background)
         .foregroundStyle(BrandColors.textPrimary)
         .tint(BrandColors.accent)
         .frame(minWidth: 760, idealWidth: 900, minHeight: 620, idealHeight: 680)
@@ -114,86 +111,52 @@ struct LyricsMatchPicker: View {
         .accessibilityElement(children: .combine)
     }
 
-    private var queryPane: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                VStack(alignment: .leading, spacing: 6) {
-                    fieldLabel(tr("Song title or keywords", "歌名或关键词"))
-                    TextEditor(text: $titleQuery)
-                        .font(MusesTypography.song(size: 13, text: titleQuery))
-                        .scrollContentBackground(.hidden)
-                        .padding(4).frame(height: 76)
-                        .background(BrandColors.background, in: RoundedRectangle(cornerRadius: 6))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 6)
-                                .stroke(focusedField == .title ? BrandColors.heading : BrandColors.hairline,
-                                        lineWidth: focusedField == .title ? 1.5 : 1)
-                        }
-                        .focused($focusedField, equals: .title)
-                        .accessibilityLabel(tr("Song title or keywords", "歌名或关键词"))
-                }
-                VStack(alignment: .leading, spacing: 6) {
-                    fieldLabel(tr("Artist (optional)", "艺人（可留空）"))
-                    TextField(tr("Artist (optional)", "艺人（可留空）"), text: $artistQuery)
-                        .textFieldStyle(.roundedBorder).focused($focusedField, equals: .artist)
-                        .accessibilityLabel(tr("Artist (optional)", "艺人（可留空）"))
-                }
-                VStack(spacing: 10) {
-                    HStack(spacing: 8) {
-                        Button {
-                            initializedQuery = false
-                            initializeQuery(useInitialQuery: false)
-                        } label: {
-                            Image(systemName: "arrow.counterclockwise").frame(width: 28, height: 28)
-                        }
-                        .buttonStyle(.musesCompact).help(tr("Restore song information", "恢复歌曲信息"))
-                        .accessibilityLabel(tr("Restore song information", "恢复歌曲信息"))
-                        Button { prepareIntelligentQuery() } label: {
-                            Label("Apple Intelligence", systemImage: "sparkles")
-                                .font(MusesTypography.system(size: 11, weight: .medium))
-                        }.musesAction()
-                        .disabled(preparingQuery || LyricsIntelligence.availability != .available)
-                        .help(LyricsIntelligence.availability.message)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    Button(action: submitSearch) {
-                        Label(tr("Search", "搜索"), systemImage: "magnifyingglass")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent).tint(BrandColors.playback)
+    private var compactQuery: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                TextField(tr("Song title or keywords", "歌名或关键词"), text: $titleQuery)
+                    .textFieldStyle(.roundedBorder).focused($focusedField, equals: .title)
+                    .accessibilityLabel(tr("Song title or keywords", "歌名或关键词"))
+                TextField(tr("Artist (optional)", "艺人（可留空）"), text: $artistQuery)
+                    .textFieldStyle(.roundedBorder).focused($focusedField, equals: .artist)
+                    .frame(maxWidth: 240)
+                Button(action: submitSearch) {
+                    Label(tr("Search", "搜索"), systemImage: "magnifyingglass")
+                }.buttonStyle(.borderedProminent).tint(BrandColors.playback)
                     .keyboardShortcut(.return, modifiers: .command)
                     .disabled(titleQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
-                VStack(alignment: .leading, spacing: 6) {
-                    fieldLabel(tr("Search mode", "搜索方式"))
-                    Picker(tr("Search mode", "搜索方式"), selection: $searchMode) {
-                        Text(tr("Title & artist", "歌名与艺人")).tag("fields")
-                        Text(tr("Keywords (fuzzy)", "关键词（模糊）")).tag("keywords")
-                    }.labelsHidden().pickerStyle(.menu).frame(maxWidth: .infinity)
-                }
-                VStack(alignment: .leading, spacing: 6) {
-                    fieldLabel(tr("Source", "来源"))
-                    Picker(tr("Source", "来源"), selection: $source) {
-                        Text(tr("All sources", "全部来源")).tag("auto")
-                        Text("LRCLIB").tag("lrclib")
-                        Text("Musixmatch").tag("musixmatch").disabled(searchMode == "keywords")
-                        Text("Lyrics.ovh").tag("lyricsOVH").disabled(searchMode == "keywords")
-                    }.labelsHidden().pickerStyle(.menu).frame(maxWidth: .infinity)
-                }
-                Text(tr("Keep editing the search terms. AI only helps prepare them.", "搜索词始终可编辑，AI 仅辅助整理。"))
-                    .font(MusesTypography.caption).foregroundStyle(BrandColors.textSecondary)
-                if preparingQuery {
-                    ProgressView(tr("Preparing search terms…", "正在整理搜索词…")).controlSize(.small)
-                }
-                if let intelligenceMessage {
-                    Text(intelligenceMessage).font(MusesTypography.caption).foregroundStyle(BrandColors.textSecondary)
-                } else if LyricsIntelligence.availability != .available {
-                    Text(LyricsIntelligence.availability.message).font(MusesTypography.caption).foregroundStyle(BrandColors.textSecondary)
-                }
-            }.padding(20)
-        }
-        .onSubmit { submitSearch() }
-        .background(BrandColors.surface)
+            }
+            HStack(spacing: 16) {
+                Picker(tr("Source", "来源"), selection: $source) {
+                    Text(tr("All sources", "全部来源")).tag("auto")
+                    Text("LRCLIB").tag("lrclib")
+                    Text("Musixmatch").tag("musixmatch").disabled(searchMode == "keywords")
+                    Text("Lyrics.ovh").tag("lyricsOVH").disabled(searchMode == "keywords")
+                }.pickerStyle(.menu).fixedSize()
+                Picker(tr("Search mode", "搜索方式"), selection: $searchMode) {
+                    Text(tr("Title & artist", "歌名与艺人")).tag("fields")
+                    Text(tr("Keywords (fuzzy)", "关键词（模糊）")).tag("keywords")
+                }.pickerStyle(.menu).fixedSize()
+                Spacer()
+                Button {
+                    initializedQuery = false
+                    initializeQuery(useInitialQuery: false)
+                } label: { Image(systemName: "arrow.counterclockwise") }
+                    .help(tr("Restore song information", "恢复歌曲信息"))
+                    .accessibilityLabel(tr("Restore song information", "恢复歌曲信息"))
+                Button { prepareIntelligentQuery() } label: {
+                    Label("Apple Intelligence", systemImage: "sparkles")
+                }.disabled(preparingQuery || LyricsIntelligence.availability != .available)
+                    .help(LyricsIntelligence.availability.message)
+            }.controlSize(.small)
+            if preparingQuery {
+                ProgressView(tr("Preparing search terms…", "正在整理搜索词…")).controlSize(.small)
+            }
+            if let intelligenceMessage {
+                Text(intelligenceMessage).font(.caption).foregroundStyle(.secondary)
+            }
+        }.padding(.horizontal, 24).padding(.vertical, 14)
+            .onSubmit { submitSearch() }
     }
 
     private func fieldLabel(_ title: String) -> some View {
@@ -209,45 +172,37 @@ struct LyricsMatchPicker: View {
                 description: Text(tr("Try the original song title or leave artist blank. A source may also be temporarily unavailable.",
                     "可尝试原始歌名或留空艺人字段；歌词来源也可能暂不可用。")))
         } else {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text(tr("Search results", "搜索结果")).font(MusesTypography.headline)
+            HSplitView {
+                VStack(alignment: .leading, spacing: 8) {
                     Text(tr("\(candidates.count) candidates", "\(candidates.count) 个候选"))
-                        .font(MusesTypography.caption).foregroundStyle(BrandColors.textSecondary)
-                    Spacer()
-                }
-                List(candidates, selection: $selectedCandidateID) { candidate in
-                    candidateRow(candidate).tag(candidate.id)
-                        .listRowBackground(selectedCandidateID == candidate.id ? BrandColors.selectionFill : Color.clear)
-                }
-                .listStyle(.plain).scrollContentBackground(.hidden)
-                .frame(minHeight: 120, idealHeight: 190, maxHeight: 220)
-                Divider()
-                HStack(spacing: 10) {
-                    Text(tr("Lyric preview", "歌词预览")).font(MusesTypography.caption)
-                    if let selectedCandidate {
-                        Text(selectedCandidate.source.displayName)
-                            .font(MusesTypography.caption).foregroundStyle(BrandColors.textSecondary)
-                        Text(selectedCandidate.syncedLyrics?.isEmpty == false ? tr("Synced", "逐行同步") : tr("Plain text", "纯文本"))
-                            .font(MusesTypography.caption).foregroundStyle(BrandColors.heading)
+                        .font(.caption).foregroundStyle(.secondary).padding(.horizontal, 12)
+                    List(candidates, selection: $selectedCandidateID) { candidate in
+                        candidateRow(candidate).tag(candidate.id)
+                    }.listStyle(.plain)
+                }.frame(minWidth: 250, idealWidth: 310, maxWidth: 380)
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 10) {
+                        Text(tr("Lyric preview", "歌词预览")).font(.headline)
+                        if let selectedCandidate {
+                            Text(selectedCandidate.source.displayName).font(.caption).foregroundStyle(.secondary)
+                            Text(selectedCandidate.syncedLyrics?.isEmpty == false ? tr("Synced", "逐行同步") : tr("Plain text", "纯文本"))
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
                     }
-                }
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 10) {
-                        if selectedCandidate == nil {
-                            Text(tr("Select a recording to preview its lyrics.", "选择录音版本以预览歌词。"))
-                                .font(MusesTypography.caption).foregroundStyle(BrandColors.textSecondary)
-                        }
-                        ForEach(previewLines.indices, id: \.self) { index in
-                            Text(previewLines[index])
-                                .font(MusesTypography.lyric(size: 20, current: false, text: previewLines[index]))
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                    }.textSelection(.enabled).padding(.vertical, 4)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .id(selectedCandidateID)
-            }.padding(20)
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 10) {
+                            if selectedCandidate == nil {
+                                Text(tr("Select a recording to preview its lyrics.", "选择录音版本以预览歌词。"))
+                                    .font(.callout).foregroundStyle(.secondary)
+                            }
+                            ForEach(previewLines.indices, id: \.self) { index in
+                                Text(previewLines[index]).font(.body)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                        }.textSelection(.enabled).padding(.vertical, 4)
+                    }.id(selectedCandidateID)
+                }.padding(16).frame(minWidth: 300, maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            }.padding(.vertical, 12)
         }
     }
 

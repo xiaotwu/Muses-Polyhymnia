@@ -59,7 +59,7 @@ enum CollectionStageSpacing {
     static let maximumPreviewRows = 5
 
     static func topInset(height: CGFloat) -> CGFloat {
-        min(56, max(12, (height - 720) * 0.12))
+        min(24, max(8, (height - 720) * 0.08))
     }
 
     static func previewCount(height: CGFloat, geometry: CollectionDeckGeometry, itemCount: Int) -> Int {
@@ -80,11 +80,11 @@ struct CollectionDeckGeometry: Equatable, Sendable {
 
     var cardHeight: CGFloat { cardWidth + footerHeight }
     /// The overlapping strip reserves clearance for its restrained static tilts.
-    var lowerFanClearance: CGFloat { 44 }
+    var lowerFanClearance: CGFloat { 24 }
     var viewportHeight: CGFloat { cardHeight + lowerFanClearance }
 
     static func resolve(containerWidth: CGFloat, containerHeight: CGFloat) -> Self {
-        let side = min(340, max(136, min(containerWidth * 0.27, containerHeight - 550)))
+        let side = min(260, max(136, min(containerWidth * 0.27, containerHeight - 580)))
         let spread = side * 0.66
         // Only nearby cards are mounted; overlap makes room for more covers.
         let radius = min(6, max(2, Int((containerWidth - side - 96) / (2 * spread))))
@@ -720,8 +720,8 @@ struct CollectionDeckStage<Controls: View>: View {
             .animation(MusesMotion.hoverAnimation(reduceMotion: reduceMotion), value: hovered)
             .overlay {
                 if activationID == row.id, !reduceMotion {
-                    CollectionActivationEmbers(progress: activationProgress)
-                        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .stroke(BrandColors.accent.opacity(0.35 * (1 - activationProgress)), lineWidth: 2)
                         .allowsHitTesting(false)
                         .accessibilityHidden(true)
                 }
@@ -844,10 +844,10 @@ struct CollectionDeckStage<Controls: View>: View {
                 // Publish the initial frame before starting the one-shot effect.
                 await Task.yield()
                 guard !Task.isCancelled else { return }
-                withAnimation(.easeOut(duration: MusesMotion.collectionActivationEmbers)) {
+                withAnimation(.easeOut(duration: 0.18)) {
                     activationProgress = 1
                 }
-                try? await Task.sleep(for: .seconds(MusesMotion.collectionActivationEmbers))
+                try? await Task.sleep(for: .seconds(0.18))
                 guard !Task.isCancelled else { return }
                 cancelActivation()
             }

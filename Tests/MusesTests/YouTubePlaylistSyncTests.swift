@@ -110,6 +110,27 @@ struct YouTubePlaylistSyncDomainTests {
         #expect(plan.requiresResolution)
     }
 
+    @Test("Pull conflict review retains independent remote insertions before choosing conflicts")
+    func conflictPreviewRetainsRemoteChanges() {
+        let baseItem = item(remote: "pi-a", video: "a", order: 0, title: "Base")
+        var localItem = baseItem
+        localItem.order = 1
+        var remoteItem = baseItem
+        remoteItem.order = 2
+        let inserted = item(remote: "pi-c", video: "c", order: 3, title: "Remote insertion")
+        let base = snapshot([baseItem])
+        let local = snapshot([localItem])
+        let remote = snapshot([remoteItem, inserted])
+        let plan = YouTubePlaylistThreeWayMerge.plan(base: base, local: local, remote: remote)
+        #expect(!plan.conflicts.isEmpty)
+        let preview = YouTubePullPreview(importID: UUID(), baseRevisionID: UUID(),
+            localRevisionID: UUID(), remoteRevisionID: UUID(), base: base, local: local,
+            remote: remote, automaticResult: nil, mergePlan: plan)
+        let initial = PlaylistPullPreviewSheet.initialItems(for: preview)
+        #expect(initial.contains { $0.videoID == "c" && $0.knownTitle == "Remote insertion" })
+        #expect(initial.contains { $0.videoID == "a" })
+    }
+
     @Test("push planner keeps duplicate occurrences distinct")
     func pushPlannerKeepsDuplicatesDistinct() throws {
         let remote = snapshot([

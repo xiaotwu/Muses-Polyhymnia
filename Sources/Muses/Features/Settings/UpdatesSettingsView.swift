@@ -13,6 +13,7 @@ enum MusesResources {
 /// Update preferences and progress share the app-lifetime update facade.
 struct UpdatesSettingsView: View {
     @Environment(UpdateService.self) private var updater
+    @State private var showProgress = false
 
     var body: some View {
         Section {
@@ -38,8 +39,38 @@ struct UpdatesSettingsView: View {
                 information: tr("Updates restart Muses after saving playback state. Playback, video, imports, and synchronization postpone automatic restarts.",
                                 "空闲时保存播放状态后更新并重启。播放、视频、导入和同步期间会等待。"),
                 enabled: updater.isConfigured)
-            statusView
+            if !updater.isConfigured {
+                Text(tr("This build does not support automatic updates. Download a signed release from the release page.", "此构建不支持自动更新。请从版本页面下载签名发行版。"))
+                    .font(.caption).foregroundStyle(.secondary)
+                Button(tr("Open release page", "打开版本页面")) { updater.openReleasePage() }.settingsAction()
+            } else {
+                statusView
+                if updater.phase == .downloading || updater.phase == .verifying || updater.phase == .ready || updater.phase == .failed {
+                    Button(tr("Progress & result…", "进度与结果…")) { showProgress = true }.settingsAction()
+                }
+            }
         } header: { Text(tr("Updates", "更新")).font(MusesTypography.headline) }
+        .sheet(isPresented: $showProgress) {
+            VStack(alignment: .leading, spacing: 16) {
+                Text(tr("Software update", "软件更新")).font(.title2.weight(.semibold))
+                Label(summaryText, systemImage: statusSymbol).font(.headline)
+                statusView
+                if let error = updater.lastError {
+                    Text(error).font(.callout).foregroundStyle(.secondary).textSelection(.enabled)
+                }
+                HStack {
+                    Button(tr("Close", "关闭")) { showProgress = false }.keyboardShortcut(.cancelAction)
+                    Spacer()
+                    if updater.phase == .failed {
+                        Button(tr("Retry", "重试")) { Task { await updater.checkForUpdates() } }
+                            .buttonStyle(.glassProminent).disabled(!updater.canCheck)
+                    }
+                }
+            }.padding(24).frame(width: 480)
+        }
+        .onChange(of: updater.phase) { old, phase in
+            if phase == .failed || ((old == .downloading || old == .verifying) && phase == .ready) { showProgress = true }
+        }
     }
 
     @ViewBuilder private var statusView: some View {
@@ -64,7 +95,7 @@ struct UpdatesSettingsView: View {
             HStack(spacing: 8) {
                 Spacer()
                 if updater.canDownload {
-                    Button { updater.downloadUpdate() } label: {
+                    Button { showProgress = true; updater.downloadUpdate() } label: {
                         Label(tr("Download", "下载更新"), systemImage: "arrow.down.circle")
                     }.settingsAction(prominent: true)
                 }

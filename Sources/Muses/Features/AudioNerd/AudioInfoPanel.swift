@@ -10,6 +10,7 @@ struct AudioInfoPanel: View {
     @Environment(AudioDeviceService.self) private var deviceService
     @AppStorage(PrefKey.eqActivePresetId) private var eqPresetId: String = "Flat"
     @State private var showEQ = false
+    @State private var showTechnicalDetails = false
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -25,44 +26,33 @@ struct AudioInfoPanel: View {
                     .keyboardShortcut(.cancelAction)
             }
 
-            // Metadata rows (purely model-driven).
-            let rows = AudioInfoModel.rows(
-                track: playback.transportState.track, defaultDeviceName: currentDeviceName,
-                eqPresetId: playback.eqBypassed ? tr("Bypassed", "已旁路", zhHant: "已旁路") : eqPresetId, volume: Double(playback.volume))
-            GroupBox(tr("Track", "曲目")) {
-                VStack(alignment: .leading, spacing: 6) {
-                    ForEach(rows, id: \.label) { row in
-                        HStack {
-                            Text(row.label).foregroundStyle(BrandColors.textSecondary)
-                            Spacer()
-                            Text(row.value).foregroundStyle(BrandColors.textPrimary)
-                                .font(MusesTypography.system(size: 13, design: .monospaced))
+            Form {
+                Section(tr("Playback", "播放")) {
+                    let rows = informationRows
+                    ForEach(rows.filter { [tr("Source", "来源"), tr("EQ Preset", "EQ 预设"), tr("Volume", "音量")].contains($0.label) }, id: \.label) { row in
+                        LabeledContent(row.label, value: row.value)
+                    }
+                    DisclosureGroup(tr("Technical details", "技术详情"), isExpanded: $showTechnicalDetails) {
+                        ForEach(rows.filter { ![tr("Source", "来源"), tr("EQ Preset", "EQ 预设"), tr("Volume", "音量"), tr("Output Device", "输出设备")].contains($0.label) }, id: \.label) { row in
+                            LabeledContent(row.label, value: row.value)
                         }
                     }
                 }
-                .padding(8)
-            }
-
-            // Output device selection.
-            GroupBox(tr("Output Device", "输出设备")) {
-                VStack(alignment: .leading, spacing: 8) {
+                Section(tr("Output Device", "输出设备")) {
                     devicePicker
-                    Text(tr("Changes the macOS default output for all apps.", "更改所有应用使用的 macOS 默认输出。", zhHant: "更改所有 App 使用的 macOS 預設輸出。"))
-                        .font(MusesTypography.caption).foregroundStyle(.secondary)
+                    Text(tr("Changes the macOS default output for all apps.", "更改所有应用使用的 macOS 默认输出。"))
+                        .font(.caption).foregroundStyle(.secondary)
                     if let status = deviceService.lastError {
-                        Text(tr("Output device unavailable", "输出设备不可用", zhHant: "輸出裝置無法使用") + " (\(status))")
-                            .font(MusesTypography.caption).foregroundStyle(BrandColors.textPrimary)
+                        Text(tr("Output device unavailable", "输出设备不可用") + " (\(status))")
+                            .font(.caption).foregroundStyle(.secondary)
                     }
-                }.padding(8)
-            }
-
-            GroupBox(tr("Spectrum", "频谱")) {
-                VStack(alignment: .leading, spacing: 8) {
+                }
+                Section(tr("Spectrum", "频谱")) {
                     SpectrumView().frame(height: 90)
                     StreamingEQAvailabilityNote()
-                }.padding(8)
+                }
             }
-
+            .formStyle(.grouped)
             // EQ entry point.
             Button {
                 showEQ = true
@@ -73,10 +63,15 @@ struct AudioInfoPanel: View {
             .tint(BrandColors.accent)
         }
         .padding(20)
-        .frame(width: 420)
-        .musesFloatingChrome(cornerRadius: 16)
+        .frame(minWidth: 420, idealWidth: 460, minHeight: 500, idealHeight: 620)
         .sheet(isPresented: $showEQ) { EQEditorView() }
         .onAppear { deviceService.refresh() }
+    }
+
+    private var informationRows: [AudioInfoModel.Row] {
+        AudioInfoModel.rows(track: playback.transportState.track, defaultDeviceName: currentDeviceName,
+            eqPresetId: playback.eqBypassed ? tr("Bypassed", "已旁路") : eqPresetId,
+            volume: Double(playback.volume))
     }
 
     private var currentDeviceName: String? {

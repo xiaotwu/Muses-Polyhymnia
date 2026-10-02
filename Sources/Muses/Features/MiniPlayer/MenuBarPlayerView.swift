@@ -122,8 +122,6 @@ struct MenuBarPlayerView: View {
         }
         .padding(18)
         .frame(width: 332)
-        .background(LinearGradient(colors: [BrandColors.accent.opacity(0.08), Color.white.opacity(0.025)],
-                                   startPoint: .topLeading, endPoint: .bottomTrailing))
         .foregroundStyle(BrandColors.textPrimary)
         .tint(BrandColors.accent)
         .fixedSize(horizontal: false, vertical: true)

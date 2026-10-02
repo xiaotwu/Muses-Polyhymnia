@@ -380,10 +380,10 @@ struct ChromeLayoutTests {
         ) == 42)
     }
 
-    @Test("permanent sidebar uses edge-attached liquid glass")
+    @Test("permanent sidebar uses floating liquid glass islands")
     func permanentSidebarGlass() {
         #expect(SidebarGlassPolicy.usesLiquidGlass)
-        #expect(SidebarGlassPolicy.touchesTopLeadingAndBottomEdges)
+        #expect(!SidebarGlassPolicy.touchesTopLeadingAndBottomEdges)
         #expect(LibraryChromePolicy.sidebarIsPermanent)
         #expect(TrafficLightsPolicy.livesInToolbar)
         #expect(WindowChromeMetrics.sidebarOuterInset == 0)
@@ -500,7 +500,7 @@ struct ChromeLayoutTests {
     func menuBarPolicy() {
         #expect(MenuBarPolicy.playbackCommandsLiveInPlaybackMenu)
         #expect(MenuBarPolicy.playbackCommandsAreNotInViewMenu)
-        #expect(MenuBarPolicy.viewMenuIncludesSidebarToggle)
+        #expect(MenuBarPolicy.viewMenuIncludesFocusNavigation)
         #expect(MenuBarPolicy.viewMenuIncludesLibraryDestinations)
         #expect(MenuBarPolicy.fileMenuOmitsDuplicateLibraryWindow)
         #expect(MenuBarPolicy.fileMenuIncludesMiniPlayerWindow)
@@ -548,17 +548,13 @@ struct ChromeLayoutTests {
         #expect(!sidebar.contains("@Query"))
 
         let settings = try readSource("Sources/Muses/Features/Settings/SettingsSheet.swift")
-        #expect(settings.contains("GPUSettingsView()"))
-        #expect(SettingsPanePolicy.gpuAccelerationLivesInAppearance)
+        let diagnostics = try readSource("Sources/Muses/Features/Settings/SettingsDiagnosticsWindow.swift")
+        #expect(diagnostics.contains("GPUSettingsView()"))
+        #expect(SettingsPanePolicy.gpuAccelerationLivesInDiagnostics)
         #expect(!SettingsPanePolicy.gpuAccelerationLivesInGeneral)
-        let appearancePane = settings.range(of: "case .appearance, .desktop:")
-        let gpu = settings.range(of: "GPUSettingsView()")
-        let generalPane = settings.range(of: "case .general:")
-        #expect(appearancePane != nil && gpu != nil && generalPane != nil)
-        if let appearancePane, let gpu, let generalPane {
-            #expect(gpu.lowerBound > appearancePane.lowerBound)
-            #expect(gpu.lowerBound > generalPane.lowerBound)
-        }
+        #expect(!settings.contains("GPUSettingsView()"))
+        #expect(settings.contains("openWindow(id: \"muses-diagnostics\")"))
+        #expect(app.contains("id: \"muses-diagnostics\""))
     }
 
     private func playbackMenuSource(in app: String) -> String {
@@ -727,7 +723,7 @@ struct ChromeLayoutTests {
         #expect(home.contains("Public discovery"))
         #expect(!home.contains("Make Home yours"))
         #expect(!home.contains("guestBanner"))
-        #expect(home.contains("Sign In"))
+        #expect(home.contains("openHomeAccountSettings()"))
 
         let homeView = try readSource("Sources/Muses/Features/HomeView.swift")
         #expect(!homeView.contains("guestBanner"))

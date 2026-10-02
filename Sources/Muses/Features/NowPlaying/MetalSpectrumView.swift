@@ -13,6 +13,7 @@ import AppKit
 /// reads it, applies peak decay, and renders.
 struct MetalSpectrumView: NSViewRepresentable {
     var onUnavailable: () -> Void = {}
+    var visualizationsEnabled = true
     @Environment(PlaybackService.self) private var playback
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -24,7 +25,7 @@ struct MetalSpectrumView: NSViewRepresentable {
         mtkView.preferredFramesPerSecond = 30
         mtkView.framebufferOnly = true
         mtkView.enableSetNeedsDisplay = false
-        mtkView.isPaused = reduceMotion || !playback.transportState.isPlaying || playback.transportState.audioProcessing != .available
+        mtkView.isPaused = !visualizationsEnabled || reduceMotion || !playback.transportState.isPlaying || playback.transportState.audioProcessing != .available
         mtkView.clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
         mtkView.colorPixelFormat = .bgra8Unorm
         mtkView.wantsLayer = true
@@ -40,7 +41,7 @@ struct MetalSpectrumView: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: MTKView, context: Context) {
-        let shouldPause = reduceMotion || !playback.transportState.isPlaying || playback.transportState.audioProcessing != .available
+        let shouldPause = !visualizationsEnabled || reduceMotion || !playback.transportState.isPlaying || playback.transportState.audioProcessing != .available
         context.coordinator.setSampling(!shouldPause && context.coordinator.renderer?.isAvailable == true)
         guard nsView.isPaused != shouldPause else { return }
         nsView.isPaused = shouldPause

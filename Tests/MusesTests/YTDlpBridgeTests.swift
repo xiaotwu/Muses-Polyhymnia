@@ -57,6 +57,41 @@ struct YTDlpBridgeTests {
         #expect(entries[1].duration == nil)
     }
 
+    @Test("Channel Videos uses the explicit tab and requested page, retaining stable video IDs")
+    func channelVideosPageUsesVerifiedSource() async throws {
+        let bin = try makeFakeBinary(script: """
+            #!/bin/sh
+            case " $* " in
+              *" --playlist-start 21 --playlist-end 40 --dump-single-json https://www.youtube.com/channel/UC_x5XG1OV2P6uZZ5FSM9Ttw/videos "*) ;;
+              *) exit 3 ;;
+            esac
+            echo '{"webpage_url":"https://www.youtube.com/channel/UC_x5XG1OV2P6uZZ5FSM9Ttw/videos","entries":[{"id":"FVkp6tc2rNY","title":"Video","url":"https://www.youtube.com/watch?v=FVkp6tc2rNY","duration":30}]}'
+            """)
+        let bridge = YTDlpBridge(binaryPath: bin)
+        let entries = try await bridge.fetchChannelVideosPage(
+            channelID: "UC_x5XG1OV2P6uZZ5FSM9Ttw", offset: 20)
+        #expect(entries.map(\.id) == ["FVkp6tc2rNY"])
+        // Duration never determines classification: short ordinary videos remain Videos.
+        #expect(entries.first?.duration == 30)
+    }
+
+    @Test("Channel Videos rejects tab fallback, Shorts and mismatched video identities")
+    func channelVideosRejectSourceMismatch() throws {
+        let channel = "UC_x5XG1OV2P6uZZ5FSM9Ttw"
+        for (tab, entryURL) in [
+            ("shorts", "https://www.youtube.com/watch?v=FVkp6tc2rNY"),
+            ("videos", "https://www.youtube.com/shorts/FVkp6tc2rNY"),
+            ("videos", "https://www.youtube.com/watch?v=AAAAAAAAAAA")
+        ] {
+            let payload = """
+                {"webpage_url":"https://www.youtube.com/channel/\(channel)/\(tab)","entries":[{"id":"FVkp6tc2rNY","title":"Item","url":"\(entryURL)"}]}
+                """
+            #expect(throws: YTDlpBridge.YTDlpError.self) {
+                try YTDlpBridge.parseChannelVideosPage(payload, channelID: channel)
+            }
+        }
+    }
+
     @Test("Shorts page selects the requested range and validates source URLs")
     func shortsPageUsesVerifiedSource() async throws {
         let bin = try makeFakeBinary(script: """

@@ -12,6 +12,8 @@ struct SpectrumView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @AppStorage(PrefKey.gpuAcceleration) private var gpuAcceleration = true
 
+    @AppStorage("reducedPlaybackVisuals") private var reducedVisuals = false
+    @State private var visible = false
     @State private var metalUnavailable = false
     @State private var handlerOwner: UUID?
     @State private var samples = SpectrumSampleBuffer()
@@ -23,11 +25,15 @@ struct SpectrumView: View {
     private let peakDecayPerSecond: Float = 1.0 / 0.2
 
     var body: some View {
-        if gpuAcceleration && !metalUnavailable {
-            MetalSpectrumView(onUnavailable: { metalUnavailable = true })
-        } else {
-            canvasSpectrum
+        Group {
+            if gpuAcceleration && !metalUnavailable {
+                MetalSpectrumView(onUnavailable: { metalUnavailable = true }, visualizationsEnabled: visible && !reducedVisuals)
+            } else {
+                canvasSpectrum
+            }
         }
+        .onAppear { visible = true }
+        .onDisappear { visible = false }
     }
 
     /// System-rendered fallback spectrum via Canvas.
@@ -51,7 +57,7 @@ struct SpectrumView: View {
     }
 
     private var sampling: Bool {
-        !reduceMotion && playback.transportState.isPlaying && playback.transportState.audioProcessing == .available
+        visible && !reducedVisuals && !reduceMotion && playback.transportState.isPlaying && playback.transportState.audioProcessing == .available
     }
 
     private func syncSampling() {

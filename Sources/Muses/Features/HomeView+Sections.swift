@@ -2,6 +2,60 @@ import AppKit
 import SwiftUI
 
 extension HomeView {
+    /// An application editorial role using the first playable item in source order.
+    /// No release-date or external editorial classification is inferred.
+    var spotlightSelection: (item: DiscoveryItem, provenance: String)? {
+        for section in visibleDiscoverySections {
+            if let item = section.items.first(where: isPlayableDiscoveryItem) {
+                return (item, sourceAwareSubtitle(section))
+            }
+        }
+        if homeSourceSelection == .recommended, let snapshot = supportedRecent.first {
+            return (.track(snapshot), tr("Your library · recently played", "你的资料库 · 最近播放"))
+        }
+        return nil
+    }
+
+    @ViewBuilder
+    var homeSpotlight: some View {
+        if let selection = spotlightSelection {
+            VStack(alignment: .leading, spacing: 12) {
+                SectionHeader(title: tr("Muses Spotlight", "Muses 聚焦"), subtitle: selection.provenance)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(alignment: .top) {
+                        switch selection.item {
+                        case .youTube(let card):
+                            EditorialCard(eyebrow: tr("Muses Spotlight", "Muses 聚焦"),
+                                          title: card.title,
+                                          subtitle: webCardSubtitle(card),
+                                          artwork: .resolve(remoteURL: card.thumbnailURL, youTubeId: card.playableVideoID),
+                                          onOpen: { openWebCard(card) },
+                                          onPlay: { Task { await play(card) } })
+                                .youTubeEntryContextMenu(card: card, showsMenuButton: true,
+                                                        menuButtonAlignment: .bottomLeading) {
+                                    Task { await play(card) }
+                                }
+                        case .track(let snapshot):
+                            let context = visibleDiscoverySections.flatMap(\.items).compactMap { item -> TrackSnapshot? in
+                                if case .track(let track) = item { return track }
+                                return nil
+                            }
+                            EditorialCard(eyebrow: tr("Muses Spotlight", "Muses 聚焦"),
+                                          title: snapshot.title,
+                                          subtitle: SongCreditCache.shared.artist(snapshot: snapshot),
+                                          artwork: .resolve(for: snapshot),
+                                          onOpen: { openPreview(snapshot, context: context.isEmpty ? supportedRecent : context) },
+                                          onPlay: { play(snapshot, context: context.isEmpty ? supportedRecent : context) })
+                                .trackContextMenu(snapshot: snapshot,
+                                                  onPlay: { play(snapshot, context: context.isEmpty ? supportedRecent : context) },
+                                                  showsMenuButton: true, menuButtonAlignment: .bottomLeading)
+                        }
+                    }.padding(.horizontal, AppleMusicTokens.contentPaddingX)
+                }
+            }
+        }
+    }
+
     @ViewBuilder
     var topPicks: some View {
         if !topPickItems.isEmpty {
@@ -57,11 +111,12 @@ extension HomeView {
                     remoteURL: card.thumbnailURL, youTubeId: card.playableVideoID),
                 videoEntry: card.playableVideoID.map { .init(id: $0, title: card.title, uploader: card.uploader, duration: card.duration) },
                 isYouTube: true,
-                style: .home,
-                onOpen: { Task { await play(card) } },
+                style: card.browseEndpoint?.kind == .channel ? .portraitOverlay : .home,
+                showsHoverPlay: card.playableVideoID != nil,
+                onOpen: { openWebCard(card) },
                 onPlay: { Task { await play(card) } }
             )
-            .youTubeEntryContextMenu(card: card) {
+            .youTubeEntryContextMenu(card: card, showsMenuButton: true) {
                 Task { await play(card) }
             }
         case .track(let snapshot):
@@ -73,19 +128,19 @@ extension HomeView {
                 isYouTube: true,
                 nowPlayingID: snapshot.id,
                 style: .home,
-                onOpen: { play(snapshot, context: supportedRecent) },
+                onOpen: { openPreview(snapshot, context: supportedRecent) },
                 onPlay: { play(snapshot, context: supportedRecent) }
             )
             .trackContextMenu(snapshot: snapshot, onPlay: {
                 play(snapshot, context: supportedRecent)
-            })
+            }, showsMenuButton: true)
         }
     }
 
     @ViewBuilder
     var discoveryShelves: some View {
         if discovery.isEnabled {
-            let sections = discovery.sections
+            let sections = visibleDiscoverySections
             let hasLoadedAny = sections.contains { section in
                 if case .loaded = section.status { return true }
                 return false
@@ -207,7 +262,9 @@ extension HomeView {
                             spacing: 18,
                             alignment: .top
                         ) {
-                            ForEach(items) { item in squareCard(item, sectionItems: items) }
+                            ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                                squareCard(item, sectionItems: items)
+                            }
                         }
                     }
                 }
@@ -238,7 +295,7 @@ extension HomeView {
                 alignment: .leading,
                 spacing: 10
             ) {
-                ForEach(items.prefix(8)) { item in
+                ForEach(Array(items.prefix(8).enumerated()), id: \.offset) { _, item in
                     quickPickRow(item, context: items)
                 }
             }
@@ -325,7 +382,7 @@ extension HomeView {
                 artwork: ArtworkSource.resolve(
                     remoteURL: card.thumbnailURL, youTubeId: card.playableVideoID),
                 size: MusicObjectMetrics.albumRail,
-                role: canPlay ? .play : .browse,
+                role: .browse,
                 style: .home,
                 videoEntry: card.playableVideoID.map { .init(id: $0, title: card.title, uploader: card.uploader, duration: card.duration) },
                 isYouTube: true,
@@ -339,7 +396,7 @@ extension HomeView {
                     }
                 }
             )
-            .youTubeEntryContextMenu(card: card) {
+            .youTubeEntryContextMenu(card: card, showsMenuButton: true) {
                 Task { await play(card, siblings: sectionItems) }
             }
         case .track(let snapshot):
@@ -352,14 +409,14 @@ extension HomeView {
                 subtitle: SongCreditCache.shared.artist(snapshot: snapshot),
                 artwork: ArtworkSource.resolve(for: snapshot),
                 size: MusicObjectMetrics.albumRail,
-                role: .play,
+                role: .browse,
                 style: .home,
                 nowPlayingID: snapshot.id,
                 showsHoverPlay: true,
-                onSelect: {},
+                onSelect: { openPreview(snapshot, context: context) },
                 onPlay: { play(snapshot, context: context) }
             )
-            .trackContextMenu(snapshot: snapshot, onPlay: { play(snapshot, context: context) })
+            .trackContextMenu(snapshot: snapshot, onPlay: { play(snapshot, context: context) }, showsMenuButton: true)
         }
     }
 
@@ -458,41 +515,78 @@ extension HomeView {
         .accessibilityLabel(tr("Moods and activities", "心情与活动"))
     }
 
-    var homeSourceStatus: some View {
-        HStack(spacing: 7) {
-            Image(systemName: homeSourceStatusIcon)
-                .font(MusesTypography.caption.weight(.semibold))
-            Text(homeSourceStatusText)
-                .font(MusesTypography.caption.weight(.medium))
-                .lineLimit(1)
-            if discovery.isShowingStale {
-                Text(tr("Saved", "已保存"))
-                    .font(MusesTypography.caption2.weight(.semibold))
-                    .padding(.horizontal, 7)
-                    .frame(height: 20)
-                    .background(BrandColors.textPrimary.opacity(0.08),
-                                in: Capsule())
-            }
-            if discovery.recommendationMode == .youtubeMusic,
-               HomeGuestStatusPolicy.unsignedInShowsSingleCue,
-               !youTubeAccount.isConnected {
-                Button(tr("Sign In", "登录"), systemImage: "person.badge.key.fill") {
-                    NotificationCenter.default.post(
-                        name: .musesOpenSettings, object: SettingsCategory.youtube)
-                }
-                .labelStyle(ActionIconLabelStyle())
-                .help(tr("Sign In", "登录"))
-                .musesAction()
-                .controlSize(.small)
-                .tint(BrandColors.accent)
+    var visibleDiscoverySections: [HomeSection] {
+        discovery.sections.filter { section in
+            let origin = section.cachedOrigin ?? section.source
+            switch homeSourceSelection {
+            case .recommended: return true
+            case .publicDiscovery: return origin == .publicDiscovery
+            case .account: return origin == .signedInWeb || origin == .officialAccount
+            case .imports: return false
             }
         }
-        .foregroundStyle(BrandColors.textSecondary)
+    }
+
+    var homeSourceStatus: some View {
+        Menu {
+            Button(tr("Recommended on this Mac", "这台 Mac 上的推荐")) {
+                selectHomeSource(.recommended)
+            }
+            Button(tr("Public discovery", "公共发现")) {
+                selectHomeSource(.publicDiscovery)
+            }
+            Button(tr("Your account", "你的账号")) {
+                guard youTubeAccount.isConnected else {
+                    openHomeAccountSettings()
+                    return
+                }
+                selectHomeSource(.account)
+            }
+            Button(tr("Imported playlists", "已导入歌单")) {
+                homeSourceSelection = .imports
+            }
+            Divider()
+            Text(homeSourceStatusText)
+            if discovery.isShowingStale { Text(staleBannerDetail) }
+            if let error = discovery.lastRefreshError { Text(error) }
+            Button(tr("Refresh", "刷新")) { discovery.reload() }
+                .disabled(homeSourceSelection == .imports || discovery.isRefreshing)
+            Button(tr("Account and personalized Home settings…", "账号与个性化首页设置…")) {
+                openHomeAccountSettings()
+            }
+        } label: {
+            Label(homeSourceSelection.title, systemImage: homeSourceStatusIcon)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(tr("Home source: \(homeSourceSelection.title)", "首页来源：\(homeSourceSelection.title)"))
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
         .padding(.horizontal, AppleMusicTokens.contentPaddingX)
-        .accessibilityElement(children: youTubeAccount.isConnected ? .combine : .contain)
+        .help(homeSourceStatusText)
+    }
+
+    func openHomeAccountSettings() {
+        NotificationCenter.default.post(name: .musesOpenSettings, object: SettingsCategory.youtube)
+    }
+
+    func selectHomeSource(_ source: HomeSourceSelection) {
+        homeSourceSelection = source
+        let mode: HomeRecommendationMode = source == .recommended ? .muses : .youtubeMusic
+        if mode != discovery.recommendationMode {
+            UserDefaults.standard.set(mode.rawValue, forKey: PrefKey.homeRecommendationMode)
+            discovery.recommendationModeDidChange()
+        }
     }
 
     var homeSourceStatusText: String {
+        if homeSourceSelection == .imports {
+            return tr("Playlists already imported into your library; no browser session is required.",
+                      "已导入资料库的歌单，无需浏览器会话。")
+        }
+        if homeSourceSelection == .publicDiscovery {
+            return tr("Anonymous public discovery. Account recommendations are shown only in the Account source.",
+                      "匿名公共发现；账号推荐仅在账号来源中显示。")
+        }
         if discovery.recommendationMode == .muses {
             return tr("Recommended privately on this Mac",
                       "由这台 Mac 私密推荐", zhHant: "由這台 Mac 私密推薦")
@@ -517,6 +611,8 @@ extension HomeView {
     }
 
     var homeSourceStatusIcon: String {
+        if homeSourceSelection == .imports { return "music.note.list" }
+        if homeSourceSelection == .publicDiscovery { return "globe" }
         if discovery.recommendationMode == .muses { return "macbook" }
         return switch discovery.webCapability {
         case .available: "person.crop.circle.fill.badge.checkmark"
@@ -592,10 +688,7 @@ extension HomeView {
                 Text(tr("Personalized Web Home is unavailable",
                         "个性化 Web 首页暂不可用"))
                     .font(MusesTypography.subheadline.weight(.semibold))
-                Text(discovery.lastRefreshError
-                     ?? tr("Anonymous YouTube Music discovery remains available; retry the signed-in enhancement.",
-                           "匿名 YouTube Music 公共发现仍可使用；请重试登录增强。",
-                           zhHant: "匿名 YouTube Music 公開探索仍可使用；請重試登入增強。"))
+                Text(WebHomeRecoveryCopy.message(for: webHome.status))
                     .font(MusesTypography.caption)
                     .foregroundStyle(BrandColors.textSecondary)
                     .lineLimit(2)
@@ -855,7 +948,13 @@ extension HomeView {
     }
 
     func openWebCard(_ card: YouTubeDiscoveryCard) {
-        if card.playableVideoID != nil { Task { await play(card) }; return }
+        if card.playableVideoID != nil {
+            galleryPreview = .init(id: card.id, title: card.title,
+                subtitle: webCardSubtitle(card),
+                artwork: .resolve(remoteURL: card.thumbnailURL, youTubeId: card.playableVideoID),
+                duration: card.duration, onPlay: { Task { await play(card) } })
+            return
+        }
         guard card.availability == .available,
               let endpoint = card.browseEndpoint ?? card.playEndpoint else { return }
         let browseID: String
@@ -871,6 +970,13 @@ extension HomeView {
             title: card.title, subtitle: card.uploader ?? "YouTube Music",
             artwork: card.thumbnailURL.flatMap(URL.init(string:)), artists: [], releases: [], channels: []))
         NotificationCenter.default.post(name: .musesNavigateFromSearch, object: GlobalSearchRoute.section(.search))
+    }
+
+    func openPreview(_ snapshot: TrackSnapshot, context: [TrackSnapshot]) {
+        galleryPreview = .init(id: snapshot.id.uuidString, title: snapshot.title,
+            subtitle: SongCreditCache.shared.artist(snapshot: snapshot),
+            artwork: .resolve(for: snapshot), duration: snapshot.durationSeconds,
+            onPlay: { play(snapshot, context: context) })
     }
 
     func webCardSubtitle(_ card: YouTubeDiscoveryCard) -> String {
@@ -921,37 +1027,26 @@ extension HomeView {
     }
 }
 
+enum HomeSourceSelection: String {
+    case recommended, publicDiscovery, account, imports
+    var title: String {
+        switch self {
+        case .recommended: tr("Recommended on this Mac", "这台 Mac 上的推荐")
+        case .publicDiscovery: tr("Public discovery", "公共发现")
+        case .account: tr("Your account", "你的账号")
+        case .imports: tr("Imported playlists", "已导入歌单")
+        }
+    }
+}
+
 private struct MoodChipButton: View {
     let title: String
     let action: () -> Void
-
-    @State private var isHovered = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(MusesTypography.system(size: 13, weight: .medium))
-                .foregroundStyle(BrandColors.textPrimary)
-                .padding(.horizontal, 16)
-                .frame(height: 34)
-                .background {
-                    Capsule()
-                        .fill(BrandColors.surface)
-                        .overlay(
-                            Capsule()
-                                .fill(isHovered ? BrandColors.textPrimary.opacity(0.10) : Color.clear)
-                        )
-                }
-                .overlay {
-                    Capsule()
-                        .stroke(isHovered ? BrandColors.textPrimary.opacity(0.28) : BrandColors.hairline, lineWidth: 1)
-                }
-                .scaleEffect(isHovered && !reduceMotion ? 1.03 : 1.0)
-                .offset(y: isHovered && !reduceMotion ? -1 : 0)
-        }
-        .buttonStyle(.fullAreaPlain)
-        .onHover { isHovered = $0 }
-        .animation(MusesMotion.hoverAnimation(reduceMotion: reduceMotion), value: isHovered)
+        Button(title, action: action)
+            .buttonStyle(.bordered)
+            .controlSize(.regular)
+            .buttonBorderShape(.capsule)
+            .frame(minHeight: 28)
     }
 }

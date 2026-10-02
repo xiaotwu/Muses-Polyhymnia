@@ -7,74 +7,98 @@ struct AddToYouTubePlaylistSheet: View {
     @Environment(YouTubeImportService.self) private var importService
     @Environment(YouTubePlaylistSyncService.self) private var playlistSync
     @State private var query = ""
+    @State private var linkMode = false
     @State private var results: [YTDlpBridge.YTDlpPlaylistEntry] = []
+    @State private var selectedID: String?
     @State private var searching = false
     @State private var error: String?
+    @State private var notice: String?
+    @State private var requestID = UUID()
+    @State private var operation: Task<Void, Never>?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 16) {
+            Text(tr("Add YouTube Tracks", "添加 YouTube 曲目")).font(.title2.weight(.semibold))
+            Text(youTubeImport.title).font(.headline)
+            Picker(tr("Find a track", "查找曲目"), selection: $linkMode) {
+                Text(tr("Search", "搜索")).tag(false)
+                Text(tr("Link", "链接")).tag(true)
+            }.pickerStyle(.segmented)
             HStack {
-                Text(tr("Add to playlist", "添加到歌单"))
-                    .font(MusesTypography.headline)
+                TextField(linkMode ? tr("YouTube video link", "YouTube 视频链接") : tr("Search YouTube", "搜索 YouTube"), text: $query)
+                    .textFieldStyle(.roundedBorder).onSubmit(load)
+                Button(tr("Preview", "预览"), action: load)
+                    .disabled(searching || query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+            if searching { ProgressView(tr("Loading preview…", "正在载入预览…")).controlSize(.small) }
+            List(results, id: \.id, selection: $selectedID) { entry in
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(entry.title).lineLimit(2)
+                    Text(entry.artist ?? entry.uploader ?? tr("Unknown Artist", "未知艺人"))
+                        .font(.caption).foregroundStyle(.secondary)
+                }.tag(entry.id)
+            }
+            if let error { Text(error).font(.callout).foregroundStyle(.red) }
+            if let notice { Label(notice, systemImage: "checkmark.circle").font(.callout) }
+            Text(tr("Destination: this playlist's Muses copy. YouTube changes only through a separate reviewed Push.",
+                    "目标：此歌单的 Muses 副本。只有另行预览并确认 Push 才会修改 YouTube。"))
+                .font(.callout).foregroundStyle(.secondary)
+            Divider()
+            HStack {
+                Button(tr("Close", "关闭")) { operation?.cancel(); dismiss() }.keyboardShortcut(.cancelAction)
                 Spacer()
-                Button(tr("Close", "关闭"), systemImage: "xmark") { dismiss() }
-                    .labelStyle(ActionIconLabelStyle())
-                    .help(tr("Close", "关闭"))
+                Button(tr("Add Selected", "添加所选")) { addSelected() }
+                    .musesAction(prominent: true)
+                    .disabled(selectedID == nil || searching)
             }
-            TextField(tr("Search YouTube", "搜索 YouTube"), text: $query)
-                .textFieldStyle(.roundedBorder)
-                .onSubmit { Task { await runSearch() } }
-            if searching { ProgressView().controlSize(.small) }
-            if let error { Text(error).font(MusesTypography.caption).foregroundStyle(.red) }
-            List(results, id: \.id) { entry in
-                Button {
-                    Task { await add(entry) }
-                } label: {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(entry.title).foregroundStyle(BrandColors.textPrimary)
-                        Text(entry.uploader ?? "")
-                            .font(MusesTypography.caption)
-                            .foregroundStyle(BrandColors.textSecondary)
-                    }
-                }
-                .buttonStyle(.fullAreaPlain)
-            }
-            .listStyle(.plain)
         }
-        .padding(16)
-        .frame(width: 420, height: 480)
-        .musesFloatingChrome(cornerRadius: 16)
-        .onTapGesture {}
+        .padding(24).frame(minWidth: 500, idealWidth: 580, minHeight: 460, idealHeight: 540)
+        .onChange(of: linkMode) { _, _ in operation?.cancel(); results = []; selectedID = nil; query = ""; searching = false }
+        .onChange(of: query) { _, _ in operation?.cancel(); results = []; selectedID = nil; searching = false }
+        .onDisappear { operation?.cancel() }
     }
 
-    private func runSearch() async {
+    private func load() {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !q.isEmpty else { return }
-        searching = true
-        defer { searching = false }
-        do {
-            results = try await searchService.search(query: q, limit: 12)
-            error = nil
-        } catch {
-            self.error = error.localizedDescription
+        operation?.cancel()
+        let identity = UUID()
+        requestID = identity
+        results = []; selectedID = nil
+        searching = true; error = nil; notice = nil
+        operation = Task {
+            defer { if requestID == identity { searching = false } }
+            do {
+                let entries: [YTDlpBridge.YTDlpPlaylistEntry]
+                if linkMode {
+                    guard case .video(let videoID) = YouTubeImportURL(q) else { throw YouTubeImportError.invalidURL }
+                    let metadata = await importService.songMetadata(videoID: videoID)
+                    entries = [metadata ?? .init(id: videoID, title: tr("YouTube video", "YouTube 视频"))]
+                } else { entries = try await searchService.search(query: q, limit: 12) }
+                try Task.checkCancellation()
+                guard requestID == identity else { return }
+                results = entries.filter { $0.resourceKind == .video }
+                selectedID = results.first?.id
+            } catch is CancellationError {} catch {
+                if requestID == identity && !Task.isCancelled { self.error = error.localizedDescription }
+            }
         }
     }
 
-    private func add(_ entry: YTDlpBridge.YTDlpPlaylistEntry) async {
+    private func addSelected() {
+        guard let entry = results.first(where: { $0.id == selectedID }) else { return }
         do {
             _ = try playlistSync.saveLocalRevision(importID: youTubeImport.id)
-            guard importService.addRemoteVideo(
-                importId: youTubeImport.id,
-                videoId: entry.id,
-                title: entry.title,
-                artist: entry.uploader ?? youTubeImport.channel,
-                durationMs: Int((entry.duration ?? 0) * 1000)) else {
+            let duration = entry.duration ?? 0
+            let durationMs = duration.isFinite && duration > 0 && duration < Double(Int.max / 1000)
+                ? Int(duration * 1000) : 0
+            guard importService.addRemoteVideo(importId: youTubeImport.id, videoId: entry.id,
+                title: entry.title, artist: entry.artist ?? entry.uploader ?? tr("Unknown Artist", "未知艺人"), durationMs: durationMs) else {
                 throw YouTubeImportError.notFound
             }
+            notice = tr("Added to Muses: \(entry.title)", "已添加到 Muses：\(entry.title)")
             error = nil
-        } catch {
-            self.error = error.localizedDescription
-        }
+        } catch { self.error = error.localizedDescription }
     }
 }
 
@@ -89,8 +113,12 @@ struct PlaylistPullPreviewSheet: View {
          onApply: @escaping (YouTubePlaylistSnapshot?) -> Void) {
         self.preview = preview
         self.onApply = onApply
-        _resolvedItems = State(initialValue:
-            (preview.automaticResult ?? preview.local).normalizedItems)
+        _resolvedItems = State(initialValue: Self.initialItems(for: preview))
+    }
+
+    nonisolated static func initialItems(for preview: YouTubePullPreview) -> [YouTubePlaylistItemSnapshot] {
+        (preview.automaticResult ?? YouTubePlaylistSyncService.automaticallyMerged(
+            base: preview.base, local: preview.local, remote: preview.remote)).normalizedItems
     }
 
     var body: some View {
@@ -106,6 +134,12 @@ struct PlaylistPullPreviewSheet: View {
                 Spacer()
                 Button(tr("Cancel", "取消")) { dismiss() }
             }
+
+            HSplitView {
+                snapshotColumn(preview.local, title: tr("Muses", "Muses"))
+                snapshotColumn(preview.remote, title: tr("YouTube", "YouTube"))
+            }
+            .frame(height: 140)
 
             if !preview.mergePlan.conflicts.isEmpty {
                 Text(tr("Resolve each conflict", "逐项解决冲突"))
@@ -175,8 +209,24 @@ struct PlaylistPullPreviewSheet: View {
             }
         }
         .padding(20)
-        .frame(width: 720, height: 640)
-        .musesFloatingChrome(cornerRadius: 18)
+        .frame(minWidth: 720, idealWidth: 820, minHeight: 620, idealHeight: 760)
+    }
+
+    private func snapshotColumn(_ snapshot: YouTubePlaylistSnapshot, title: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title).font(.headline)
+            List(Array(snapshot.normalizedItems.enumerated()), id: \.element.id) { index, item in
+                HStack {
+                    Text("\(index + 1)").monospacedDigit().foregroundStyle(.secondary)
+                    Text(item.knownTitle ?? tr("Unknown Title", "未知标题")).lineLimit(1)
+                    Spacer()
+                    if item.availability != .available {
+                        Image(systemName: "exclamationmark.circle").foregroundStyle(.secondary)
+                            .accessibilityLabel(tr("Unavailable", "不可用"))
+                    }
+                }.font(.callout)
+            }
+        }.frame(minWidth: 300)
     }
 
     private var summary: String {

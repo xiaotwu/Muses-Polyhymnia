@@ -2,6 +2,26 @@ import Foundation
 import Observation
 import SwiftData
 
+/// Value draft; editing a sheet never mutates managed bookmark rows.
+struct TrackBookmarkDraft: Identifiable, Hashable, Sendable {
+    let id: UUID
+    var timestampMs: Double
+    var title: String?
+    var note: String?
+    let createdAt: Date
+
+    init(id: UUID = UUID(), timestampMs: Double, title: String? = nil,
+         note: String? = nil, createdAt: Date = .init()) {
+        self.id = id; self.timestampMs = timestampMs; self.title = title
+        self.note = note; self.createdAt = createdAt
+    }
+
+    init(_ bookmark: TrackBookmark) {
+        self.init(id: bookmark.id, timestampMs: bookmark.timestampMs,
+                  title: bookmark.title, note: bookmark.note, createdAt: bookmark.createdAt)
+    }
+}
+
 /// Notes & bookmarks service (Final Spec §10.7 Feature 7 — Notes & Bookmarks).
 ///
 /// Owns read/write access to the `TrackNote` / `TrackBookmark` tables.
@@ -97,7 +117,59 @@ final class NotesService {
         }
     }
 
-    private func persist(_ change: (ModelContext) throws -> Void) -> Bool {
+    /// Commits one sheet draft atomically and rejects stale edits instead of overwriting newer truth.
+    @discardableResult
+    func saveDraft(trackId: UUID, content: String, bookmarks: [TrackBookmarkDraft],
+                   originalContent: String, originalBookmarks: [TrackBookmarkDraft]) -> Bool {
+        guard bookmarks.allSatisfy({ $0.timestampMs.isFinite && $0.timestampMs >= 0
+            && $0.timestampMs < Double(Int.max) }), Set(bookmarks.map(\.id)).count == bookmarks.count else {
+            lastError = tr("Enter valid bookmark times.", "请输入有效的书签时间。")
+            return false
+        }
+        enum DraftError: Error { case changed, ownership }
+        let result = persist(failureMessage: { error in
+            switch error {
+            case DraftError.changed:
+                tr("This track was edited elsewhere. Copy your draft, then close and reopen this sheet to review the latest version.",
+                   "此曲目已在其他位置修改。请复制草稿，再关闭并重新打开此窗口以核对最新版本。")
+            case DraftError.ownership:
+                tr("A bookmark belongs to another track. Close and reopen this sheet.", "书签属于另一曲目，请关闭并重新打开此窗口。")
+            default:
+                tr("Changes could not be saved. Your draft is kept; try again.", "无法保存更改，草稿已保留，请重试。")
+            }
+        }) { ctx in
+            let existingNote = try ctx.fetch(FetchDescriptor<TrackNote>(
+                predicate: #Predicate { $0.trackId == trackId })).first
+            let allBookmarks = try ctx.fetch(FetchDescriptor<TrackBookmark>())
+            let existing = allBookmarks.filter { $0.trackId == trackId }
+            guard (existingNote?.content ?? "") == originalContent,
+                  Set(existing.map(TrackBookmarkDraft.init)) == Set(originalBookmarks) else {
+                throw DraftError.changed
+            }
+            guard !allBookmarks.contains(where: { $0.trackId != trackId && bookmarks.map(\.id).contains($0.id) }) else {
+                throw DraftError.ownership
+            }
+            if content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                if let existingNote { ctx.delete(existingNote) }
+            } else if let existingNote {
+                existingNote.content = content; existingNote.updatedAt = .init()
+            } else { ctx.insert(TrackNote(trackId: trackId, content: content)) }
+            let retained = Set(bookmarks.map(\.id))
+            for bookmark in existing where !retained.contains(bookmark.id) { ctx.delete(bookmark) }
+            for draft in bookmarks {
+                if let bookmark = existing.first(where: { $0.id == draft.id }) {
+                    bookmark.timestampMs = draft.timestampMs
+                    bookmark.title = draft.title; bookmark.note = draft.note
+                } else {
+                    ctx.insert(TrackBookmark(id: draft.id, trackId: trackId, timestampMs: draft.timestampMs,
+                        title: draft.title, note: draft.note, createdAt: draft.createdAt))
+                }
+            }
+        }
+        return result
+    }
+
+    private func persist(failureMessage: ((Error) -> String)? = nil, _ change: (ModelContext) throws -> Void) -> Bool {
         lastError = nil
         guard isEnabled else {
             lastError = tr("Notes are read-only.", "笔记为只读。", zhHant: "筆記為唯讀。")
@@ -112,7 +184,7 @@ final class NotesService {
             return true
         } catch {
             ctx.rollback()
-            lastError = tr("Changes could not be saved. Try again.", "无法保存更改，请重试。", zhHant: "無法儲存變更，請再試一次。")
+            lastError = failureMessage?(error) ?? tr("Changes could not be saved. Try again.", "无法保存更改，请重试。", zhHant: "無法儲存變更，請再試一次。")
             return false
         }
     }

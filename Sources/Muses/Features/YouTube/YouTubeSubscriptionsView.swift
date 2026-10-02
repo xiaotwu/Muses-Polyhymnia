@@ -72,7 +72,7 @@ struct YouTubeSubscriptionsView: View {
                                 ForEach(account.subscriptionsState.value ?? [], id: \.channelId) { channel in
                                     AlbumObjectView(title: channel.title, subtitle: tr("Channel", "频道"),
                                                     artwork: .resolve(remoteURL: channel.thumbnailURL), size: 180,
-                                                    isYouTube: true, onSelect: { selectedChannelID = channel.channelId }, onPlay: { selectedChannelID = channel.channelId })
+                                                    isYouTube: true, showsHoverPlay: false, onSelect: { selectedChannelID = channel.channelId }, onPlay: { selectedChannelID = channel.channelId })
                                     .contextMenu {
                                         Button(tr("Open", "打开")) { selectedChannelID = channel.channelId }
                                         if let target = YouTubeShareTarget(kind: .channel, id: channel.channelId) {
@@ -150,23 +150,23 @@ struct YouTubeSubscriptionsView: View {
 
 private struct YouTubeChannelContentView: View {
     let channel: YouTubeSubscription
-    @State private var tab: ChannelTab = .uploads
+    @State private var tab: ChannelTab = .videos
 
     private enum ChannelTab: String, CaseIterable {
-        case uploads, shorts
+        case videos, shorts
     }
 
     var body: some View {
         VStack(spacing: 0) {
             Picker(tr("Channel content", "频道内容", zhHant: "頻道內容"), selection: $tab) {
-                Text(tr("Uploads", "上传内容", zhHant: "上傳內容")).tag(ChannelTab.uploads)
+                Text(tr("Videos", "视频", zhHant: "影片")).tag(ChannelTab.videos)
                 Text("Shorts").tag(ChannelTab.shorts)
             }
             .pickerStyle(.segmented)
             .frame(maxWidth: 260)
             .padding(.top, 12)
-            if tab == .uploads {
-                YouTubeChannelUploadsView(channel: channel)
+            if tab == .videos {
+                YouTubeChannelVideosView(channel: channel)
             } else {
                 YouTubeChannelShortsView(channel: channel)
             }
@@ -174,14 +174,14 @@ private struct YouTubeChannelContentView: View {
     }
 }
 
-private struct YouTubeChannelUploadsView: View {
+private struct YouTubeChannelVideosView: View {
     let channel: YouTubeSubscription
+    @Environment(\.ytDlpBridge) private var bridge
     @Environment(YouTubeAccountService.self) private var account
     @Environment(YouTubeSearchService.self) private var search
     @Environment(PlaybackService.self) private var playback
     @State private var state: LoadState<[YTDlpBridge.YTDlpPlaylistEntry]> = .idle
-    @State private var playlistID: String?
-    @State private var nextPage: String?
+    @State private var nextOffset: Int?
     @State private var refreshID = UUID()
     @State private var appendPage = false
     @State private var playRequest: YTDlpBridge.YTDlpPlaylistEntry?
@@ -211,13 +211,13 @@ private struct YouTubeChannelUploadsView: View {
                         refreshID = UUID()
                     }.musesAction().disabled(state.isLoading)
                 }
-                Text(tr("Channel uploads", "频道上传内容")).foregroundStyle(.secondary)
+                Text(tr("Videos · from this channel’s Videos tab", "视频 · 来自此频道的视频分区")).foregroundStyle(.secondary)
                 if let message = state.errorMessage { MetadataProjectionErrorBanner(message: message) }
                 if let playbackError { MetadataProjectionErrorBanner(message: playbackError) }
                 if let accountActionError { MetadataProjectionErrorBanner(message: accountActionError) }
                 if state.isLoading { ProgressView() }
                 if case .empty = state {
-                    ContentUnavailableView(tr("No public uploads available", "没有可用的公开上传内容"), systemImage: "play.rectangle")
+                    ContentUnavailableView(tr("No public videos available", "没有可用的公开视频"), systemImage: "play.rectangle")
                 }
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 230), alignment: .top)], spacing: 24) {
                     ForEach(state.value ?? [], id: \.id) { entry in
@@ -228,7 +228,7 @@ private struct YouTubeChannelUploadsView: View {
                             .youTubeEntryContextMenu(entry: entry) { playRequest = entry }
                     }
                 }
-                if nextPage != nil {
+                if nextOffset != nil {
                     Button(tr("Load More", "加载更多")) {
                         appendPage = true
                         refreshID = UUID()
@@ -274,26 +274,19 @@ private struct YouTubeChannelUploadsView: View {
     }
 
     private func load() async {
-        guard let client = account.dataAPIClient() else { return }
+        guard let bridge, account.isConnected else { return }
         let identity = account.activeChannelID
         let previous = state.value
         state = .loading(previous: previous)
         do {
-            let id: String?
-            if appendPage, let playlistID { id = playlistID }
-            else { id = try await client.uploadsPlaylist(channelID: channel.channelId) }
-            guard !Task.isCancelled, identity == account.activeChannelID else { return }
-            guard let id else { state = .empty; nextPage = nil; return }
-            let page = try await client.playlistItemsPage(playlistId: id, pageToken: appendPage ? nextPage : nil)
+            let offset = appendPage ? nextOffset ?? 0 : 0
+            let page = try await bridge.fetchChannelVideosPage(channelID: channel.channelId,
+                                                               offset: offset, count: 20)
             guard !Task.isCancelled, identity == account.activeChannelID else { return }
             var seen = Set<String>()
-            let entries = page.items.filter { $0.availability == .available }.map {
-                YTDlpBridge.YTDlpPlaylistEntry(id: $0.videoId, title: $0.title, uploader: channel.title,
-                                             duration: nil, channelID: channel.channelId)
-            }
-            let all = ((appendPage ? previous ?? [] : []) + entries).filter { seen.insert($0.id).inserted }
-            playlistID = id
-            nextPage = page.nextPageToken
+            let all = ((appendPage ? previous ?? [] : []) + page).filter { seen.insert($0.id).inserted }
+            nextOffset = page.count == 20 && offset + 20 < 500 ? offset + 20 : nil
+            appendPage = false
             state = all.isEmpty ? .empty : .content(all)
         } catch {
             guard !Task.isCancelled, identity == account.activeChannelID else { return }

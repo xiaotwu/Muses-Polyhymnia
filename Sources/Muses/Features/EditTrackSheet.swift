@@ -6,6 +6,7 @@ struct EditTrackSheet: View {
     @Environment(LibraryService.self) private var library
     @Environment(\.dismiss) private var dismiss
 
+    @State private var saveError: String?
     @State private var title = ""
     @State private var artist = ""
     @State private var albumTitle = ""
@@ -24,14 +25,17 @@ struct EditTrackSheet: View {
                 Spacer()
                 Button(tr("Cancel", "取消")) { dismiss() }
                     .foregroundStyle(BrandColors.textSecondary)
+                    .keyboardShortcut(.cancelAction)
                 Button(tr("Save", "保存")) { save() }
                     .musesAction(prominent: true)
                     .tint(BrandColors.accent)
+                    .keyboardShortcut(.defaultAction)
             }
             .padding(16)
 
             Divider().background(BrandColors.hairline)
 
+            if let saveError { Text(saveError).font(.callout).foregroundStyle(.red).padding(16) }
             Form {
                 Section(tr("Basic Info", "基本信息")) {
                     TextField(tr("Title", "标题"), text: $title)
@@ -54,7 +58,6 @@ struct EditTrackSheet: View {
             .formStyle(.grouped)
             .scrollContentBackground(.hidden)
         }
-        .musesFloatingChrome(cornerRadius: 16)
         .frame(width: 480)
         .frame(maxHeight: 560)
         .onAppear { loadFields() }
@@ -73,7 +76,7 @@ struct EditTrackSheet: View {
     }
 
     private func save() {
-        library.updateTrack(
+        let saved = library.updateTrack(
             id: track.id,
             title: title,
             artist: artist,
@@ -85,6 +88,7 @@ struct EditTrackSheet: View {
             genre: genre.isEmpty ? nil : genre,
             lyrics: lyrics.isEmpty ? nil : lyrics
         )
-        dismiss()
+        if saved { dismiss() }
+        else { saveError = tr("Changes could not be saved. Your draft is kept; try again.", "无法保存更改，草稿已保留，请重试。") }
     }
 }

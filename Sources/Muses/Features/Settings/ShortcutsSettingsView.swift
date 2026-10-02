@@ -38,8 +38,6 @@ struct ShortcutsSettingsView: View {
                             }
                             .settingsAction()
                             .help(tr("Media keys require Accessibility permission.", "媒体键需要辅助功能权限。"))
-                            SettingsIconButton(title: tr("Retry media keys", "重试媒体键"),
-                                               symbol: "arrow.clockwise", action: notify)
                         }
                     }
                 }
@@ -56,11 +54,25 @@ struct ShortcutsSettingsView: View {
                 Label(tr("Show lyrics", "显示歌词"), systemImage: "arrow.up")
             }
             DisclosureGroup(tr("Gesture area", "手势作用区域")) {
+                HStack(spacing: 16) {
+                    gestureExample("arrow.down", title: tr("Down · close", "下滑 · 关闭"))
+                    gestureExample("arrow.left.arrow.right", title: tr("Left / right · track", "左右 · 切歌"))
+                    gestureExample("arrow.up", title: tr("Up · lyrics", "上滑 · 歌词"))
+                }
                 Text(tr("Use two fingers over artwork or the player background. Lyrics, sliders and scrolling regions keep their own controls.",
                         "在封面或播放页背景上双指滑动。歌词、滑块和滚动区域保留原有操作。"))
                     .font(MusesTypography.caption).foregroundStyle(.secondary)
             }
         } header: { Text(tr("Two-finger gestures", "双指手势")) }
+    }
+
+    private func gestureExample(_ symbol: String, title: String) -> some View {
+        VStack(spacing: 6) {
+            Image(systemName: symbol).font(.title2.weight(.medium)).frame(height: 32)
+            Text(title).font(.caption).fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .ignore).accessibilityLabel(title)
     }
 
     private func notify() {

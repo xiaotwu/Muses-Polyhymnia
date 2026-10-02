@@ -51,6 +51,25 @@ struct SongsListView: View {
     @State private var loadError: String?
 
     var body: some View {
+        Group {
+            if filter == .musicVideos {
+                MusicVideoCollectionView(rows: rows)
+            } else {
+                songCollection
+            }
+        }
+        .onAppear(perform: reloadRows)
+        .onChange(of: filter) { _, _ in reloadRows() }
+        .onChange(of: library.likedRevision) { _, _ in reloadRows() }
+        .onChange(of: library.metadataRevision) { _, _ in reloadRows() }
+        .onReceive(NotificationCenter.default.publisher(for: ModelContext.didSave)) { _ in reloadRows() }
+        .onReceive(NotificationCenter.default.publisher(for: .musesPlaylistsChanged)) { _ in reloadRows() }
+        .overlay(alignment: .top) {
+            if let loadError { MetadataProjectionErrorBanner(message: loadError).padding(16) }
+        }
+    }
+
+    @ViewBuilder private var songCollection: some View {
         let snapshots = rows.map(\.snapshot)
 
         CollectionPage(
@@ -98,15 +117,6 @@ struct SongsListView: View {
                     }
                 }
             }
-        }
-        .onAppear(perform: reloadRows)
-        .onChange(of: filter) { _, _ in reloadRows() }
-        .onChange(of: library.likedRevision) { _, _ in reloadRows() }
-        .onChange(of: library.metadataRevision) { _, _ in reloadRows() }
-        .onReceive(NotificationCenter.default.publisher(for: ModelContext.didSave)) { _ in reloadRows() }
-        .onReceive(NotificationCenter.default.publisher(for: .musesPlaylistsChanged)) { _ in reloadRows() }
-        .overlay(alignment: .top) {
-            if let loadError { MetadataProjectionErrorBanner(message: loadError).padding(16) }
         }
     }
 

@@ -8,10 +8,12 @@ struct VinylModeView: View {
     var size: CGFloat = 480
     @Environment(PlaybackService.self) private var playback
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage("reducedPlaybackVisuals") private var reducedVisuals = false
+    @State private var visible = false
     @State private var accumulatedDegrees: Double = 0
     @State private var activeSince: Date?
 
-    private var shouldRotate: Bool { playback.state.isPlaying && !reduceMotion }
+    private var shouldRotate: Bool { visible && playback.transportState.isPlaying && !reduceMotion && !reducedVisuals }
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 60.0,
@@ -28,14 +30,16 @@ struct VinylModeView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .aspectRatio(1, contentMode: .fit)
-        .onAppear { synchronizeRotation(at: Date()) }
-        .onChange(of: playback.state.isPlaying) { _, _ in
+        .onAppear { visible = true; synchronizeRotation(at: Date()) }
+        .onDisappear { visible = false; synchronizeRotation(at: Date()) }
+        .onChange(of: reducedVisuals) { _, _ in synchronizeRotation(at: Date()) }
+        .onChange(of: playback.transportState.isPlaying) { _, _ in
             synchronizeRotation(at: Date())
         }
         .onChange(of: reduceMotion) { _, _ in
             synchronizeRotation(at: Date())
         }
-        .onChange(of: playback.state.track?.id) { _, _ in
+        .onChange(of: playback.transportState.track?.id) { _, _ in
             accumulatedDegrees = 0
             activeSince = shouldRotate ? Date() : nil
         }
