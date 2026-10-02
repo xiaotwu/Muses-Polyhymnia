@@ -6,6 +6,109 @@ import MusesWebHomeProtocol
 @Suite("Web Home opt-in control plane")
 @MainActor
 struct WebHomeSessionControllerTests {
+    @Test("identity stage stays volatile and clears after success, account changes, disconnect and unrelated failure")
+    func identityStageLifecycle() async throws {
+        let defaults = makeDefaults()
+        let failure = WebHomeResponse(capability: .unavailable,
+            error: WebHomeError(code: .identityUnavailable, identityPhase: .accountsList))
+        let offline = WebHomeResponse(capability: .unavailable,
+            error: WebHomeError(code: .offline, identityPhase: .resolveURL))
+        let recorder = WebHomeRequestRecorder(responses: [failure, probeResponse(), failure, failure, failure, offline])
+        let controller = makeController(defaults: defaults, recorder: recorder)
+        try controller.prepareDefaultBrowserConsent()
+        try controller.enableUsingDefaultBrowser()
+        await controller.probeSession()
+        #expect(controller.lastIdentityFailurePhase == .accountsList)
+        #expect(controller.status == .unavailable(.identityUnavailable))
+        #expect(!defaults.dictionaryRepresentation().values.contains { ($0 as? String) == "accountsList" })
+        await controller.probeSession()
+        #expect(controller.lastIdentityFailurePhase == nil)
+        await controller.probeSession()
+        await controller.accountDidChange()
+        #expect(controller.lastIdentityFailurePhase == nil)
+        await controller.probeSession()
+        await controller.disableAndClearTemporarySession()
+        #expect(controller.lastIdentityFailurePhase == nil)
+        try controller.prepareDefaultBrowserConsent()
+        try controller.enableUsingDefaultBrowser()
+        await controller.probeSession()
+        #expect(controller.lastIdentityFailurePhase == .accountsList)
+        await controller.probeSession()
+        #expect(controller.lastIdentityFailurePhase == nil)
+        #expect(controller.status == .unavailable(.offline))
+    }
+
+    @Test("fetch scope rejection clears a previous identity stage without launching the helper")
+    func rejectedFetchClearsIdentityStage() async throws {
+        for scope in [HomeFeedScope.guest, .account(channelID: "UC_other")] {
+            let defaults = makeDefaults()
+            let recorder = WebHomeRequestRecorder(response: WebHomeResponse(capability: .unavailable,
+                error: WebHomeError(code: .identityUnavailable, identityPhase: .accountsList)))
+            let controller = makeController(defaults: defaults, recorder: recorder)
+            try controller.prepareDefaultBrowserConsent()
+            try controller.enableUsingDefaultBrowser()
+            await controller.probeSession()
+            #expect(controller.lastIdentityFailurePhase == .accountsList)
+            let rejectedInput = HomeDiscoveryInput(
+                topArtistNames: [], recentlyPlayedArtistNames: [], likedArtistNames: [],
+                timeBand: .morning, hour: 8, scope: scope)
+            let result = await controller.fetch(for: rejectedInput)
+            #expect(controller.lastIdentityFailurePhase == nil)
+            #expect(result.failures.first?.code == (scope == .guest ? .oauthRequired : .accountMismatch))
+            #expect(await recorder.requests.count == 1)
+        }
+    }
+
+    @Test("an invalidated suspended probe cannot resurrect an old diagnostic or response")
+    func invalidatedProbeDoesNotRestoreDiagnostic() async throws {
+        for disconnect in [false, true] {
+            for cancel in [false, true] {
+                let defaults = makeDefaults()
+                let gate = SuspendedWebHomeProbe()
+                let counter = CallCounter()
+                let failure = WebHomeResponse(capability: .unavailable,
+                    error: WebHomeError(code: .identityUnavailable, identityPhase: .resolveURL))
+                let controller = WebHomeSessionController(buildEnabled: true, defaults: defaults,
+                    currentChannelIDProvider: { "UC_expected" }, executeRequest: { _ in
+                        if await counter.increment() == 1 { return failure }
+                        return try await gate.response()
+                    })
+                try controller.prepareDefaultBrowserConsent()
+                try controller.enableUsingDefaultBrowser()
+                await controller.probeSession()
+                #expect(controller.lastIdentityFailurePhase == .resolveURL)
+                let retry = Task { await controller.probeSession() }
+                await gate.waitUntilSuspended()
+                if disconnect { await controller.disableAndClearTemporarySession() }
+                else { await controller.accountDidChange() }
+                await gate.finish(response: failure, cancelled: cancel)
+                await retry.value
+                #expect(controller.lastIdentityFailurePhase == nil)
+                #expect(controller.status == .closed)
+            }
+        }
+    }
+
+    @Test("cancelling a retry preserves the previous identity failure stage")
+    func cancelledIdentityRetryRestoresStage() async throws {
+        let defaults = makeDefaults()
+        let callCount = CallCounter()
+        let controller = WebHomeSessionController(buildEnabled: true, defaults: defaults,
+            currentChannelIDProvider: { "UC_expected" }, executeRequest: { _ in
+                if await callCount.increment() == 1 {
+                    return WebHomeResponse(capability: .unavailable,
+                        error: WebHomeError(code: .identityUnavailable, identityPhase: .resolveURL))
+                }
+                throw CancellationError()
+            })
+        try controller.prepareDefaultBrowserConsent()
+        try controller.enableUsingDefaultBrowser()
+        await controller.probeSession()
+        await controller.probeSession()
+        #expect(controller.status == .unavailable(.identityUnavailable))
+        #expect(controller.lastIdentityFailurePhase == .resolveURL)
+    }
+
     @Test("default-off fetch never launches the helper")
     func defaultOffDoesNotLaunch() async {
         let defaults = makeDefaults()
@@ -497,5 +600,30 @@ private actor WebHomeRequestRecorder {
 
     func cancel() {
         cancelCount += 1
+    }
+}
+
+private actor SuspendedWebHomeProbe {
+    private var continuation: CheckedContinuation<WebHomeResponse, any Error>?
+    private var waiter: CheckedContinuation<Void, Never>?
+
+    func response() async throws -> WebHomeResponse {
+        try await withCheckedThrowingContinuation { continuation in
+            self.continuation = continuation
+            waiter?.resume()
+            waiter = nil
+        }
+    }
+
+    func waitUntilSuspended() async {
+        if continuation != nil { return }
+        await withCheckedContinuation { waiter = $0 }
+    }
+
+    func finish(response: WebHomeResponse, cancelled: Bool) {
+        let pending = continuation
+        continuation = nil
+        if cancelled { pending?.resume(throwing: CancellationError()) }
+        else { pending?.resume(returning: response) }
     }
 }

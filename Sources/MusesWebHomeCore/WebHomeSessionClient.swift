@@ -249,6 +249,11 @@ struct WebHomeIdentityParser: Sendable {
     }
 }
 
+struct WebHomeIdentityFailure: Error, Sendable {
+    let code: WebHomeErrorCode
+    let phase: WebHomeIdentityPhase
+}
+
 final class WebHomeSessionClient: @unchecked Sendable {
     /// YouTube Music serves a reduced, non-bootstrap HTML shell to generic
     /// URLSession clients. Use a fixed desktop Web identity so the one-shot
@@ -298,52 +303,62 @@ final class WebHomeSessionClient: @unchecked Sendable {
             locale: request.locale,
             region: request.region)
 
-        let identityResponse = try await post(
-            endpoint: "account/account_menu",
-            context: context,
-            cookies: cookies,
-            timeout: timeout,
-            extraBody: [:])
         let channelID: String
+        var phase: WebHomeIdentityPhase = .remixMenu
         do {
-            channelID = try identityParser.channelID(from: identityResponse)
-        } catch WebHomeCoreError.code(.identityUnavailable) {
-            // WEB_REMIX may omit the current-channel link entirely. Verify the
-            // same selected account using YouTube's WEB account menu, keeping
-            // cookie material inside this helper and rejecting account switches.
-            let webBootstrap = try await send(
-                request: URLRequest(url: URL(string: "https://www.youtube.com/")!),
-                timeout: timeout, cookies: cookies, context: nil, body: nil)
-            guard webBootstrap.statusCode == 200, webBootstrap.finalURL?.host == "www.youtube.com" else {
-                throw WebHomeCoreError.code(.identityUnavailable)
+            let identityResponse = try await post(
+                endpoint: "account/account_menu",
+                context: context,
+                cookies: cookies,
+                timeout: timeout,
+                extraBody: [:])
+            do {
+                channelID = try identityParser.channelID(from: identityResponse)
+            } catch WebHomeCoreError.code(.identityUnavailable) {
+                // WEB_REMIX may omit the current-channel link entirely. Verify the
+                // same selected account using YouTube's WEB account menu, keeping
+                // cookie material inside this helper and rejecting account switches.
+                phase = .webBootstrap
+                let webBootstrap = try await send(
+                    request: URLRequest(url: URL(string: "https://www.youtube.com/")!),
+                    timeout: timeout, cookies: cookies, context: nil, body: nil)
+                guard webBootstrap.statusCode == 200, webBootstrap.finalURL?.host == "www.youtube.com" else {
+                    throw WebHomeCoreError.code(.identityUnavailable)
+                }
+                var webContext = try bootstrapParser.parse(html: webBootstrap.data, locale: request.locale, region: request.region)
+                guard webContext.sessionIndex == context.sessionIndex,
+                      webContext.delegatedSessionID == context.delegatedSessionID else {
+                    throw WebHomeCoreError.code(.accountMismatch)
+                }
+                webContext.isYouTubeWeb = true
+                phase = .webMenu
+                let webIdentity = try await post(endpoint: "account/account_menu", context: webContext,
+                                                 cookies: cookies, timeout: timeout, extraBody: [:])
+                do {
+                    channelID = try identityParser.channelID(from: webIdentity)
+                } catch WebHomeCoreError.code(.identityUnavailable) {
+                    // Current account menus may expose only a handle. Resolve only
+                    // the uniquely selected account, never an arbitrary result or
+                    // the requested OAuth ID. This is still a read-only verification.
+                    phase = .accountsList
+                    let accounts = try await post(endpoint: "account/accounts_list", context: webContext,
+                                                  cookies: cookies, timeout: timeout, extraBody: [:])
+                    let handle = try identityParser.selectedHandle(from: accounts)
+                    var channelURL = URLComponents(string: "https://www.youtube.com")!
+                    channelURL.path = "/" + handle
+                    phase = .resolveURL
+                    let resolved = try await post(endpoint: "navigation/resolve_url", context: webContext,
+                                                  cookies: cookies, timeout: timeout,
+                                                  extraBody: ["url": channelURL.url!.absoluteString])
+                    channelID = try identityParser.resolvedChannelID(from: resolved)
+                }
             }
-            var webContext = try bootstrapParser.parse(html: webBootstrap.data, locale: request.locale, region: request.region)
-            guard webContext.sessionIndex == context.sessionIndex,
-                  webContext.delegatedSessionID == context.delegatedSessionID else {
+            guard channelID == request.expectedChannelID else {
                 throw WebHomeCoreError.code(.accountMismatch)
             }
-            webContext.isYouTubeWeb = true
-            let webIdentity = try await post(endpoint: "account/account_menu", context: webContext,
-                                             cookies: cookies, timeout: timeout, extraBody: [:])
-            do {
-                channelID = try identityParser.channelID(from: webIdentity)
-            } catch WebHomeCoreError.code(.identityUnavailable) {
-                // Current account menus may expose only a handle. Resolve only
-                // the uniquely selected account, never an arbitrary result or
-                // the requested OAuth ID. This is still a read-only verification.
-                let accounts = try await post(endpoint: "account/accounts_list", context: webContext,
-                                              cookies: cookies, timeout: timeout, extraBody: [:])
-                let handle = try identityParser.selectedHandle(from: accounts)
-                var channelURL = URLComponents(string: "https://www.youtube.com")!
-                channelURL.path = "/" + handle
-                let resolved = try await post(endpoint: "navigation/resolve_url", context: webContext,
-                                              cookies: cookies, timeout: timeout,
-                                              extraBody: ["url": channelURL.url!.absoluteString])
-                channelID = try identityParser.resolvedChannelID(from: resolved)
-            }
-        }
-        guard channelID == request.expectedChannelID else {
-            throw WebHomeCoreError.code(.accountMismatch)
+        } catch let error as WebHomeCoreError {
+            guard error.code == .identityUnavailable || error.code == .accountMismatch else { throw error }
+            throw WebHomeIdentityFailure(code: error.code, phase: phase)
         }
 
         guard request.action != .probeSession else {

@@ -8,6 +8,54 @@ import MusesWebHomeProtocol
 struct WebHomeSessionCoreTests {
     private let channelID = "UC1234567890123456789012"
 
+    @Test("identity stage metadata is additive and unknown stages do not break error decoding")
+    func identityStageCompatibility() throws {
+        let decoder = JSONDecoder()
+        let legacy = try decoder.decode(WebHomeError.self, from: Data(#"{"code":"identityUnavailable"}"#.utf8))
+        #expect(legacy.identityPhase == nil)
+        let future = try decoder.decode(WebHomeError.self, from: Data(#"{"code":"identityUnavailable","identityPhase":"futureStage"}"#.utf8))
+        #expect(future.identityPhase == nil)
+        #expect(future.code == .identityUnavailable)
+        let error = WebHomeError(code: .identityUnavailable, identityPhase: .accountsList)
+        #expect(try decoder.decode(WebHomeError.self, from: JSONEncoder().encode(error)) == error)
+        #expect(WebHomeProtocolVersion.current == 2)
+    }
+
+    @Test("terminal identity stage survives helper IPC without changing error or strict account rejection")
+    func terminalIdentityStages() async throws {
+        let empty = response(Data("{}".utf8))
+        let web = WebHomeTransportResponse(data: bootstrapHTML, statusCode: 200,
+                                           finalURL: URL(string: "https://www.youtube.com/"))
+        let accounts = response(Data(#"{"accountItem":{"isSelected":true,"channelHandle":{"runs":[{"text":"@Example"}]}}}"#.utf8))
+        let wrong = response(identityJSON(channelID: "UC9999999999999999999999"))
+        let cases: [(WebHomeIdentityPhase, WebHomeErrorCode, [WebHomeTransportResponse])] = [
+            (.remixMenu, .accountMismatch, [response(bootstrapHTML), wrong]),
+            (.webBootstrap, .identityUnavailable, [response(bootstrapHTML), empty,
+                WebHomeTransportResponse(data: bootstrapHTML, statusCode: 200,
+                                         finalURL: URL(string: "https://consent.youtube.com/"))]),
+            (.webMenu, .accountMismatch, [response(bootstrapHTML), empty, web, wrong]),
+            (.accountsList, .identityUnavailable, [response(bootstrapHTML), empty, web, empty, empty]),
+            (.resolveURL, .identityUnavailable, [response(bootstrapHTML), empty, web, empty, accounts, empty])
+        ]
+        for (phase, code, responses) in cases {
+            let root = temporaryRoot()
+            defer { try? FileManager.default.removeItem(at: root) }
+            let manager = try WebHomeCookieJarManager(rootDirectory: root,
+                exporter: RecordingCookieExporter(cookieText: cookieText))
+            let transport = QueueWebHomeTransport(responses: responses)
+            let command = WebHomeCommand(cookieManager: manager,
+                sessionClient: WebHomeSessionClient(transport: transport))
+            let result = await command.execute(request(expectedChannelID: channelID))
+            let decoded = try JSONDecoder().decode(WebHomeResponse.self, from: JSONEncoder().encode(result))
+            #expect(decoded.error?.code == code)
+            #expect(decoded.error?.identityPhase == phase)
+            #expect(decoded.error?.message == nil)
+            #expect(decoded.channelID == nil)
+            #expect(decoded.sections.isEmpty)
+            #expect(await transport.requests.count == responses.count)
+        }
+    }
+
     @Test("handle fallback requires exactly one selected account and an explicit resolved channel")
     func selectedHandleVerification() throws {
         let parser = WebHomeIdentityParser()
@@ -356,6 +404,8 @@ struct WebHomeSessionCoreTests {
         do {
             _ = try await operation()
             Issue.record("Expected \(code.rawValue)")
+        } catch let error as WebHomeIdentityFailure {
+            #expect(error.code == code)
         } catch let error as WebHomeCoreError {
             #expect(error == .code(code))
         } catch {

@@ -68,6 +68,8 @@ public struct WebHomeCommand: Sendable {
                     expiresAt: fetchedAt.addingTimeInterval(15 * 60),
                     capability: .available)
             }
+        } catch let error as WebHomeIdentityFailure {
+            return failure(error.code, identityPhase: error.phase)
         } catch let error as WebHomeCoreError {
             return failure(error.code)
         } catch is CancellationError {
@@ -77,11 +79,11 @@ public struct WebHomeCommand: Sendable {
         }
     }
 
-    private func failure(_ code: WebHomeErrorCode) -> WebHomeResponse {
+    private func failure(_ code: WebHomeErrorCode, identityPhase: WebHomeIdentityPhase? = nil) -> WebHomeResponse {
         WebHomeResponse(
             helperVersion: Self.helperVersion,
             parserSchemaVersion: Self.parserSchemaVersion,
             capability: .unavailable,
-            error: WebHomeError(code: code))
+            error: WebHomeError(code: code, identityPhase: identityPhase))
     }
 }

@@ -86,14 +86,36 @@ public enum WebHomeErrorCode: String, Codable, Sendable {
     case cancelled
 }
 
+/// Credential-free verification stage; IPC and volatile UI state only.
+public enum WebHomeIdentityPhase: String, Codable, Sendable, Equatable {
+    case remixMenu
+    case webBootstrap
+    case webMenu
+    case accountsList
+    case resolveURL
+}
+
 public struct WebHomeError: Codable, Sendable, Equatable {
     public let code: WebHomeErrorCode
     /// A bounded, credential-free diagnostic intended for local UI only.
     public let message: String?
+    public let identityPhase: WebHomeIdentityPhase?
 
-    public init(code: WebHomeErrorCode, message: String? = nil) {
+    public init(code: WebHomeErrorCode, message: String? = nil,
+                identityPhase: WebHomeIdentityPhase? = nil) {
         self.code = code
         self.message = message
+        self.identityPhase = identityPhase
+    }
+
+    private enum CodingKeys: String, CodingKey { case code, message, identityPhase }
+
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        code = try container.decode(WebHomeErrorCode.self, forKey: .code)
+        message = try container.decodeIfPresent(String.self, forKey: .message)
+        // A missing or future stage must not invalidate an otherwise valid error.
+        identityPhase = try? container.decode(WebHomeIdentityPhase.self, forKey: .identityPhase)
     }
 }
 

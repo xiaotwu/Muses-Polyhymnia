@@ -1,5 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import MusesWebHomeProtocol
 
 private struct YTDlpBridgeEnvironmentKey: EnvironmentKey {
     static let defaultValue: YTDlpBridge? = nil
@@ -493,7 +494,24 @@ struct YouTubeSettingsView: View {
 
         DisclosureGroup(tr("Browser access details", "浏览器访问说明")) {
             Text(webHomeDisclosureSummary).font(MusesTypography.caption).foregroundStyle(BrandColors.textSecondary)
+            if let phase = webHome.lastIdentityFailurePhase {
+                Text(identityPhaseExplanation(phase))
+                    .font(MusesTypography.caption)
+                    .foregroundStyle(BrandColors.textSecondary)
+            }
         }
+    }
+
+    private func identityPhaseExplanation(_ phase: WebHomeIdentityPhase) -> String {
+        let stage = switch phase {
+        case .remixMenu: tr("YouTube Music account menu", "YouTube Music 账号菜单")
+        case .webBootstrap: tr("YouTube session verification", "YouTube 会话验证")
+        case .webMenu: tr("YouTube account menu", "YouTube 账号菜单")
+        case .accountsList: tr("Selected account verification", "所选账号验证")
+        case .resolveURL: tr("Selected channel verification", "所选频道验证")
+        }
+        return tr("Verification stopped at: \(stage). This identifies the step, not the cause. No session details are saved.",
+                  "验证停止于：\(stage)。此信息仅标明步骤，不能确认原因；不会保存会话详情。")
     }
 
     @ViewBuilder
