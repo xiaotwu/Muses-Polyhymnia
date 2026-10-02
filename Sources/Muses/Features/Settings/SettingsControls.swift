@@ -4,8 +4,9 @@ import SwiftUI
 /// native semantics instead of inheriting an action style from the entire Form.
 extension View {
     func settingsAction(prominent: Bool = false) -> some View {
-        buttonStyle(SettingsGlassActionStyle(prominent: prominent))
+        modifier(SettingsActionStyle(prominent: prominent))
             .controlSize(.small)
+            .buttonBorderShape(.capsule)
             .frame(minHeight: 30)
     }
 }
@@ -106,20 +107,15 @@ struct SettingsExplainedToggle: View {
     }
 }
 
-/// Keep the Button's native activation, focus and accessibility semantics while
-/// using clear glass rather than the regular glass button style's opaque fill.
-private struct SettingsGlassActionStyle: ButtonStyle {
+/// Native button styles provide focus, activation, disabled and glass behavior.
+private struct SettingsActionStyle: ViewModifier {
     let prominent: Bool
-    @Environment(\.isEnabled) private var enabled
 
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .padding(.horizontal, 10)
-            .frame(minHeight: 28)
-            .foregroundStyle(configuration.role == .destructive ? Color.red : BrandColors.textPrimary)
-            .background(BrandColors.accent.opacity(prominent ? 0.15 : (configuration.isPressed ? 0.08 : 0)), in: Capsule())
-            .modifier(SettingsClearGlassSurface())
-            .contentShape(Capsule())
-            .opacity(enabled ? 1 : 0.45)
+    @ViewBuilder func body(content: Content) -> some View {
+        if prominent {
+            content.buttonStyle(.glassProminent).tint(BrandColors.accent)
+        } else {
+            content.buttonStyle(.glass).tint(nil)
+        }
     }
 }

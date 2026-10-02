@@ -5,7 +5,7 @@ title: Development
 
 # Development guide
 
-Muses is a Swift 6 package with a standard SwiftPM layout, built with SwiftUI, SwiftData, AVFoundation, and Swift Testing. Target platform is macOS 14+.
+Muses is a Swift 6 package with a standard SwiftPM layout, built with SwiftUI, SwiftData, AVFoundation, and Swift Testing. Target platform is macOS 26+, with the latest macOS release prioritized for UI validation.
 
 Home is a mode-switched product boundary. The default Muses provider ranks local library snapshots on-device. The YouTube Music provider uses anonymous Innertube as its baseline and may layer an explicitly authorized, account-matched Web response from the isolated helper. Neither network path receives Muses listening signals.
 

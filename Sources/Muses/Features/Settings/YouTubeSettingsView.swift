@@ -162,9 +162,15 @@ struct YouTubeSettingsView: View {
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 5) {
                     Text(account.account?.channel?.title ?? (account.connectionState == .expired
-                         ? tr("Session expired", "登录已过期") : tr("Not connected", "未连接")))
+                         ? tr("Session expired", "登录已过期")
+                         : account.isConnected
+                             ? tr("Saved YouTube session", "已保存 YouTube 会话")
+                             : tr("Not connected", "未连接")))
                         .font(MusesTypography.headline)
-                    Text(account.isConnected ? tr("YouTube connected", "已连接 YouTube")
+                    Text(account.isConnected
+                         ? (account.account?.channel == nil
+                            ? tr("Channel details unavailable", "频道信息暂不可用")
+                            : tr("YouTube connected", "已连接 YouTube"))
                          : tr("Connect your account to import playlists.", "连接账号以导入歌单。"))
                         .font(MusesTypography.caption).foregroundStyle(.secondary)
                 }

@@ -9,7 +9,7 @@ title: Installation
 2. Open the DMG and drag **Muses** into **Applications**.
 3. Open Muses from Applications. The app is signed and notarized for macOS.
 
-Muses requires macOS 14 or later. Your library remains available when you replace an earlier version of the app.
+The current development build of Muses requires macOS 26 or later for native Liquid Glass. Previously published releases retain their original system requirements. Your library remains available when you replace an earlier version of the app.
 
 Versions containing the automatic updater can check, download, install, and
 restart from **Settings → About → Updates**. Enable automatic downloading and

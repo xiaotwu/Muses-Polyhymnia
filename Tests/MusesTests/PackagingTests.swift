@@ -84,7 +84,7 @@ struct PackagingTests {
         #expect(plist["CFBundlePackageType"] as? String == "APPL")
         #expect(plist["CFBundleShortVersionString"] as? String != nil)
         #expect(plist["CFBundleVersion"] as? String != nil)
-        #expect(plist["LSMinimumSystemVersion"] as? String == "14.0")
+        #expect(plist["LSMinimumSystemVersion"] as? String == "26.0")
         #expect(plist["CFBundleIconFile"] as? String == "AppIcon")
         #expect(plist["MusesWebHomeEnabled"] as? Bool == true)
 

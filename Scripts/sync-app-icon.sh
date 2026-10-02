@@ -18,7 +18,7 @@ cp "$ROOT/assets/icon.png" "$ICON_BUILD/Muses.icon/Assets/icon.png"
 mkdir "$ICON_BUILD/output"
 xcrun actool "$ICON_BUILD/Muses.icon" \
     --compile "$ICON_BUILD/output" --platform macosx \
-    --minimum-deployment-target 14.0 --app-icon Muses \
+    --minimum-deployment-target 26.0 --app-icon Muses \
     --output-partial-info-plist "$ICON_BUILD/info.plist" >/dev/null
 cp "$ICON_BUILD/output/Assets.car" "$RESOURCES/Assets.car"
 cp "$ICON_BUILD/output/Muses.icns" "$RESOURCES/Muses.icns"

@@ -680,3 +680,13 @@ S：Timeline、播放时钟、封面动画路径定位；未作性能测量，�
 | [XW-10](https://linear.app/xiaotwu/issue/XW-10) | 播放、队列和媒体交接 |
 | [XW-11](https://linear.app/xiaotwu/issue/XW-11) | 复杂操作、设置与状态表达 |
 | [XW-12](https://linear.app/xiaotwu/issue/XW-12) | 所有未验证状态和辅助功能/平台矩阵 |
+
+### F0 实际修复与验证结果
+
+- macOS最低版本已改为26.0；Package、Info.plist、App Intents与图标编译目标一致。运行包主程序和Helper的LC_BUILD_VERSION均为26.0。开发启动脚本同步新Helper和最低版本，复用资源包不会保留旧声明。
+- 设置动作已用系统`.glass`/`.glassProminent`，普通动作不继承金色tint，主动作保留语义强调。浅/深色运行截图保存在76–78；辅助显示及活跃/非活跃窗口的完整对比度验收仍在XW-12。
+- 账号页已显示“已保存YouTube会话 / 频道信息暂不可用”，未修改认证服务或Token；截图72及76–78确认矛盾消失。
+- 提高部署目标暴露两个编译器类型推断超时：HistoryService汇总链拆为明确类型的中间值，RootView的URL拖放closure提取为同签名方法。排序、输入校验与行为未改。
+- 运行新包时实际发生MediaPlayer后台封面请求触发MainActor断言。NowPlayingManager的logo和远端封面均改由nonisolated工厂创建回调，仅返回已解析图片，不访问播放/管理器状态；新增后台executor请求测试。崩溃后系统恢复prompt经原生Return处理，之后正常退出/重开验证通过。这个修复属于系统目标升级的必要阻塞修复。
+- 最终`swift test --no-parallel`：**765项测试、106个suite通过**（23.848秒）；NowPlayingManager专项7项通过。Shell语法、Info.plist解析和diff检查通过；方案数据64项/256方案及选择器JavaScript语法检查通过。选择器尚未做浏览器完整交互验收。
+- 启动检查和设置页实际运行通过；不等于真实播放、系统媒体键、macOS26实机或辅助矩阵已全部通过。首批任务进入待审阅，后续布局仍需方案选择。

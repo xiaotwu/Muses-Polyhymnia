@@ -147,6 +147,15 @@ struct NowPlayingManagerTests {
 
         #expect(manager.observationLifecycleStartCount == 1)
     }
+    @Test("System media artwork can be requested from a background executor")
+    func artworkRequestDoesNotRequireMainActor() async {
+        let artwork = NowPlayingManager.mediaArtwork(NSImage(size: .init(width: 202, height: 202)))
+        let width = await Task.detached {
+            artwork.image(at: NSSize(width: 300, height: 300))?.size.width
+        }.value
+        #expect(width == 202)
+    }
+
     @Test("System media artwork rejects the previous track's delayed cover")
     func rejectsStaleArtwork() async throws {
         let engine = RecordingEngine()

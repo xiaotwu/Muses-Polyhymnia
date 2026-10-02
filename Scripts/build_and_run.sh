@@ -71,6 +71,13 @@ mkdir -p "$APP_CONTENTS/Frameworks"
 /usr/bin/ditto "$SPARKLE_SOURCE" "$APP_CONTENTS/Frameworks/Sparkle.framework"
 cp "$BUILD_BINARY" "$APP_BINARY"
 chmod +x "$APP_BINARY"
+HELPER_BINARY="$(dirname "$BUILD_BINARY")/MusesWebHomeHelper"
+mkdir -p "$APP_CONTENTS/Helpers"
+cp "$HELPER_BINARY" "$APP_CONTENTS/Helpers/MusesWebHomeHelper"
+chmod 700 "$APP_CONTENTS/Helpers/MusesWebHomeHelper"
+# Reused bundles must declare the same OS floor as the newly linked executable.
+MINIMUM_SYSTEM_VERSION="$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$ROOT_DIR/Sources/Muses/Resources/Info.plist")"
+/usr/bin/plutil -replace LSMinimumSystemVersion -string "$MINIMUM_SYSTEM_VERSION" "$INFO_PLIST"
 ln -sfn Muses_Muses.bundle "$APP_CONTENTS/Resources/Muses-Polyhymnia_Muses.bundle"
 # Keep SwiftPM resources in sync as well as the executable. Reusing a bundle
 # with stale localization or artwork produces a misleading development build.

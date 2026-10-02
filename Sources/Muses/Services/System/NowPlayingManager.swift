@@ -27,7 +27,7 @@ final class NowPlayingManager {
     private var artwork: MPMediaItemArtwork?
     private let artworkLoader: (URL) async -> NSImage?
     private lazy var logoArtwork: MPMediaItemArtwork? = TrayIcon.logoImage.map { image in
-        MPMediaItemArtwork(boundsSize: image.size) { _ in image }
+        Self.mediaArtwork(image)
     }
 
     init(_ playback: PlaybackService,
@@ -136,9 +136,16 @@ final class NowPlayingManager {
             guard !Task.isCancelled, let self, self.artworkIdentity == identity,
                   self.playback.transportState.track?.id == track?.id,
                   let image else { return }
-            self.artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
+            self.artwork = Self.mediaArtwork(image)
             self.updateInfo()
         }
+    }
+
+    /// MediaPlayer requests artwork from its own queue. Creating the callback
+    /// outside MainActor prevents inheriting UI isolation; it only returns the
+    /// resolved image and never accesses manager or playback state.
+    nonisolated static func mediaArtwork(_ image: NSImage) -> MPMediaItemArtwork {
+        MPMediaItemArtwork(boundsSize: image.size) { _ in image }
     }
 
     // MARK: - Track-change notifications

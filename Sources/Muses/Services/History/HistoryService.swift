@@ -271,12 +271,21 @@ final class HistoryService {
             at.plays += 1; at.ms += ev.listenedMs
             artistPlays[ev.artist] = at
         }
-        let topTracks = trackPlays.map { ListeningRecap.TrackTally(id: $0.key, title: $0.value.title, artist: $0.value.artist, plays: $0.value.plays, listenedMs: $0.value.ms) }
-            .sorted { $0.plays > $1.plays || ($0.plays == $1.plays && $0.listenedMs > $1.listenedMs) }
-            .prefix(10)
-        let topArtists = artistPlays.map { ListeningRecap.ArtistTally(id: $0.key, name: $0.key, plays: $0.value.plays, listenedMs: $0.value.ms) }
-            .sorted { $0.plays > $1.plays || ($0.plays == $1.plays && $0.listenedMs > $1.listenedMs) }
-            .prefix(10)
+        let trackTallies: [ListeningRecap.TrackTally] = trackPlays.map { entry in
+            ListeningRecap.TrackTally(id: entry.key, title: entry.value.title,
+                                      artist: entry.value.artist, plays: entry.value.plays,
+                                      listenedMs: entry.value.ms)
+        }
+        let topTracks = trackTallies.sorted { lhs, rhs in
+            lhs.plays > rhs.plays || (lhs.plays == rhs.plays && lhs.listenedMs > rhs.listenedMs)
+        }.prefix(10)
+        let artistTallies: [ListeningRecap.ArtistTally] = artistPlays.map { entry in
+            ListeningRecap.ArtistTally(id: entry.key, name: entry.key,
+                                       plays: entry.value.plays, listenedMs: entry.value.ms)
+        }
+        let topArtists = artistTallies.sorted { lhs, rhs in
+            lhs.plays > rhs.plays || (lhs.plays == rhs.plays && lhs.listenedMs > rhs.listenedMs)
+        }.prefix(10)
         return ListeningRecap(
             rangeLabel: rangeLabel,
             totalListenedMs: totalMs, eventCount: evs.count,

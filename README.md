@@ -22,6 +22,6 @@ An artwork-led library, an integrated queue and a floating player keep browsing 
 
 ## Get Muses
 
-Requires **macOS 14 or later**. Download the signed, notarized application from [Releases](https://github.com/xiaotwu/Project-Muses/releases/tag/polyhymnia%2Fv0.5.6) and follow the [installation guide](https://xiaotwu.github.io/Project-Muses/installation.html).
+The current development build requires **macOS 26 or later** for native Liquid Glass. Previously published releases retain their original system requirements. Download the signed, notarized application from [Releases](https://github.com/xiaotwu/Project-Muses/releases/tag/polyhymnia%2Fv0.5.6) and follow the [installation guide](https://xiaotwu.github.io/Project-Muses/installation.html).
 
 [Website](https://xiaotwu.github.io/Project-Muses/) · [Privacy](https://xiaotwu.github.io/Project-Muses/macos-privacy.html) · [MIT license](LICENSE)

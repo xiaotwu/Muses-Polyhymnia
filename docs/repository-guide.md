@@ -20,7 +20,7 @@ Muses brings YouTube music, playlists, videos and followed podcasts into a focus
 - Follow podcasts, resume episodes, adjust playback speed and skip back or forward.
 - Choose an optional personalized Home with explicit browser-session consent. Guest discovery works without it.
 
-The [website](https://xiaotwu.github.io/Project-Muses/#tour) includes a keyboard-accessible tour of real app screens. Muses requires **macOS 14 or later**. Download the signed app from the [latest release](https://github.com/xiaotwu/Project-Muses/releases/tag/polyhymnia%2Fv0.5.6); see [installation](docs/installation.md) for setup.
+The [website](https://xiaotwu.github.io/Project-Muses/#tour) includes a keyboard-accessible tour of real app screens. The current development build requires **macOS 26 or later**; published releases retain their original system requirements. Download the signed app from the [latest release](https://github.com/xiaotwu/Project-Muses/releases/tag/polyhymnia%2Fv0.5.6); see [installation](docs/installation.md) for setup.
 
 For contributors: [development](docs/development.md) · [project guidance](AGENTS.md). For account and data handling: [privacy](docs/privacy.md). [MIT license](LICENSE).
 

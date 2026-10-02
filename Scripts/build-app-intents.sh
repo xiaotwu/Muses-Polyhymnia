@@ -27,8 +27,8 @@ xcrun appintentsmetadataprocessor \
     --toolchain-dir "$(dirname "$(dirname "$(xcrun --find swiftc)")")" \
     --module-name Muses --sdk-root "$(xcrun --show-sdk-path)" \
     --xcode-version "$(xcodebuild -version | awk '/Build version/{print $3}')" \
-    --platform-family macOS --deployment-target 14.0 \
-    --target-triple "$(uname -m)-apple-macos14.0" \
+    --platform-family macOS --deployment-target 26.0 \
+    --target-triple "$(uname -m)-apple-macos26.0" \
     --source-file-list "$WORK/sources" --swift-const-vals-list "$WORK/values"
 test -d "$OUTPUT/Metadata.appintents"
 

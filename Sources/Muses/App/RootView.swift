@@ -255,6 +255,15 @@ struct RootView: View {
         }
     }
 
+    private func handleDroppedURLs(_ urls: [URL], _ location: CGPoint) -> Bool {
+        guard urls.count == 1, let url = urls.first,
+              let target = YouTubeShareTarget(url: url),
+              target.kind == .video || target.kind == .playlist else { return false }
+        droppedYouTubeLink = url.absoluteString
+        showYouTubeLink = true
+        return true
+    }
+
     private var notificationWired: some View {
         navigationWired
             .onReceive(NotificationCenter.default.publisher(for: .musesOpenSettings)) { note in
@@ -263,14 +272,7 @@ struct RootView: View {
                     settingsPane = category.destination.rawValue
                 }
             }
-            .dropDestination(for: URL.self) { urls, _ in
-                guard urls.count == 1, let url = urls.first,
-                      let target = YouTubeShareTarget(url: url),
-                      target.kind == .video || target.kind == .playlist else { return false }
-                droppedYouTubeLink = url.absoluteString
-                showYouTubeLink = true
-                return true
-            }
+            .dropDestination(for: URL.self, action: handleDroppedURLs)
             .onAppear(perform: handleAppear)
             .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
                 if NSApp.keyWindow == nil {
