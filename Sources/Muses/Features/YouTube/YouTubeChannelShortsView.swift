@@ -13,6 +13,7 @@ struct YouTubeChannelShortsView: View {
     @State private var refreshID = UUID()
     @State private var playRequest: YTDlpBridge.YTDlpPlaylistEntry?
     @State private var playbackError: String?
+    @State private var galleryPreview: GalleryMediaPreview?
     private let pageSize = 20
 
     var body: some View {
@@ -42,10 +43,10 @@ struct YouTubeChannelShortsView: View {
                     ForEach(state.value ?? [], id: \.id) { entry in
                         AlbumObjectView(title: entry.title, subtitle: entry.uploader ?? channel.title,
                                         artwork: .resolve(remoteURL: nil, youTubeId: entry.id),
-                                        size: 180, role: .play, artworkHeight: 320,
+                                        size: 180, role: .browse, artworkHeight: 320,
                                         isYouTube: true, showsHoverPlay: true,
-                                        onSelect: { playRequest = entry }, onPlay: { playRequest = entry })
-                            .youTubeEntryContextMenu(entry: entry) {
+                                        onSelect: { openPreview(entry) }, onPlay: { playRequest = entry })
+                            .youTubeEntryContextMenu(entry: entry, showsMenuButton: true) {
                                 playRequest = entry
                             }
                     }
@@ -61,6 +62,7 @@ struct YouTubeChannelShortsView: View {
             .padding(.bottom, 100)
         }
         .task(id: refreshID) { await load() }
+        .sheet(item: $galleryPreview) { GalleryMediaPreviewSheet(preview: $0) }
         .task(id: playRequest?.id) {
             guard let entry = playRequest else { return }
             let identity = account.activeChannelID
@@ -72,10 +74,18 @@ struct YouTubeChannelShortsView: View {
                 playback.playTrack(snapshot, context: TrackSnapshot.playbackContext(
                     playing: snapshot, youTubeEntries: entries), from: .search)
             } catch {
-                if !Task.isCancelled { playbackError = error.localizedDescription }
+                guard !Task.isCancelled, identity == account.activeChannelID else { return }
+                playbackError = error.localizedDescription
             }
-            playRequest = nil
+            if playRequest?.id == entry.id { playRequest = nil }
         }
+    }
+
+    private func openPreview(_ entry: YTDlpBridge.YTDlpPlaylistEntry) {
+        galleryPreview = .init(id: entry.id, title: entry.title,
+            subtitle: entry.uploader ?? channel.title,
+            artwork: .resolve(remoteURL: nil, youTubeId: entry.id), duration: entry.duration,
+            onPlay: { playRequest = entry })
     }
 
     private func load() async {

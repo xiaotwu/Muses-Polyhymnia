@@ -28,6 +28,11 @@ struct PodcastContinueShelf: View {
                                                     showsHoverPlay: true,
                                                     onSelect: { openPreview(episode) },
                                                     onPlay: { preparingVideoID = episode.videoID })
+                                        .youTubeEntryContextMenu(entry: entry(for: episode),
+                                                                 mediaKind: .podcastEpisode,
+                                                                 showsMenuButton: true) {
+                                            preparingVideoID = episode.videoID
+                                        }
                                     Text(tr("Resume at \(position(episode.lastPositionMs))",
                                             "从 \(position(episode.lastPositionMs)) 继续"))
                                         .font(.caption).foregroundStyle(.secondary)
@@ -57,10 +62,7 @@ struct PodcastContinueShelf: View {
             guard let id = preparingVideoID else { return }
             defer { if preparingVideoID == id { preparingVideoID = nil } }
             guard let episode = episodes.first(where: { $0.videoID == id }) else { return }
-            let entries = episodes.map {
-                YTDlpBridge.YTDlpPlaylistEntry(id: $0.videoID, title: $0.title,
-                    uploader: showTitles[$0.showCatalogID], duration: $0.durationMs.map { Double($0) / 1000 })
-            }
+            let entries = episodes.map { entry(for: $0) }
             guard let entry = entries.first(where: { $0.id == id }) else { return }
             do {
                 let snapshot = try await search.resolveTrack(entry: entry, mediaKindOverride: .podcastEpisode)
@@ -83,6 +85,12 @@ struct PodcastContinueShelf: View {
             artwork: .resolve(remoteURL: episode.artworkURL, youTubeId: episode.videoID),
             duration: episode.durationMs.map { Double($0) / 1000 },
             onPlay: { preparingVideoID = episode.videoID })
+    }
+
+    private func entry(for episode: PodcastEpisodeSnapshot) -> YTDlpBridge.YTDlpPlaylistEntry {
+        .init(id: episode.videoID, title: episode.title,
+              uploader: showTitles[episode.showCatalogID],
+              duration: episode.durationMs.map { Double($0) / 1000 })
     }
 
     private func position(_ milliseconds: Double) -> String {

@@ -435,22 +435,34 @@ extension HomeView {
                 ForEach(fallbackEntries, id: \.id) { entry in
                     AlbumObjectView(
                         title: entry.title,
-                        subtitle: entry.uploader ?? "YouTube Music",
+                        subtitle: fallbackEntrySubtitle(entry),
                         artwork: ArtworkSource.resolve(
                             remoteURL: nil, youTubeId: entry.id),
                         size: MusicObjectMetrics.albumRail,
-                        role: .play,
+                        role: .browse,
                         style: .home,
                         showsHoverPlay: true,
-                        onSelect: {},
+                        onSelect: {
+                            galleryPreview = .init(id: entry.id, title: entry.title,
+                                subtitle: fallbackEntrySubtitle(entry),
+                                artwork: .resolve(remoteURL: nil, youTubeId: entry.id),
+                                duration: entry.duration,
+                                onPlay: { Task { await play(entry) } })
+                        },
                         onPlay: { Task { await play(entry) } }
                     )
-                    .youTubeEntryContextMenu(entry: entry) {
+                    .youTubeEntryContextMenu(entry: entry, showsMenuButton: true,
+                                             menuButtonTrailingInset: 0) {
                         Task { await play(entry) }
                     }
                 }
             }
         }
+    }
+
+    private func fallbackEntrySubtitle(_ entry: YTDlpBridge.YTDlpPlaylistEntry) -> String {
+        let metadata = SongCreditCache.shared.entry(videoID: entry.id)
+        return metadata?.artist ?? entry.artist ?? metadata?.uploader ?? entry.uploader ?? "YouTube Music"
     }
 
     var importedPlaylistsShelf: some View {

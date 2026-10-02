@@ -63,15 +63,31 @@ private struct CatalogCollectionContextMenu: ViewModifier {
     let onOpen: () -> Void
     let onPlay: () -> Void
     let onShuffle: () -> Void
+    let menuTitle: String
+    let showsMenuButton: Bool
+    let canResolvePlayback: Bool
 
     @Environment(PlaybackService.self) private var playback
 
     func body(content: Content) -> some View {
-        content.contextMenu {
+        content
+            .contextMenu { menuItems }
+            .overlay(alignment: .topTrailing) {
+                if showsMenuButton {
+                    ChromeIconMenu(systemName: "ellipsis", title: menuTitle) { menuItems }
+                        .padding(8)
+                }
+            }
+    }
+
+    @ViewBuilder
+    private var menuItems: some View {
             Button(openTitle, systemImage: "arrow.forward.circle", action: onOpen)
-            if !tracks.isEmpty {
+            if !tracks.isEmpty || canResolvePlayback {
                 Button(playTitle, systemImage: "play.fill", action: onPlay)
                 Button(shuffleTitle, systemImage: "shuffle", action: onShuffle)
+            }
+            if !tracks.isEmpty {
                 Button(addTitle, systemImage: "text.badge.plus") {
                     tracks.forEach(playback.queue.addToQueue)
                 }
@@ -84,26 +100,28 @@ private struct CatalogCollectionContextMenu: ViewModifier {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(link.absoluteString, forType: .string)
                 }
-                Button {
-                    if let first = tracks.first { PlaybackPresentation.video(first, context: tracks, playback: playback) }
-                    else { onOpen() }
-                } label: {
-                    Label {
-                        Text(tr("Floating video", "悬浮视频"))
-                    } icon: {
-                        YouTubeMark(size: 12)
-                            .accessibilityHidden(true)
+                if let first = tracks.first {
+                    Button {
+                        PlaybackPresentation.video(first, context: tracks, playback: playback)
+                    } label: {
+                        Label {
+                            Text(tr("Floating video", "悬浮视频"))
+                        } icon: {
+                            YouTubeMark(size: 12)
+                                .accessibilityHidden(true)
+                        }
                     }
+                    .accessibilityLabel(tr("Floating video", "悬浮视频"))
                 }
-                .accessibilityLabel(tr("Floating video", "悬浮视频"))
             }
-        }
     }
 }
 
 extension View {
     func catalogReleaseContextMenu(
         release: CatalogReleaseProjection,
+        showsMenuButton: Bool = false,
+        canResolvePlayback: Bool = false,
         onOpen: @escaping () -> Void,
         onPlay: @escaping () -> Void,
         onShuffle: @escaping () -> Void
@@ -117,12 +135,16 @@ extension View {
             link: YouTubeCatalogLink.releaseURL(stableID: release.stableID),
             onOpen: onOpen,
             onPlay: onPlay,
-            onShuffle: onShuffle
+            onShuffle: onShuffle,
+            menuTitle: tr("More for \(release.title)", "更多：\(release.title)"),
+            showsMenuButton: showsMenuButton,
+            canResolvePlayback: canResolvePlayback
         ))
     }
 
     func catalogArtistContextMenu(
         artist: CatalogArtistProjection,
+        showsMenuButton: Bool = false,
         onOpen: @escaping () -> Void,
         onPlay: @escaping () -> Void,
         onShuffle: @escaping () -> Void
@@ -136,7 +158,10 @@ extension View {
             link: YouTubeCatalogLink.artistURL(stableID: artist.stableID),
             onOpen: onOpen,
             onPlay: onPlay,
-            onShuffle: onShuffle
+            onShuffle: onShuffle,
+            menuTitle: tr("More for \(artist.name)", "更多：\(artist.name)"),
+            showsMenuButton: showsMenuButton,
+            canResolvePlayback: false
         ))
     }
 }

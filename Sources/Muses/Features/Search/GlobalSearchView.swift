@@ -240,6 +240,7 @@ struct GlobalSearchView: View {
                                     )
                                     .catalogReleaseContextMenu(
                                         release: release,
+                                        showsMenuButton: true,
                                         onOpen: { open(release) },
                                         onPlay: { playFirst(release.tracks, source: .album) },
                                         onShuffle: {
@@ -270,6 +271,7 @@ struct GlobalSearchView: View {
                                     )
                                     .catalogArtistContextMenu(
                                         artist: artist,
+                                        showsMenuButton: true,
                                         onOpen: { open(artist) },
                                         onPlay: { playFirst(artist.tracks, source: .artist) },
                                         onShuffle: {

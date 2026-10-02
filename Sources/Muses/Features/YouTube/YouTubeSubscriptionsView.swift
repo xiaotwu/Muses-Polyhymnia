@@ -188,6 +188,7 @@ private struct YouTubeChannelVideosView: View {
     @State private var playbackError: String?
     @State private var accountActionError: String?
     @State private var showingUnsubscribe = false
+    @State private var galleryPreview: GalleryMediaPreview?
 
     var body: some View {
         ScrollView {
@@ -223,9 +224,9 @@ private struct YouTubeChannelVideosView: View {
                     ForEach(state.value ?? [], id: \.id) { entry in
                         AlbumObjectView(title: entry.title, subtitle: entry.uploader ?? channel.title,
                                         artwork: .resolve(remoteURL: nil, youTubeId: entry.id), size: 220,
-                                        role: .play, artworkHeight: 124, isYouTube: true, showsHoverPlay: true,
-                                        onSelect: { playRequest = entry }, onPlay: { playRequest = entry })
-                            .youTubeEntryContextMenu(entry: entry) { playRequest = entry }
+                                        role: .browse, artworkHeight: 124, isYouTube: true, showsHoverPlay: true,
+                                        onSelect: { openPreview(entry) }, onPlay: { playRequest = entry })
+                            .youTubeEntryContextMenu(entry: entry, showsMenuButton: true) { playRequest = entry }
                     }
                 }
                 if nextOffset != nil {
@@ -237,6 +238,7 @@ private struct YouTubeChannelVideosView: View {
             }.padding(28).padding(.bottom, 100)
         }
         .task(id: refreshID) { await load() }
+        .sheet(item: $galleryPreview) { GalleryMediaPreviewSheet(preview: $0) }
         .alert(
             tr("Unsubscribe from \(channel.title) (\(channel.channelId)) using \(account.account?.channel?.title ?? "YouTube")?",
                "使用 \(account.account?.channel?.title ?? "YouTube") 账号取消订阅 \(channel.title)（\(channel.channelId)）？",
@@ -267,10 +269,18 @@ private struct YouTubeChannelVideosView: View {
                 playbackError = nil
                 playback.playTrack(snapshot, context: TrackSnapshot.playbackContext(playing: snapshot, youTubeEntries: entries), from: .search)
             } catch {
-                if !Task.isCancelled { playbackError = error.localizedDescription }
+                guard !Task.isCancelled, identity == account.activeChannelID else { return }
+                playbackError = error.localizedDescription
             }
-            playRequest = nil
+            if playRequest?.id == entry.id { playRequest = nil }
         }
+    }
+
+    private func openPreview(_ entry: YTDlpBridge.YTDlpPlaylistEntry) {
+        galleryPreview = .init(id: entry.id, title: entry.title,
+            subtitle: entry.uploader ?? channel.title,
+            artwork: .resolve(remoteURL: nil, youTubeId: entry.id), duration: entry.duration,
+            onPlay: { playRequest = entry })
     }
 
     private func load() async {

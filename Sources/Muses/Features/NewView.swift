@@ -201,7 +201,8 @@ struct NewView: View {
                             )
                             .trackContextMenu(snapshot: snapshot, onPlay: {
                                 play(snapshot, context: newTracks)
-                            }, showsMenuButton: true)
+                            }, showsMenuButton: true, menuButtonAlignment: .bottomLeading,
+                               menuButtonTrailingInset: 0)
                         }
                         if featuredTracks.isEmpty {
                             ForEach(Array(featuredPersonalCards.enumerated()), id: \.offset) { _, card in
@@ -215,7 +216,9 @@ struct NewView: View {
                                     onOpen: { openPreview(card, siblings: featuredPersonalCards) },
                                     onPlay: { Task { await play(card) } }
                                 )
-                                .youTubeEntryContextMenu(card: card, showsMenuButton: true) {
+                                .youTubeEntryContextMenu(card: card, showsMenuButton: true,
+                                                        menuButtonAlignment: .bottomLeading,
+                                                        menuButtonTrailingInset: 0) {
                                     Task { await play(card) }
                                 }
                             }

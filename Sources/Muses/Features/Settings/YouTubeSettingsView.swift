@@ -259,7 +259,14 @@ struct YouTubeSettingsView: View {
         } header: { Text(tr("Permissions & sync", "权限与同步")) }
         Section {
             homeRecommendationSource
-            LabeledContent(tr("Session", "会话状态")) { webHomeStatusAction }
+            // A status and an action must remain separate accessibility children.
+            // Native LabeledContent can summarize this mixed value as one text element.
+            HStack {
+                Text(tr("Session", "会话状态"))
+                Spacer()
+                webHomeStatusAction
+            }
+            .accessibilityElement(children: .contain)
             if webHome.isEnabled, !isWebHomeBusy, case .available = webHome.status {
                 EmptyView()
             } else if webHome.isEnabled, !isWebHomeBusy {
@@ -314,6 +321,7 @@ struct YouTubeSettingsView: View {
             .disabled(!webHome.isBuildEnabled || isWebHomeBusy)
             .accessibilityValue(webHomeStatusText)
         }
+        .accessibilityElement(children: .contain)
     }
 
     /// Connecting continues to the separate, explicit Home consent dialog.

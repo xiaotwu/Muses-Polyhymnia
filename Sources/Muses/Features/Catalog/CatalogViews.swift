@@ -146,12 +146,13 @@ struct CatalogReleasesView: View {
                                 onSelect: { selection = release },
                                 onPlay: { play(release.tracks, from: .album) }
                             )
-                            .overlay(alignment: .topTrailing) {
+                            .overlay(alignment: .topLeading) {
                                 CatalogStateBadge(state: release.cacheState)
                                     .padding(7)
                             }
                             .catalogReleaseContextMenu(
                                 release: release,
+                                showsMenuButton: true,
                                 onOpen: { selection = release },
                                 onPlay: { play(release.tracks, from: .album) },
                                 onShuffle: { play(release.tracks.shuffled(), from: .album) }
@@ -623,6 +624,7 @@ struct CatalogReleaseDetailView: View {
                     }
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)
+                    .youTubeEntryContextMenu(entry: entry) { playOnlineTrack(entry) }
                 }
             }
             .background(BrandColors.surface.opacity(0.5), in: Capsule())
@@ -821,12 +823,13 @@ struct CatalogArtistsView: View {
                                 onSelect: { selection = artist },
                                 onPlay: { play(artist.tracks) }
                             )
-                            .overlay(alignment: .topTrailing) {
+                            .overlay(alignment: .topLeading) {
                                 CatalogStateBadge(state: artist.cacheState)
                                     .padding(7)
                             }
                             .catalogArtistContextMenu(
                                 artist: artist,
+                                showsMenuButton: true,
                                 onOpen: { selection = artist },
                                 onPlay: { play(artist.tracks) },
                                 onShuffle: { play(artist.tracks.shuffled()) }
@@ -950,6 +953,7 @@ struct CatalogArtistDetailView: View {
     @Query(sort: \Playlist.name) private var playlists: [Playlist]
 
     @State private var onlineTask: Task<Void, Never>?
+    @State private var onlineReleasePlayTask: Task<Void, Never>?
     @State private var refreshedArtist: CatalogArtistProjection?
     private var currentArtist: CatalogArtistProjection { refreshedArtist ?? artist }
 
@@ -988,7 +992,10 @@ struct CatalogArtistDetailView: View {
             .padding(.bottom, AppleMusicTokens.scrollBottomInset)
         }
         .background(BrowseBackground())
-        .onDisappear { onlineTask?.cancel() }
+        .onDisappear {
+            onlineTask?.cancel()
+            onlineReleasePlayTask?.cancel()
+        }
         .task(id: catalog.revision) {
             refreshedArtist = catalog.artist(byStableID: artist.stableID)
         }
@@ -1157,6 +1164,17 @@ struct CatalogArtistDetailView: View {
                                 playback.playTrack(first, context: release.tracks, from: .album)
                             }
                         )
+                        .catalogReleaseContextMenu(release: release, showsMenuButton: true,
+                            onOpen: {
+                                NotificationCenter.default.post(name: .musesNavigateToRelease, object: release)
+                            }, onPlay: {
+                                guard let first = release.tracks.first else { return }
+                                playback.playTrack(first, context: release.tracks, from: .album)
+                            }, onShuffle: {
+                                let shuffled = release.tracks.shuffled()
+                                guard let first = shuffled.first else { return }
+                                playback.playTrack(first, context: shuffled, from: .album)
+                            })
                     }
                 }
             }
@@ -1291,31 +1309,22 @@ struct CatalogArtistDetailView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
+        .youTubeEntryContextMenu(entry: entry) { playOnlineTrack(entry) }
     }
 
     private func onlineReleaseCard(_ release: OnlineReleaseItem) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            ArtworkView(
-                source: ArtworkSource.resolve(
-                    remoteURL: release.artworkURL, youTubeId: nil),
-                cornerRadius: 10,
-                glyphSize: 32,
-                targetSize: 140,
-                targetHeight: 140
-            )
-            .frame(width: 140, height: 140)
-            .shadow(color: Color.black.opacity(0.2), radius: 6, y: 3)
-
-            Text(release.title)
-                .font(MusesTypography.system(size: 12, weight: .semibold))
-                .foregroundStyle(BrandColors.textPrimary)
-                .lineLimit(1)
-
-            if let year = release.year {
-                Text("\(year)")
-                    .font(MusesTypography.system(size: 11))
-                    .foregroundStyle(BrandColors.textSecondary)
-            }
+            AlbumObjectView(title: release.title,
+                subtitle: release.year.map(String.init) ?? currentArtist.name,
+                artwork: .resolve(remoteURL: release.artworkURL), size: 140,
+                showsHoverPlay: true,
+                onSelect: { openOnlineRelease(release) },
+                onPlay: { playOnlineRelease(release) })
+                .catalogReleaseContextMenu(release: onlineReleaseProjection(release), showsMenuButton: true,
+                    canResolvePlayback: true,
+                    onOpen: { openOnlineRelease(release) },
+                    onPlay: { playOnlineRelease(release) },
+                    onShuffle: { playOnlineRelease(release, shuffled: true) })
 
             Button {
                 importOnlineAlbum(release)
@@ -1333,6 +1342,42 @@ struct CatalogArtistDetailView: View {
             .buttonStyle(.fullAreaPlain)
         }
         .frame(width: 140)
+    }
+
+    private func onlineReleaseProjection(_ release: OnlineReleaseItem) -> CatalogReleaseProjection {
+        .init(stableID: release.stableID, title: release.title,
+              artistName: currentArtist.name, artistStableID: currentArtist.stableID,
+              artworkURL: release.artworkURL, year: release.year, kind: release.kind,
+              cacheState: .fresh, tracks: [])
+    }
+
+    private func openOnlineRelease(_ release: OnlineReleaseItem) {
+        NotificationCenter.default.post(name: .musesNavigateToRelease, object: onlineReleaseProjection(release))
+    }
+
+    private func playOnlineRelease(_ release: OnlineReleaseItem, shuffled: Bool = false) {
+        onlineReleasePlayTask?.cancel()
+        let projection = onlineReleaseProjection(release)
+        onlineReleasePlayTask = Task {
+            do {
+                let fetched = try await catalog.fetchAlbumOnlineTracks(release: projection)
+                guard !Task.isCancelled else { return }
+                let entries = shuffled ? fetched.shuffled() : fetched
+                guard let first = entries.first else {
+                    onlineError = tr("No playable songs are available for this release.", "此作品暂无可播放的歌曲。")
+                    return
+                }
+                let snapshot = try catalog.importOnlineTrack(entry: first,
+                    releaseStableID: projection.stableID, albumTitle: projection.title,
+                    artistName: projection.artistName, saveToLibrary: false)
+                playback.playTrack(snapshot, context: TrackSnapshot.playbackContext(
+                    playing: snapshot, youTubeEntries: entries), from: .album)
+                onlineError = nil
+            } catch {
+                guard !Task.isCancelled else { return }
+                onlineError = error.localizedDescription
+            }
+        }
     }
 
     private func playAll() {
