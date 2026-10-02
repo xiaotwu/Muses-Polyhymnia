@@ -97,6 +97,12 @@ struct RootView: View {
                 }
             }
             .onChange(of: showNowPlaying) { _, _ in immersiveToolbarRevealed = false }
+            .onChange(of: [showNowPlaying, showQuickSearch, showYouTubeLink,
+                           showYouTubeVideo, showQueue, showLyricsDrawer, showAudioInfo]) { previous, current in
+                if zip(previous, current).contains(where: { !$0.0 && $0.1 }) {
+                    galleryPresentation.dismiss()
+                }
+            }
             .modifier(MainWindowTitleHidden())
             .alert(tr("Unable to Open Link", "无法打开链接", zhHant: "無法開啟連結"), isPresented: Binding(
                 get: { externalPlaybackRouter.errorMessage != nil },
