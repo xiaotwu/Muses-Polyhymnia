@@ -25,28 +25,37 @@ struct MusicVideoCollectionView: View {
                         ForEach(rows) { row in
                             VStack(alignment: .leading, spacing: 8) {
                                 Button { play(row) } label: {
-                                    ArtworkView(source: ArtworkSource.resolve(for: row.snapshot),
-                                        cornerRadius: 8, glyphSize: 40, targetSize: 360, targetHeight: 203, presentation: .fill)
-                                        .aspectRatio(16.0 / 9.0, contentMode: .fit)
-                                        .overlay(alignment: .bottomTrailing) {
-                                            if row.duration.isFinite && row.duration > 0 {
-                                                Text(Duration.seconds(row.duration).formatted(.time(pattern: .minuteSecond)))
-                                                    .font(.caption.monospacedDigit()).foregroundStyle(.white)
-                                                    .padding(5).background(.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 4))
-                                                    .padding(8)
+                                    GeometryReader { geometry in
+                                        ArtworkView(source: ArtworkSource.resolve(for: row.snapshot),
+                                            cornerRadius: 0, glyphSize: 40,
+                                            targetSize: geometry.size.width,
+                                            targetHeight: geometry.size.height, presentation: .fill)
+                                            .frame(width: geometry.size.width, height: geometry.size.height)
+                                            .clipped()
+                                            .overlay(alignment: .bottomTrailing) {
+                                                if row.duration.isFinite && row.duration > 0 {
+                                                    Text(Duration.seconds(row.duration).formatted(.time(pattern: .minuteSecond)))
+                                                        .font(.caption.monospacedDigit()).foregroundStyle(.white)
+                                                        .padding(5).background(.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 4))
+                                                        .padding(8)
+                                                }
                                             }
-                                        }
+                                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                                    }
+                                    .aspectRatio(16.0 / 9.0, contentMode: .fit)
                                 }
                                 .buttonStyle(.plain)
                                 .accessibilityLabel(tr("Play music video \(row.title)", "播放音乐视频 \(row.title)"))
                                 Text(row.title).font(.headline).lineLimit(2)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
                                 HStack {
                                     Text(row.displayArtist).font(.callout).foregroundStyle(.secondary).lineLimit(1)
                                     Spacer()
                                     YouTubeMark(size: 14)
                                 }
                             }
-                            .trackContextMenu(snapshot: row.snapshot, onPlay: { play(row) })
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .trackContextMenu(snapshot: row.snapshot, onPlay: { play(row) }, showsMenuButton: true)
                         }
                     }
                     .padding(.bottom, OverlayChromeMetrics.scrollBottomInset)

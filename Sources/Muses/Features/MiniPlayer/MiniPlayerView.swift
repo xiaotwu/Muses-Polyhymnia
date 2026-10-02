@@ -11,7 +11,6 @@ import AppKit
 struct MiniPlayerView: View {
     @Environment(PlaybackService.self) private var playback
     @Environment(LibraryService.self) private var library
-    @AppStorage(PrefKey.theme) private var theme = AppTheme.system.rawValue
     @State private var alwaysOnTop = true
     @State private var isHovered = false
 
@@ -21,60 +20,64 @@ struct MiniPlayerView: View {
     }
 
     var body: some View {
-        ThemeApplier {
-            let shape = Capsule()
-            HStack(spacing: 12) {
-                // Left: Circular Play/Pause button with circular progress ring (Figure 1)
-                playWithProgressRing
+        let shape = Capsule()
+        HStack(spacing: 12) {
+            // Left: Circular Play/Pause button with circular progress ring (Figure 1)
+            playWithProgressRing
 
-                // Center: Track Title & Artist
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(MusesTypography.system(size: 13, weight: .semibold))
-                        .foregroundStyle(BrandColors.textPrimary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
+            // Center: Track Title & Artist
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(MusesTypography.system(size: 13, weight: .semibold))
+                    .foregroundStyle(BrandColors.textPrimary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
 
-                    Text(artist)
-                        .font(MusesTypography.system(size: 11, weight: .medium))
-                        .foregroundStyle(BrandColors.textSecondary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                // Right: Opaque circular Prev & Next buttons + Pin toggle
-                HStack(spacing: 6) {
-                    circularButton("backward.fill", help: tr("Previous", "上一首")) {
-                        playback.previous()
-                    }
-
-                    circularButton("forward.fill", help: tr("Next", "下一首")) {
-                        playback.next()
-                    }
-
-                    Button {
-                        alwaysOnTop.toggle()
-                    } label: {
-                        Image(systemName: alwaysOnTop ? "pin.fill" : "pin")
-                            .font(MusesTypography.system(size: 10, weight: .semibold))
-                            .foregroundStyle(alwaysOnTop ? BrandColors.accent : BrandColors.textSecondary)
-                            .frame(width: 22, height: 22)
-                    }
-                    .buttonStyle(.fullAreaPlain)
-                    .help(tr("Keep on top", "常驻置顶"))
-                }
+                Text(artist)
+                    .font(MusesTypography.system(size: 11, weight: .medium))
+                    .foregroundStyle(BrandColors.textSecondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .frame(width: 340, height: 60)
-            .musesGlass(in: shape, role: .player)
-            .overlay(
-                shape.stroke(isHovered ? BrandColors.textPrimary.opacity(0.22) : BrandColors.hairline, lineWidth: 1)
-            )
-            .shadow(color: .black.opacity(0.35), radius: 16, y: 6)
-            .onHover { isHovered = $0 }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            // Right: Opaque circular Prev & Next buttons + Pin toggle
+            HStack(spacing: 6) {
+                circularButton("backward.fill", help: tr("Previous", "上一首")) {
+                    playback.previous()
+                }
+
+                circularButton("forward.fill", help: tr("Next", "下一首")) {
+                    playback.next()
+                }
+
+                Button {
+                    alwaysOnTop.toggle()
+                } label: {
+                    Image(systemName: alwaysOnTop ? "pin.fill" : "pin")
+                        .font(MusesTypography.system(size: 10, weight: .semibold))
+                        .foregroundStyle(alwaysOnTop ? BrandColors.accent : BrandColors.textSecondary)
+                        .frame(width: 28, height: 28)
+                }
+                .buttonStyle(.fullAreaPlain)
+                .help(tr("Keep on top", "常驻置顶"))
+                .accessibilityLabel(tr("Keep on top", "常驻置顶"))
+                .accessibilityValue(alwaysOnTop ? tr("On", "开启") : tr("Off", "关闭"))
+            }
         }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+        .frame(width: 340, height: 60)
+        .musesGlass(in: shape, role: .player)
+        .overlay(
+            shape.stroke(isHovered ? BrandColors.textPrimary.opacity(0.22) : BrandColors.hairline, lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.35), radius: 16, y: 6)
+        .onHover { isHovered = $0 }
+        .padding(.horizontal, 12)
+        .padding(.top, 28)
+        .padding(.bottom, 12)
+        .frame(width: 364, height: 100)
         .windowLevel(alwaysOnTop ? .floating : .normal)
         .background(WindowAccessor { win in
             win?.setFrameAutosaveName("MusesMiniPlayer")
@@ -118,6 +121,8 @@ struct MiniPlayerView: View {
             }
             .buttonStyle(.fullAreaPlain)
             .help(playback.transportState.isPlaying ? tr("Pause", "暂停") : tr("Play", "播放"))
+            .accessibilityLabel(playback.transportState.isPlaying ? tr("Pause", "暂停") : tr("Play", "播放"))
+            .disabled(playback.transportState.track == nil)
         }
     }
 
@@ -133,6 +138,7 @@ struct MiniPlayerView: View {
         .buttonStyle(.fullAreaPlain)
         .help(help)
         .accessibilityLabel(help)
+        .disabled(playback.transportState.track == nil)
     }
 
     // MARK: - Helpers

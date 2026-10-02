@@ -517,7 +517,8 @@ struct MusesApp: App {
             }
         }
         .windowStyle(.hiddenTitleBar)
-        .defaultSize(width: 240, height: 380)
+        .defaultSize(width: 364, height: 100)
+        .windowResizability(.contentSize)
 
 
     }
