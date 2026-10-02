@@ -177,6 +177,7 @@ struct CollectionDeckStage<Controls: View>: View {
     let subtitle: String
     let youTubeURL: URL?
     let rows: [CollectionTrackRow]
+    let source: QueueSource
     let currentTrack: TrackSnapshot?
     let playlists: [Playlist]
     let isInteractionEnabled: Bool
@@ -467,6 +468,7 @@ struct CollectionDeckStage<Controls: View>: View {
                 .disabled(!isInteractionEnabled)
                 .trackContextMenu(snapshot: row.snapshot, playlists: playlists,
                     onPlay: { onPlay(row) },
+                    videoContext: rows.map(\.snapshot), videoSource: source,
                     onRemoveFromContainer: onRemove.map { handler in { handler(row) } })
             }
             .padding(16)
@@ -540,6 +542,7 @@ struct CollectionDeckStage<Controls: View>: View {
                 .contextMenu {
                     TrackContextMenuItems(snapshot: row.snapshot, playlists: playlists,
                         onPlay: { onPlay(row) },
+                        videoContext: rows.map(\.snapshot), videoSource: source,
                         onRemoveFromContainer: onRemove.map { handler in { handler(row) } })
                 }
                 .overlay(alignment: .bottom) { BrandColors.hairline.frame(height: 1) }
@@ -673,6 +676,7 @@ struct CollectionDeckStage<Controls: View>: View {
                                 setPosition(CGFloat(index), animated: false)
                                 onPlay(row)
                             },
+                            videoContext: rows.map(\.snapshot), videoSource: source,
                             showsMenuButton: true,
                             menuButtonTrailingInset: 0,
                             onRemoveFromContainer: onRemove.map { handler in { handler(row) } }
@@ -758,6 +762,7 @@ struct CollectionDeckStage<Controls: View>: View {
                 setPosition(CGFloat(index), animated: false)
                 onPlay(row)
             },
+            videoContext: rows.map(\.snapshot), videoSource: source,
             showsMenuButton: true,
             menuButtonTrailingInset: 0,
             onRemoveFromContainer: onRemove.map { handler in { handler(row) } }

@@ -293,7 +293,7 @@ struct PlaylistsView: View {
                     }
                     Button {
                         let context = (imp.items ?? []).sorted { $0.order < $1.order }.compactMap(\.track).map(TrackSnapshot.init(from:))
-            if let first = context.first { PlaybackPresentation.video(first, context: context, playback: playback) }
+                        if let first = context.first { PlaybackPresentation.video(first, context: context, source: .import, playback: playback) }
                     } label: {
                         Label {
                             Text(tr("Floating video", "悬浮视频"))

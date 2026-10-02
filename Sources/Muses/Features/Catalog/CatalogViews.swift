@@ -431,7 +431,7 @@ struct CatalogReleaseDetailView: View {
 
                     if YouTubeCatalogLink.releaseURL(stableID: currentRelease.stableID) != nil {
                         Button {
-                            if let first = currentRelease.tracks.first { PlaybackPresentation.video(first, context: currentRelease.tracks, playback: playback) }
+                            if let first = currentRelease.tracks.first { PlaybackPresentation.video(first, context: currentRelease.tracks, source: .album, playback: playback) }
                             else { checkOnlineTracklist() }
                         } label: {
                             YouTubeMark(size: 14)
@@ -515,7 +515,8 @@ struct CatalogReleaseDetailView: View {
         .trackContextMenu(
             snapshot: snapshot,
             playlists: playlists,
-            onPlay: { playback.playTrack(snapshot, context: currentRelease.tracks, from: .album) }
+            onPlay: { playback.playTrack(snapshot, context: currentRelease.tracks, from: .album) },
+            videoContext: currentRelease.tracks, videoSource: .album
         )
     }
 
@@ -1056,7 +1057,7 @@ struct CatalogArtistDetailView: View {
 
                     if YouTubeCatalogLink.artistURL(stableID: currentArtist.stableID) != nil {
                         Button {
-                            if let first = orderedTracks.first { PlaybackPresentation.video(first, context: orderedTracks, playback: playback) }
+                            if let first = orderedTracks.first { PlaybackPresentation.video(first, context: orderedTracks, source: .artist, playback: playback) }
                             else { toggleOnlineDiscovery() }
                         } label: {
                             YouTubeMark(size: 14)
@@ -1130,7 +1131,8 @@ struct CatalogArtistDetailView: View {
                     .trackContextMenu(
                         snapshot: track,
                         playlists: playlists,
-                        onPlay: { playback.playTrack(track, context: orderedTracks, from: .artist) }
+                        onPlay: { playback.playTrack(track, context: orderedTracks, from: .artist) },
+                        videoContext: orderedTracks, videoSource: .artist
                     )
                 }
             }

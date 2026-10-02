@@ -56,7 +56,8 @@ struct MusicVideoCollectionView: View {
                                 }
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .trackContextMenu(snapshot: row.snapshot, onPlay: { play(row) }, showsMenuButton: true)
+                            .trackContextMenu(snapshot: row.snapshot, onPlay: { play(row) },
+                                              videoContext: snapshots, videoSource: .songs, showsMenuButton: true)
                             .task(id: row.snapshot.youTubeId) {
                                 do { try await Task.sleep(for: .milliseconds(350)) } catch { return }
                                 guard !Task.isCancelled, let importService else { return }

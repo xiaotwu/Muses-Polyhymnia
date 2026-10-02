@@ -210,12 +210,13 @@ struct GlobalSearchView: View {
                         LazyVStack(spacing: 0) {
                             ForEach(search.trackResults.prefix(expandedResultSections.contains("songs") ? search.trackResults.count : 6)) { snapshot in
                                 GlobalSearchTrackRow(snapshot: snapshot,
-                                                     isCurrent: playback.state.track?.id == snapshot.id) {
+                                                     isCurrent: playback.state.track?.id == snapshot.id,
+                                                     videoContext: search.trackResults) {
                                     play(snapshot, context: search.trackResults)
                                 }
                                 .trackContextMenu(snapshot: snapshot, onPlay: {
                                     play(snapshot, context: search.trackResults)
-                                })
+                                }, videoContext: search.trackResults)
                             }
                         }
                     }
@@ -304,7 +305,8 @@ struct GlobalSearchView: View {
                             ForEach(search.youtubeResults.prefix(expandedResultSections.contains("youtube") ? search.youtubeResults.count : 6), id: \.id) { entry in
                                 if entry.resourceKind == .video {
                                 GlobalSearchYouTubeRow(entry: entry,
-                                                       isSaved: savedYouTubeIDs.contains(entry.id)) {
+                                                       isSaved: savedYouTubeIDs.contains(entry.id),
+                                                       videoEntries: search.youtubeResults.filter { $0.resourceKind == .video }) {
                                     Task { await playYouTube(entry) }
                                 }
                                 .youTubeEntryContextMenu(entry: entry,

@@ -257,7 +257,9 @@ struct QueueDrawerView: View {
             if let item = playback.queue.current() {
                 QueueRow(item: item, isCurrent: true)
                     .queueRowActions(title: item.track.title) {
-                        TrackContextMenuItems(snapshot: item.track, onPlay: { playback.toggle() })
+                        TrackContextMenuItems(snapshot: item.track, onPlay: { playback.toggle() },
+                            videoContext: playback.queue.items.map(\.track) + playback.queue.upNext.map(\.track),
+                            videoSource: item.fromContext)
                     }
                     .focusable()
                     .onKeyPress(.return) { playback.toggle(); return .handled }
@@ -406,7 +408,7 @@ struct QueueDrawerView: View {
                                         context: [item.track],
                                         from: item.fromContext
                                     )
-                                }
+                                }, videoContext: [item.track], videoSource: item.fromContext
                             )
                             if advancedQueue {
                                 Divider()
@@ -505,6 +507,8 @@ struct QueueDrawerView: View {
         TrackContextMenuItems(
             snapshot: item.track,
             onPlay: { playQueueItem(item) },
+            videoContext: playback.queue.items.map(\.track) + playback.queue.upNext.map(\.track),
+            videoSource: item.fromContext,
             showsPlayNext: false,
             showsAddToQueue: false
         )

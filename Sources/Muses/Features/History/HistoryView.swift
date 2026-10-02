@@ -232,7 +232,8 @@ struct HistoryView: View {
     }
 
     private func recentActivity(_ events: [ListeningEventSnapshot], range: String) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let context = historyPlaybackContext(events)
+        return VStack(alignment: .leading, spacing: 12) {
             Text(tr("Recent activity · \(range)", "最近活动 · \(range)", zhHant: "最近活動 · \(range)"))
                 .font(MusesTypography.sectionTitle)
             LazyVStack(spacing: 2) {
@@ -242,7 +243,8 @@ struct HistoryView: View {
                         event: event,
                         track: track,
                         isCurrent: playback.state.track?.id == event.trackId,
-                        onPlay: { play(event, within: events) }
+                        onPlay: { play(event, within: events) },
+                        videoContext: context
                     )
                 }
             }
@@ -325,13 +327,17 @@ struct HistoryView: View {
     }
 
     private func play(_ event: ListeningEventSnapshot, within events: [ListeningEventSnapshot]) {
-        let context = events.compactMap { library.track(by: $0.trackId) }
+        let context = historyPlaybackContext(events)
+        guard let selected = context.first(where: { $0.id == event.trackId }) else { return }
+        playback.playTrack(selected, context: context, from: .recently)
+    }
+
+    private func historyPlaybackContext(_ events: [ListeningEventSnapshot]) -> [TrackSnapshot] {
+        events.compactMap { library.track(by: $0.trackId) }
             .reduce(into: [TrackSnapshot]()) { result, track in
                 guard !result.contains(where: { $0.id == track.id }) else { return }
                 result.append(TrackSnapshot(from: track))
             }
-        guard let selected = context.first(where: { $0.id == event.trackId }) else { return }
-        playback.playTrack(selected, context: context, from: .recently)
     }
 
     private func completionLabel(_ recap: ListeningRecap) -> String {
@@ -347,6 +353,7 @@ private struct HistoryTimelineRow: View {
     let track: TrackSnapshot?
     let isCurrent: Bool
     let onPlay: () -> Void
+    let videoContext: [TrackSnapshot]
 
     @Environment(YouTubeImportService.self) private var importService: YouTubeImportService?
     private var displayArtist: String {
@@ -410,7 +417,8 @@ private struct HistoryTimelineRow: View {
     @ViewBuilder private var historyActions: some View {
 
             if let track, isPlayable {
-                TrackContextMenuItems(snapshot: track, onPlay: onPlay)
+                TrackContextMenuItems(snapshot: track, onPlay: onPlay,
+                                      videoContext: videoContext, videoSource: .recently)
             } else {
                 Button(tr("Play", "播放"), systemImage: "play.fill", action: onPlay)
                     .disabled(true)

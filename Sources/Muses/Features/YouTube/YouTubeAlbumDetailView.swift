@@ -40,6 +40,7 @@ struct YouTubeAlbumDetailView: View {
             subtitle: "\(metadataLine) • \(tr("Playlist Order", "歌单顺序"))",
             youTubeURL: URL(string: youTubeImport.url),
             rows: rows,
+            source: .import,
             defaultSort: .playlistOrder,
             currentTrack: playback.state.track,
             playlists: allPlaylists,

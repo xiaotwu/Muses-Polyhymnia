@@ -11,6 +11,8 @@ struct TrackContextMenu: ViewModifier {
     var track: Track? = nil
     var playlists: [Playlist] = []
     let onPlay: () -> Void
+    var videoContext: [TrackSnapshot] = []
+    var videoSource: QueueSource = .search
     var showsMenuButton = false
     var menuButtonAlignment: Alignment = .topTrailing
     var menuButtonTrailingInset: CGFloat = 40
@@ -61,6 +63,8 @@ struct TrackContextMenu: ViewModifier {
             track: track,
             playlists: playlists,
             onPlay: onPlay,
+            videoContext: videoContext,
+            videoSource: videoSource,
             onRemoveFromContainer: onRemoveFromContainer,
             onEditTrack: { showEditTrack = true },
             onTrackNotes: { showTrackNotes = true },
@@ -187,6 +191,8 @@ struct TrackContextMenuItems: View {
     var track: Track? = nil
     var playlists: [Playlist] = []
     let onPlay: () -> Void
+    var videoContext: [TrackSnapshot] = []
+    var videoSource: QueueSource = .search
     var onRemoveFromContainer: (() -> Void)? = nil
     var removeTitle: String = tr("Remove from Playlist", "从歌单移除")
     var showsPlayNext = true
@@ -292,7 +298,7 @@ struct TrackContextMenuItems: View {
                 NSPasteboard.general.setString(url.absoluteString, forType: .string)
             }
             Button {
-                PlaybackPresentation.video(snapshot, playback: playback)
+                PlaybackPresentation.video(snapshot, context: videoContext, source: videoSource, playback: playback)
             } label: {
                 Label {
                     Text(tr("Floating video", "悬浮视频"))
@@ -316,12 +322,15 @@ extension View {
                           track: Track? = nil,
                           playlists: [Playlist] = [],
                           onPlay: @escaping () -> Void,
+                          videoContext: [TrackSnapshot] = [],
+                          videoSource: QueueSource = .search,
                           showsMenuButton: Bool = false,
                           menuButtonAlignment: Alignment = .topTrailing,
                           menuButtonTrailingInset: CGFloat = 40,
                           onRemoveFromContainer: (() -> Void)? = nil) -> some View {
         modifier(TrackContextMenu(snapshot: snapshot, track: track,
                                   playlists: playlists, onPlay: onPlay,
+                                  videoContext: videoContext, videoSource: videoSource,
                                   showsMenuButton: showsMenuButton,
                                   menuButtonAlignment: menuButtonAlignment,
                                   menuButtonTrailingInset: menuButtonTrailingInset,

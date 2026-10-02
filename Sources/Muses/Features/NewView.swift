@@ -201,7 +201,7 @@ struct NewView: View {
                             )
                             .trackContextMenu(snapshot: snapshot, onPlay: {
                                 play(snapshot, context: newTracks)
-                            }, showsMenuButton: true, menuButtonAlignment: .bottomLeading,
+                            }, videoContext: newTracks, videoSource: .songs, showsMenuButton: true, menuButtonAlignment: .bottomLeading,
                                menuButtonTrailingInset: 0)
                         }
                         if featuredTracks.isEmpty {
@@ -246,12 +246,12 @@ struct NewView: View {
                 spacing: 0
             ) {
                 ForEach(bestNewTracks) { snapshot in
-                    CompactDiscoveryTrackRow(snapshot: snapshot) {
+                    CompactDiscoveryTrackRow(snapshot: snapshot, videoContext: bestNewTracks) {
                         play(snapshot, context: bestNewTracks)
                     }
                     .trackContextMenu(snapshot: snapshot, onPlay: {
                         play(snapshot, context: bestNewTracks)
-                    })
+                    }, videoContext: bestNewTracks, videoSource: .songs)
                 }
             }
             .padding(.horizontal, AppleMusicTokens.contentPaddingX)
@@ -270,6 +270,7 @@ struct NewView: View {
                         size: MusicObjectMetrics.albumRail,
                         role: .browse,
                         videoEntry: .init(id: snapshot.youTubeId, title: snapshot.title, uploader: snapshot.artist, duration: snapshot.durationSeconds),
+                        videoContext: section.items, videoSource: .songs,
                         isYouTube: true,
                         nowPlayingID: snapshot.id,
                         showsHoverPlay: true,
@@ -278,7 +279,7 @@ struct NewView: View {
                     )
                     .trackContextMenu(snapshot: snapshot, onPlay: {
                         play(snapshot, context: section.items)
-                    }, showsMenuButton: true)
+                    }, videoContext: section.items, videoSource: .songs, showsMenuButton: true)
                 }
             }
         }
@@ -304,6 +305,10 @@ struct NewView: View {
                             size: MusicObjectMetrics.albumRail,
                             role: .browse,
                             videoEntry: .init(id: card.playableVideoID ?? card.id, title: card.title, uploader: card.uploader, duration: card.duration),
+                            videoEntries: cards.compactMap { sibling in
+                                guard let id = sibling.playableVideoID else { return nil }
+                                return .init(id: id, title: sibling.title, uploader: sibling.uploader, duration: sibling.duration)
+                            },
                             isYouTube: true,
                             showsHoverPlay: true,
                             onSelect: { openPreview(card, siblings: cards) },
@@ -477,6 +482,7 @@ struct NewView: View {
 
 private struct CompactDiscoveryTrackRow: View {
     let snapshot: TrackSnapshot
+    var videoContext: [TrackSnapshot] = []
     let onPlay: () -> Void
 
     @State private var hovering = false
@@ -515,7 +521,8 @@ private struct CompactDiscoveryTrackRow: View {
         }
         .buttonStyle(.fullAreaPlain)
         .overlay(alignment: .trailing) {
-            YouTubeVideoButton(entry: .init(id: snapshot.youTubeId, title: snapshot.title, uploader: snapshot.artist, duration: snapshot.durationSeconds))
+            YouTubeVideoButton(entry: .init(id: snapshot.youTubeId, title: snapshot.title, uploader: snapshot.artist, duration: snapshot.durationSeconds),
+                               context: videoContext, source: .songs)
                 .padding(.trailing, 8)
         }
         .onHover { hovering = $0 }

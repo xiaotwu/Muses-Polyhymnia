@@ -79,6 +79,7 @@ struct SongsListView: View {
                 "\(rows.count) 首歌曲 • 标题 A–Z", zhHant: "\(rows.count) 首歌曲 • 標題 A–Z"
             ),
             rows: rows,
+            source: .songs,
             defaultSort: .titleAZ,
             currentTrack: playback.state.track,
             playlists: allPlaylists,

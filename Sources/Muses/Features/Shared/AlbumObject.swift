@@ -25,6 +25,10 @@ struct AlbumObjectView: View {
     var hoverLift: CGFloat? = nil
     var pressedScale: CGFloat = 1
     var videoEntry: YTDlpBridge.YTDlpPlaylistEntry? = nil
+    var videoContext: [TrackSnapshot] = []
+    var videoEntries: [YTDlpBridge.YTDlpPlaylistEntry] = []
+    var videoSource: QueueSource = .search
+    var videoResumeAtMs: Double? = nil
     var isYouTube = false
     var isNowPlaying: Bool = false
     /// Snap-level identity for `.play` rails. Compared inside `NowPlayingMark`,
@@ -288,7 +292,10 @@ struct AlbumObjectView: View {
         if isYouTube {
             let shape = RoundedRectangle(cornerRadius: 7, style: .continuous)
             Group {
-                if let videoEntry { YouTubeVideoButton(entry: videoEntry) }
+                if let videoEntry {
+                    YouTubeVideoButton(entry: videoEntry, context: videoContext, entries: videoEntries,
+                                       source: videoSource, resumeAtMs: videoResumeAtMs)
+                }
                 else { YouTubeMark(size: 12).accessibilityHidden(true) }
             }
                 .padding(.horizontal, 7)

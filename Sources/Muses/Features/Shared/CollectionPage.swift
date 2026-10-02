@@ -8,6 +8,7 @@ struct CollectionPage<Controls: View>: View {
     let subtitle: String
     let youTubeURL: URL?
     let rows: [CollectionTrackRow]
+    let source: QueueSource
     let defaultSort: CollectionTableDefaultSort
     let currentTrack: TrackSnapshot?
     var playlists: [Playlist] = []
@@ -33,6 +34,7 @@ struct CollectionPage<Controls: View>: View {
         subtitle: String,
         youTubeURL: URL? = nil,
         rows: [CollectionTrackRow],
+        source: QueueSource,
         defaultSort: CollectionTableDefaultSort,
         currentTrack: TrackSnapshot?,
         playlists: [Playlist] = [],
@@ -49,6 +51,7 @@ struct CollectionPage<Controls: View>: View {
         self.subtitle = subtitle
         self.youTubeURL = youTubeURL
         self.rows = rows
+        self.source = source
         self.defaultSort = defaultSort
         self.currentTrack = currentTrack
         self.playlists = playlists
@@ -92,6 +95,7 @@ struct CollectionPage<Controls: View>: View {
                         subtitle: subtitle,
                         youTubeURL: youTubeURL,
                         rows: rows,
+                        source: source,
                         currentTrack: currentTrack,
                         playlists: playlists,
                         isInteractionEnabled: mode == .stage,
@@ -114,6 +118,7 @@ struct CollectionPage<Controls: View>: View {
                         subtitle: subtitle,
                         youTubeURL: youTubeURL,
                         rows: rows,
+                        source: source,
                         defaultSort: defaultSort,
                         currentTrack: currentTrack,
                         playlists: playlists,
@@ -281,6 +286,7 @@ private struct CollectionListPanel<Controls: View>: View {
     let subtitle: String
     let youTubeURL: URL?
     let rows: [CollectionTrackRow]
+    let source: QueueSource
     let defaultSort: CollectionTableDefaultSort
     let currentTrack: TrackSnapshot?
     let playlists: [Playlist]
@@ -313,6 +319,7 @@ private struct CollectionListPanel<Controls: View>: View {
 
             CollectionTrackTable(
                 rows: rows,
+                source: source,
                 defaultSort: defaultSort,
                 currentTrack: currentTrack,
                 playlists: playlists,
@@ -326,6 +333,7 @@ private struct CollectionListPanel<Controls: View>: View {
 
 private struct CollectionTrackTable: View {
     let rows: [CollectionTrackRow]
+    let source: QueueSource
     let defaultSort: CollectionTableDefaultSort
     let currentTrack: TrackSnapshot?
     let playlists: [Playlist]
@@ -354,6 +362,7 @@ private struct CollectionTrackTable: View {
 
     init(
         rows: [CollectionTrackRow],
+        source: QueueSource,
         defaultSort: CollectionTableDefaultSort,
         currentTrack: TrackSnapshot?,
         playlists: [Playlist],
@@ -361,6 +370,7 @@ private struct CollectionTrackTable: View {
         onRemove: ((CollectionTrackRow) -> Void)?
     ) {
         self.rows = rows
+        self.source = source
         self.defaultSort = defaultSort
         self.currentTrack = currentTrack
         self.playlists = playlists
@@ -662,6 +672,8 @@ private struct CollectionTrackTable: View {
                 snapshot: row.snapshot,
                 playlists: playlists,
                 onPlay: { onPlay(row) },
+                videoContext: rows.map(\.snapshot),
+                videoSource: source,
                 onRemoveFromContainer: onRemove.map { handler in { handler(row) } },
                 onEditTrack: { editingTrack = library.track(by: row.snapshot.id) },
                 onTrackNotes: { notesTrack = library.track(by: row.snapshot.id) },

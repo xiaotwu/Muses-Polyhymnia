@@ -42,6 +42,7 @@ struct SearchCategoryButton: View {
 struct GlobalSearchTrackRow: View {
     let snapshot: TrackSnapshot
     let isCurrent: Bool
+    var videoContext: [TrackSnapshot] = []
     let onPlay: () -> Void
 
     var body: some View {
@@ -72,7 +73,8 @@ struct GlobalSearchTrackRow: View {
         }
         .buttonStyle(.fullAreaPlain)
         .overlay(alignment: .trailing) {
-            YouTubeVideoButton(entry: .init(id: snapshot.youTubeId, title: snapshot.title, uploader: snapshot.artist, duration: snapshot.durationSeconds))
+            YouTubeVideoButton(entry: .init(id: snapshot.youTubeId, title: snapshot.title, uploader: snapshot.artist, duration: snapshot.durationSeconds),
+                               context: videoContext)
         }
         .overlay(alignment: .bottom) {
             Rectangle().fill(BrandColors.hairline).frame(height: 1)
@@ -85,6 +87,7 @@ struct GlobalSearchTrackRow: View {
 struct GlobalSearchYouTubeRow: View {
     let entry: YTDlpBridge.YTDlpPlaylistEntry
     let isSaved: Bool
+    var videoEntries: [YTDlpBridge.YTDlpPlaylistEntry] = []
     let onPlay: () -> Void
 
     var body: some View {
@@ -120,7 +123,7 @@ struct GlobalSearchYouTubeRow: View {
                     .help(tr("In Library", "已在资料库中"))
                     .accessibilityLabel(tr("In Library", "已在资料库中"))
             }
-            YouTubeVideoButton(entry: entry)
+            YouTubeVideoButton(entry: entry, entries: videoEntries)
         }
         .frame(minHeight: SearchPagePolicy.resultRowHeight)
         .overlay(alignment: .bottom) {

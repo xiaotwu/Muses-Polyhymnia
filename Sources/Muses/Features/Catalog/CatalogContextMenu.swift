@@ -66,6 +66,7 @@ private struct CatalogCollectionContextMenu: ViewModifier {
     let menuTitle: String
     let showsMenuButton: Bool
     let canResolvePlayback: Bool
+    let videoSource: QueueSource
 
     @Environment(PlaybackService.self) private var playback
 
@@ -102,7 +103,7 @@ private struct CatalogCollectionContextMenu: ViewModifier {
                 }
                 if let first = tracks.first {
                     Button {
-                        PlaybackPresentation.video(first, context: tracks, playback: playback)
+                        PlaybackPresentation.video(first, context: tracks, source: videoSource, playback: playback)
                     } label: {
                         Label {
                             Text(tr("Floating video", "悬浮视频"))
@@ -138,7 +139,8 @@ extension View {
             onShuffle: onShuffle,
             menuTitle: tr("More for \(release.title)", "更多：\(release.title)"),
             showsMenuButton: showsMenuButton,
-            canResolvePlayback: canResolvePlayback
+            canResolvePlayback: canResolvePlayback,
+            videoSource: .album
         ))
     }
 
@@ -161,7 +163,8 @@ extension View {
             onShuffle: onShuffle,
             menuTitle: tr("More for \(artist.name)", "更多：\(artist.name)"),
             showsMenuButton: showsMenuButton,
-            canResolvePlayback: false
+            canResolvePlayback: false,
+            videoSource: .artist
         ))
     }
 }

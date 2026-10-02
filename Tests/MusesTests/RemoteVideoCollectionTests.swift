@@ -5,6 +5,23 @@ import Testing
 @MainActor
 @Suite("Remote video collection selection", .serialized)
 struct RemoteVideoCollectionTests {
+    @Test("Snapshot video preserves canonical order and originating collection", arguments: [QueueSource.songs, .playlist, .import, .recently, .album, .artist, .search])
+    func snapshotCollection(source: QueueSource) throws {
+        let queue = QueueService()
+        let playback = PlaybackService(engine: RecordingEngine(), queue: queue)
+        let selected = snapshot("video00000b")
+        let canonical = [snapshot("video00000c"), selected, snapshot("video00000a")]
+        let session = try #require(PlaybackPresentation.prepareVideo(selected,
+            context: canonical, source: source, playback: playback))
+
+        #expect(queue.items.map(\.track.id) == canonical.map(\.id))
+        #expect(queue.items.map(\.track.youTubeId) == ["video00000c", "video00000b", "video00000a"])
+        #expect(queue.currentIndex == 1)
+        #expect(queue.items.allSatisfy { $0.fromContext == source })
+        #expect(session.videoId == selected.youTubeId)
+        playback.pause()
+    }
+
     @Test("Video selection retains repeated source occurrence and podcast resume before readiness")
     func selectsOccurrenceWithResume() throws {
         let queue = QueueService()

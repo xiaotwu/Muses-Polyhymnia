@@ -50,6 +50,7 @@ extension HomeView {
                                           onPlay: { play(snapshot, context: context.isEmpty ? supportedRecent : context) })
                                 .trackContextMenu(snapshot: snapshot,
                                                   onPlay: { play(snapshot, context: context.isEmpty ? supportedRecent : context) },
+                                                  videoContext: context.isEmpty ? supportedRecent : context,
                                                   showsMenuButton: true, menuButtonAlignment: .topTrailing, menuButtonTrailingInset: 0)
                         }
                     }.padding(.horizontal, AppleMusicTokens.contentPaddingX)
@@ -137,7 +138,7 @@ extension HomeView {
             )
             .trackContextMenu(snapshot: snapshot, onPlay: {
                 play(snapshot, context: supportedRecent)
-            }, showsMenuButton: true, menuButtonTrailingInset: 0)
+            }, videoContext: supportedRecent, showsMenuButton: true, menuButtonTrailingInset: 0)
         }
     }
 
@@ -343,7 +344,15 @@ extension HomeView {
                 Task { await play(card, siblings: context) }
             }
         case .track(let snapshot):
-            Button { play(snapshot, context: [snapshot]) } label: {
+            let tracks = context.compactMap { item -> TrackSnapshot? in
+                if case .track(let track) = item, !track.youTubeId.isEmpty { return track }
+                return nil
+            }
+            let playbackContext = tracks.contains(where: { $0.id == snapshot.id }) ? tracks : [snapshot] + tracks
+            Button {
+                guard !snapshot.youTubeId.isEmpty else { return }
+                play(snapshot, context: playbackContext)
+            } label: {
                 HStack(spacing: 10) {
                     ArtworkView(source: ArtworkSource.resolve(for: snapshot),
                                 cornerRadius: 5, glyphSize: 18, targetSize: 48)
@@ -357,6 +366,10 @@ extension HomeView {
                 }
             }
             .buttonStyle(.fullAreaPlain)
+            .trackContextMenu(snapshot: snapshot, onPlay: {
+                guard !snapshot.youTubeId.isEmpty else { return }
+                play(snapshot, context: playbackContext)
+            }, videoContext: playbackContext)
         }
     }
 
@@ -389,6 +402,10 @@ extension HomeView {
                 role: .browse,
                 style: .home,
                 videoEntry: card.playableVideoID.map { .init(id: $0, title: card.title, uploader: card.uploader, duration: card.duration) },
+                videoEntries: remoteCards(in: sectionItems).compactMap { sibling in
+                    guard let id = sibling.playableVideoID else { return nil }
+                    return .init(id: id, title: sibling.title, uploader: sibling.uploader, duration: sibling.duration)
+                },
                 isYouTube: true,
                 showsHoverPlay: canPlay,
                 onSelect: { openWebCard(card) },
@@ -420,7 +437,8 @@ extension HomeView {
                 onSelect: { openPreview(snapshot, context: context) },
                 onPlay: { play(snapshot, context: context) }
             )
-            .trackContextMenu(snapshot: snapshot, onPlay: { play(snapshot, context: context) }, showsMenuButton: true)
+            .trackContextMenu(snapshot: snapshot, onPlay: { play(snapshot, context: context) },
+                              videoContext: context, showsMenuButton: true)
         }
     }
 
@@ -498,7 +516,7 @@ extension HomeView {
                         }
                         Button {
                             let context = (imported.items ?? []).sorted { $0.order < $1.order }.compactMap(\.track).map(TrackSnapshot.init(from:))
-                            if let first = context.first { PlaybackPresentation.video(first, context: context, playback: playback) }
+                            if let first = context.first { PlaybackPresentation.video(first, context: context, source: .import, playback: playback) }
                         } label: {
                             Label {
                                 Text(tr("Floating video", "悬浮视频"))

@@ -21,6 +21,7 @@ struct PlaylistDetailView: View {
                 "\(rows.count) 首歌曲 • 歌单顺序", zhHant: "\(rows.count) 首歌曲 • 歌單順序"
             ),
             rows: rows,
+            source: .playlist,
             defaultSort: .playlistOrder,
             currentTrack: playback.state.track,
             playlists: allPlaylists,

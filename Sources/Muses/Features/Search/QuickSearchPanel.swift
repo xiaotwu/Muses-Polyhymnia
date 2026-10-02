@@ -34,14 +34,15 @@ struct QuickSearchPanel: View {
             } else {
                 ForEach(matches.prefix(6)) { snapshot in
                     GlobalSearchTrackRow(snapshot: snapshot,
-                                         isCurrent: playback.state.track?.id == snapshot.id) {
+                                         isCurrent: playback.state.track?.id == snapshot.id,
+                                         videoContext: matches) {
                         playback.playTrack(snapshot, context: matches, from: .search)
                         onDismiss()
                     }
                     .trackContextMenu(snapshot: snapshot, onPlay: {
                         playback.playTrack(snapshot, context: matches, from: .search)
                         onDismiss()
-                    })
+                    }, videoContext: matches)
                 }
             }
             Button(tr("Open full search", "打开完整搜索"), systemImage: "arrow.up.forward.app") {
