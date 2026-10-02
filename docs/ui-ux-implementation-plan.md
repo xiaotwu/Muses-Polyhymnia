@@ -4,11 +4,11 @@ This is the active implementation contract for the user's completed selections, 
 
 ## Completion accounting
 
-Concept samples and imported choices are complete. Production redesign is not complete. Foundation commit `c1c9dcb` raised the macOS floor and repaired a subset of settings controls. Hero commit `a2e8a6e` implemented H0 structure + H2 center emphasis + H3 optional information. No other area may be marked complete merely because an SVG exists or a unit test passes.
+Concept samples and imported choices are complete. The selected production reconstruction is implemented across the areas accounted for below; comprehensive acceptance remains open. Implementation, test/package validation and live-state acceptance are separate milestones. Foundation commit `c1c9dcb` raised the macOS floor and repaired a subset of settings controls. Hero commit `a2e8a6e` implemented H0 structure + H2 center emphasis + H3 optional information. No other area may be marked complete merely because an SVG exists or a unit test passes.
 
 Per-area completion requires production code, proportionate build/tests, rendered runtime evidence, keyboard/pointer/context-menu/focus checks and relevant state/accessibility checks. Record evidence and gaps in its Linear task. Final completion requires reconciliation of all 64 areas; an unverified state remains pending. macOS below 26 is out of scope. Keep existing user data, queue semantics and shared services intact.
 
-### Phase 1 first implementation — 2026-10-01
+### Historical: phase 1 first implementation — 2026-10-01
 
 Persistent native glass navigation islands now replace the expandable playlist sidebar. Search/Home and library destinations form separate capsules, with an independent Settings circle. Settings uses two category islands including the approved shortcuts category. Hover expands labels over content without changing its width. Albums/Artists share a native menu. Immersive playback reveals the same navigation on pointer entry and fades it on exit; a view focus callback supports keyboard reveal.
 
@@ -16,7 +16,7 @@ Verification: all 765 tests in 106 suites passed; the release acceptance bundle 
 
 Remaining phase 1 acceptance: compact windows, full keyboard traversal/focus reveal, VoiceOver naming (including the native catalog menu), light/high-contrast/Reduce Transparency, and the approved shared typography/content-width treatment. This increment does not complete XW-7 or all 64 areas.
 
-### Phase 1 typography and phase 2 first implementation — 2026-10-01
+### Historical: phase 1 typography and phase 2 first implementation — 2026-10-01
 
 Shared browsing/settings titles now use native SF typography at a consistent 28pt; shared section headings use 20pt. Expressive editorial, hero, song-information and lyric font families remain available. Navigation hover covers the expanded label width. The catalog menu's label now has an explicit accessibility boundary; its semantic name survived repeated runtime state changes in the isolated acceptance instance.
 
@@ -30,7 +30,7 @@ Additional isolated native verification confirmed idle transport disabling, acti
 
 Remaining: compact/light/accessibility matrices; full keyboard traversal, queue menu/reorder/group mutations and clear/replay recovery in an isolated acceptance store. These areas remain In Progress, not complete. Native queue rows currently expose their menu label as the row name in AX, although the track identity is present in the value; include this in XW-12 acceptance.
 
-### Phase 3 overview and filter increment — 2026-10-01
+### Historical: phase 3 overview and filter increment — 2026-10-01
 
 All Playlists now defaults to a lazy native list with an optional adaptive square cover grid. Layout choice persists through relaunch. Titles/owner/count sit outside artwork; one source/status mark carries sync detail, with visible review warnings. Open, Play and the per-playlist options menu are separate native controls. Existing pin/delete/undo, import synchronization, versions, sharing, video and recently-deleted flows retain their service calls. Empty collection Play is disabled. The approved detail hero remains unchanged.
 
@@ -40,12 +40,20 @@ Validation: 765 tests in 106 suites passed; the signed final release package pas
 
 Remaining phase 3 work: Home source/recovery menu and content-type artwork; New provenance and shared shelves; broader catalog/video/favorites states; Spotlight quick entry; grouped-result expansion and catalog details; podcast continuation and subscription/Shorts segmentation; reduced hero stage/table/cover-wall/detail heading acceptance. Remote category execution, editorial keyboard traversal, compact/light/high-contrast/Reduce Transparency and actual VoiceOver remain unverified. XW-8/XW-9 remain In Progress.
 
+### Integrated implementation delivery — 2026-10-02
+
+The approved reconstruction now has production implementations for the navigation/chrome, discovery/catalog/search, preserved H0 + H2 + H3 collection hero, playlist operations, queue/history, playback/lyrics/auxiliary surfaces and settings combinations recorded below. Implementation commit `782f633` delivers the reconstructed surfaces; `6df4cf2` repairs two rendered layout defects. The integrated suite passed **774 tests in 106 suites**; final targeted chrome/collection verification passed **72 tests in 2 suites**, and ad-hoc signed release packaging passed again. These checks establish build and behavioral guardrails; they do not establish comprehensive rendered or authenticated acceptance. Earlier phase paragraphs are historical snapshots; their “remaining” lists describe those earlier increments and are superseded by the current area table and [acceptance ledger](ui-ux-redesign-acceptance.md).
+
+Latest native inspection verified the entire navigation island group centered as one group with equal 16pt gaps, including its footer action. Home, Queue and Now Playing were inspected with Reduce Transparency; Now Playing's empty-lyrics recovery was inspected with Increase Contrast. Earlier isolated native inspections covered the playlist list/grid and persisted choice, source/search menus, gallery preview, integrated queue/history and auxiliary/settings surfaces. Native Reduce Motion inspection exercised the deck and vinyl. Reduce Motion, Reduce Transparency and Increase Contrast were restored to their original off values; a fresh NSWorkspace read confirmed all three false. VoiceOver remained enabled. Private screenshots and acceptance-store content remain local and are not committed.
+
+Live authenticated catalog/podcast/channel results, actual browser consent/cookie recovery, notification/media permission transitions, remote playlist/subscription writes and eligible update download/installation were not exercised end to end. The dedicated consent and exact-target confirmation boundaries remain required. The complete keyboard/VoiceOver and light/dark/contrast state matrix, representative per-artwork lyric contrast, and measured CPU/energy benefits also remain unverified. Do not close coordination parents or XW-12 as comprehensively accepted on the strength of the suite/package pass.
+
 ## Delivery order and dependencies
 
 | Phase | Linear task | Deliverable | Dependency |
 | --- | --- | --- | --- |
 | Foundation | XW-6 | macOS 26 floor, native settings action foundation | Existing implementation; broader acceptance pending |
-| 1 | XW-7 | Persistent glass menu islands; Settings category islands; combined Albums/Artists entry; immersive reveal; semantic contrast and typography | First active phase |
+| 1 | XW-7 | Persistent glass menu islands; Settings category islands; combined Albums/Artists entry; immersive reveal; semantic contrast and typography | Integrated shell; acceptance tracked below |
 | 2 | XW-13 | Full-height trailing queue, collection/Up Next/history and listening history | Window composition in phase 1 |
 | 3 | XW-8 / XW-9 | Home/New/search/catalog/podcast/subscriptions; preserved heroes; songs/playlist layouts | Navigation shell in phase 1 |
 | 4 | XW-16 | Create/import/add/sync/delete/version/metadata/notes/context actions | Playlist browsing and shared controls |
@@ -74,70 +82,70 @@ Use SwiftUI Expert for state/view invalidation, resizable layout, native control
 
 | Area | Selected options | Primary task | Current evidence/status |
 | --- | --- | --- | --- |
-| 01 窗口与导航 | A + B | XW-7 | Persistent navigation islands implemented; broader acceptance pending |
-| 02 工具栏与返回语义 | A + B + C | XW-7 | Native history retained; sidebar collapse removed; broader acceptance pending |
-| 03 边栏选中与图标轨道 | A + B | XW-7 | Capsule groups and selection implemented; keyboard/VoiceOver acceptance pending |
-| 04 标题、字体与内容宽度 | A + B | XW-7 | Shared SF page/section titles implemented; editorial F3 retained; content-width/compact acceptance pending |
-| 05 玻璃层级与颜色 | C | XW-7 | Pending production redesign |
-| 06 浅色、深色和辅助显示 | A | XW-7 | Existing foundation; full accessibility matrix pending |
-| 07 首页来源与恢复提示 | B | XW-8 | Pending production redesign |
-| 08 心情与活动 | A | XW-8 | Pending production redesign |
-| 09 首页精选与封面货架 | D | XW-8 | Pending production redesign |
-| 10 新发现 | A | XW-8 | Pending production redesign |
-| 11 货架卡片及hover播放 | A | XW-8 | Editorial Open/Play semantics and focus visibility implemented; shared shelf/native acceptance pending |
-| 12 歌曲默认页面 | B | XW-9 | Hero first implementation a2e8a6e; remaining layout/accessibility acceptance pending |
-| 13 焦点带、定位与播放仪式 | A | XW-9 | Hero first implementation a2e8a6e; remaining layout/accessibility acceptance pending |
-| 14 完整表格、分页和排序 | A | XW-9 | Pending production redesign |
-| 15 封面墙与布局记忆 | A | XW-9 | Pending production redesign |
-| 16 专辑与艺术家 | A | XW-8 | Pending production redesign |
-| 17 音乐视频 | A | XW-8 | Pending production redesign |
-| 18 收藏、固定与空态 | A | XW-8 | Pending production redesign |
-| 19 全部歌单卡片 | A + B | XW-9 | Default lazy list, optional square grid, layout persistence and named controls rendered; broader state/accessibility acceptance pending |
-| 20 歌单详情标题与动作 | A | XW-9 | Pending production redesign |
-| 21 创建与导入入口 | B | XW-16 | Pending production redesign |
-| 22 导入链接与进度 | B | XW-16 | Pending production redesign |
-| 23 添加YouTube曲目与预览 | A | XW-16 | Pending production redesign |
-| 24 Pull、Push与冲突合并 | B | XW-16 | Pending production redesign |
-| 25 删除与版本恢复 | B + C | XW-16 | Pending production redesign |
-| 26 搜索场景和输入 | C | XW-8 | Pending production redesign |
-| 27 来源与类别筛选 | B | XW-8 | Two native menus implemented; Library/empty states rendered; remote filtering/compact acceptance pending |
-| 28 分组结果与目录详情 | A | XW-8 | Pending production redesign |
-| 29 播客关注与节目详情 | C | XW-8 | Pending production redesign |
-| 30 订阅频道与Shorts | B + C | XW-8 | Pending production redesign |
-| 31 历史概览与热力图 | A | XW-13 | Quiet metrics/disclosure implemented and rendered; compact/accessibility acceptance pending |
-| 32 历史歌曲、清除与回放 | B | XW-13 | Timestamp/duration/stored completion/context menus implemented; clear/replay acceptance pending |
-| 33 队列面板和三段结构 | A | XW-13 | Full-height shell confirmed; prioritized sections/counts/disclosure implemented and rendered; broader acceptance pending |
-| 34 队列分组、重排与Smart Shuffle | A | XW-13 | Native reorder menus and explanation implemented; mutation/keyboard/focus acceptance pending |
-| 35 PlayerBar布局与闲置 | A | XW-14 | Pending production redesign |
-| 36 进度、随机与重复 | A | XW-14 | Pending production redesign |
-| 37 音量与输出 | C | XW-14 | Pending production redesign |
-| 38 Now Playing封面与歌词布局 | B + C | XW-14 | Pending production redesign |
-| 39 黑胶模式与封面连续性 | A | XW-14 | Pending production redesign |
-| 40 歌词显示、翻译和时序 | A + B + C + D | XW-14 | Pending production redesign |
-| 41 歌词匹配sheet与预览 | A | XW-15 | Pending production redesign |
-| 42 视频主窗口与浮窗 | A | XW-15 | Pending production redesign |
-| 43 章节、评论与回复 | A | XW-15 | Pending production redesign |
-| 44 音频信息与频谱 | A | XW-15 | Pending production redesign |
-| 45 EQ编辑与预设保存 | B | XW-15 | Pending production redesign |
-| 46 迷你播放器、菜单栏和桌面歌词 | A | XW-15 | Pending production redesign |
-| 47 歌曲上下文菜单、分享和更多 | A + C | XW-16 | Pending production redesign |
-| 48 编辑元数据、笔记与书签 | A | XW-16 | Pending production redesign |
-| 49 设置结构、标题与按钮 | A + B | XW-7 | Category islands and native form foundation implemented; remaining combination/acceptance pending |
-| 50 通用、语言和通知 | A | XW-17 | Pending production redesign |
-| 51 快捷键、手势和媒体权限 | D | XW-17 | Pending production redesign |
-| 52 音质、缓存和预缓存 | B + C + D | XW-17 | Pending production redesign |
-| 53 外观、字号和字体popover | A + C | XW-17 | Pending production redesign |
-| 54 账号连接与权限 | A + C | XW-17 | Some foundation repairs; approved full combination pending |
-| 55 个性化首页与浏览器同意 | A + B + C + D | XW-18 | Pending production redesign |
-| 56 播放访问、cookies和解析器配置 | A + B + C + D | XW-18 | Pending production redesign |
-| 57 歌词来源与Intelligence | A + B + C + D | XW-17 | Pending production redesign |
-| 58 诊断、GPU和技术路径 | B + D | XW-18 | Pending production redesign |
-| 59 资料库身份核对 | A + B + C | XW-17 | Pending production redesign |
-| 60 帮助与隐私 | A | XW-17 | Pending production redesign |
-| 61 关于与更新 | A + C + D | XW-17 | Pending production redesign |
-| 62 加载、空、失败与过期 | A + B + D | XW-12 | Pending production redesign |
-| 63 键盘、焦点和VoiceOver | A + C | XW-12 | Pending production redesign |
-| 64 动效、滚动和能耗 | B + D | XW-12 | Pending production redesign |
+| 01 窗口与导航 | A + B | XW-7 | Implemented persistent native glass islands; entire group centered with equal 16pt gaps rendered; full keyboard/VoiceOver matrix open |
+| 02 工具栏与返回语义 | A + B + C | XW-7 | Native window-local Back/Forward and immersive exit retained; main Search shares history; complete keyboard/window-restoration matrix open |
+| 03 边栏选中与图标轨道 | A + B | XW-7 | Grouped capsules, semantic selection and combined catalog menu implemented; hover/focus reveal retained; complete AX traversal open |
+| 04 标题、字体与内容宽度 | A + B | XW-7 | Shared 28pt SF page / 20pt section hierarchy and responsive forms implemented; expressive F3 remains; full font/appearance matrix open |
+| 05 玻璃层级与颜色 | C | XW-7 | Native navigation/window glass with adaptive solid PlayerBar capsule implemented; Reduce Transparency rendered on Home/Queue/Now Playing; light/artwork matrix open |
+| 06 浅色、深色和辅助显示 | A | XW-7 | Semantic colors, opaque accessibility path and neutral lyric fallback implemented; Increase Contrast empty lyrics rendered; full appearance matrix open |
+| 07 首页来源与恢复提示 | B | XW-8 | Native source menu, true source/cached-origin filters and shared Account/Home recovery copy implemented; live browser/account recovery unexercised |
+| 08 心情与活动 | A | XW-8 | Native horizontal capsule activities implemented; shared main Search routing retained; complete keyboard/compact traversal open |
+| 09 首页精选与封面货架 | D | XW-8 | Source-labeled landscape Muses Spotlight, type-aware Top Picks and square shelves implemented; no external editorial/release metadata invented |
+| 10 新发现 | A | XW-8 | Truthful library rediscovery / account / subscription-inspired provenance and source menu implemented; account identity/cancellation guards retained; live provider states open |
+| 11 货架卡片及hover播放 | A | XW-8 | True read-only cover Open, separate focus-visible Play and full native More implemented; compact Spotlight More moved to artwork corner; complete focus matrix open |
+| 12 歌曲默认页面 | B | XW-9 | H0/H2/H3 hero retained; bounded 260pt cover stage and reduced vertical clearance implemented; complete compact/state acceptance open |
+| 13 焦点带、定位与播放仪式 | A | XW-9 | Canonical focus inputs preserved; ember effect replaced by restrained 180ms continuity outline with Reduce Motion path; full input equivalence open |
+| 14 完整表格、分页和排序 | A | XW-9 | Existing native Table, visible columns, sorting and accessible paging retained; canonical order/context preserved; full keyboard/large-list runtime matrix open |
+| 15 封面墙与布局记忆 | A | XW-9 | Existing adaptive lazy square cover wall, two-line titles, native actions and per-collection layout memory retained; complete wall/focus acceptance open |
+| 16 专辑与艺术家 | A | XW-8 | Square album overview, circular artists and independent identity notice implemented; stable identities/cache/refresh/detail authority retained; live catalog matrix open |
+| 17 音乐视频 | A | XW-8 | Track-backed 16:9 MusicVideoCollectionView with duration/video copy and full playback context implemented; populated native video matrix open |
+| 18 收藏、固定与空态 | A | XW-8 | Shared native ContentUnavailableView with destination-specific search/import actions implemented; complete favorites/pins/unavailable matrix open |
+| 19 全部歌单卡片 | A + B | XW-9 | Default lazy list / optional square grid and layout persistence rendered; separate named Open/Play/More retained; broader state/AX matrix open |
+| 20 歌单详情标题与动作 | A | XW-9 | Existing cover/information/primary Play hierarchy retained; imported-playlist Pull/Push moved to More; authenticated sync acceptance open |
+| 21 创建与导入入口 | B | XW-16 | Direct native Add menu lists Muses create, YouTube import and YouTube create; choice sheet removed; remote create not executed |
+| 22 导入链接与进度 | B | XW-16 | Source / occurrence selection / confirmation import sheet implemented; only final confirmation writes, cancellation and occurrence tests passed; live import matrix open |
+| 23 添加YouTube曲目与预览 | A | XW-16 | Native Search/Link preview with explicit Muses-local target and separate saved local revision implemented; actual remote Push remains separate and unexercised |
+| 24 Pull、Push与冲突合并 | B | XW-16 | Side-by-side Muses/YouTube snapshot lists and explicit per-conflict resolution implemented; automatic merge preserves remote-only changes; live Pull/Push unexercised |
+| 25 删除与版本恢复 | B + C | XW-16 | Affected-entry deletion preview implemented; existing revision timeline/diff/pin/restore and Recently Deleted retained; isolated delete/restore matrix open |
+| 26 搜索场景和输入 | C | XW-8 | Local-only Spotlight-style quick entry wired to Cmd-F; full Search remains main-window destination/history; complete shortcut handoff matrix open |
+| 27 来源与类别筛选 | B | XW-8 | Separate native source/category menus implemented and Library/empty states rendered; authenticated/remote category execution matrix open |
+| 28 分组结果与目录详情 | A | XW-8 | Bounded grouped previews and stable-key See all/Show less implemented; full source playback context and main catalog history retained; populated remote matrix open |
+| 29 播客关注与节目详情 | C | XW-8 | Home continuation reads true persisted episode progress and resumes via shared facade; cover preview independent of Play; followed directory/paging retained; populated native episode acceptance open |
+| 30 订阅频道与Shorts | B + C | XW-8 | Discovery menu routes subscribed channels; native Videos/Shorts segments use separately verified tab sources, square channels and 9:16 Shorts; source/fallback tests passed, live channel matrix open |
+| 31 历史概览与热力图 | A | XW-13 | Native range, four quiet metrics and optional heatmap/data table implemented and rendered; complete keyboard/appearance matrix open |
+| 32 历史歌曲、清除与回放 | B | XW-13 | Stored timestamp/listening-duration/optional completion timeline with separate Play/Options implemented; confirmed clear preserved; isolated mutation matrix open |
+| 33 队列面板和三段结构 | A | XW-13 | Full-height trailing queue with pinned current, Up Next, current collection, groups/history and explicit empty copy rendered; row identity/Options separated; broader matrix open |
+| 34 队列分组、重排与Smart Shuffle | A | XW-13 | Native row/group reorder menus, drag order and Smart Shuffle explanation/Escape retained; complete isolated group/reorder mutation matrix open |
+| 35 PlayerBar布局与闲置 | A | XW-14 | Responsive three-group solid floating PlayerBar and idle lyre tile implemented; unavailable actions disabled while queue/volume stay usable; full compact/idle matrix open |
+| 36 进度、随机与重复 | A | XW-14 | Native keyboard/AX progress Slider and elapsed/remaining values implemented; seek commits guard media identity, shuffle/repeat expose readable values; live seek matrix open |
+| 37 音量与输出 | C | XW-14 | Horizontal app-volume popover and distinct trailing Mac-wide output menu implemented; shared PlaybackService volume preserved; actual device changes not exercised |
+| 38 Now Playing封面与歌词布局 | B + C | XW-14 | Left artwork/right lyrics with fixed safe dock and calm environment retained; empty lyric Match recovery and Increase Contrast inspected; representative artwork matrix open |
+| 39 黑胶模式与封面连续性 | A | XW-14 | Optional circular vinyl retained with Reduce Motion and visible/reduced-visual lifecycle gates; cover continuity retained; full vinyl/runtime matrix open |
+| 40 歌词显示、翻译和时序 | A + B + C + D | XW-14 | One native options menu, true source/synced/plain-text status, timing controls, neutral reading and artwork-line color implemented; fallback path retained; per-cover contrast/provider matrix open |
+| 41 歌词匹配sheet与预览 | A | XW-15 | Native split candidate list / independently scrolling lyric preview / fixed confirmation implemented; search/cancellation authority retained; populated remote candidate acceptance open |
+| 42 视频主窗口与浮窗 | A | XW-15 | Aspect-preserving on-demand video with visible Close and bounded native control group retained; no outer glass frame; live/floating video lifecycle acceptance open |
+| 43 章节、评论与回复 | A | XW-15 | Native chapter popover and full-height trailing read-only comments pane implemented; reply/paging authority unchanged; live comments/replies matrix open |
+| 44 音频信息与频谱 | A | XW-15 | Native grouped audio Form with collapsed technical details, separate output and spectrum implemented; unknown metadata remains unknown; populated metadata/device matrix open |
+| 45 EQ编辑与预设保存 | B | XW-15 | Curve drag plus frequency selection, exact finite gain input, Stepper and preset validation implemented; existing preset/delete semantics retained; isolated edit/save matrix open |
+| 46 迷你播放器、菜单栏和桌面歌词 | A | XW-15 | Single mini capsule and one native menu-bar popover surface retained; desktop lyrics reuse shared document/timing; full auxiliary-window/show-hide matrix open |
+| 47 歌曲上下文菜单、分享和更多 | A + C | XW-16 | Shared full track menus expose separate native More and semantic action groups; real share/external targets retained; complete per-surface keyboard/action matrix open |
+| 48 编辑元数据、笔记与书签 | A | XW-16 | Native metadata Form retained; notes/bookmarks use value drafts and one atomic Save with cancellation/failure handling; draft persistence tests passed; isolated native Save/Cancel matrix open |
+| 49 设置结构、标题与按钮 | A + B | XW-7 | Native responsive grouped Forms, SF titles and role-specific actions implemented with existing adaptive category islands; complete focus/window matrix open |
+| 50 通用、语言和通知 | A | XW-17 | Native language/notification controls with current permission status and one recovery action implemented; real OS permission transitions unexercised |
+| 51 快捷键、手势和媒体权限 | D | XW-17 | Static gesture examples and one media-permission recovery action implemented; shortcuts retained; live permission/conflict matrix open |
+| 52 音质、缓存和预缓存 | B + C + D | XW-17 | Quality profiles, progressive codec/cache categories, retained-scope deletion preview and pre-cache explanation implemented; actual quality reload/cache-clear matrix open |
+| 53 外观、字号和字体popover | A + C | XW-17 | Native theme/text controls, three live font samples and compact scrolling font popover implemented; no family rewrite on open; complete font/appearance acceptance open |
+| 54 账号连接与权限 | A + C | XW-17 | Distinct unconfigured/saved/pending/connected/expired account conclusions with progressive errors and separate permissions implemented; live OAuth/connect/revoke not exercised |
+| 55 个性化首页与浏览器同意 | A + B + C + D | XW-18 | Dedicated two-step browser-pinned consent and shared Home/Account recovery implemented; dismissal/reconnect/source-identity tests passed; live cookie/session acceptance unexercised |
+| 56 播放访问、cookies和解析器配置 | A + B + C + D | XW-18 | Purpose-separated native playback browser config, staged current/target/new preview and external-source location implemented; wizard no longer overwrites external config; live Apply unexercised |
+| 57 歌词来源与Intelligence | A + B + C + D | XW-17 | Automatic/default lyric source, progressive provider details, matching availability popover and reading-menu default separation implemented; provider/Intelligence error matrix open |
+| 58 诊断、GPU和技术路径 | B + D | XW-18 | Separate diagnostics window with Playback/Import/Account troubleshooting and progressive technical/GPU/reduced-visual controls implemented; auxiliary lifecycle matrix open |
+| 59 资料库身份核对 | A + B + C | XW-17 | Native evidence Table, selected preview, Pending/Confirmed and grouped Problems with fixed apply count implemented; stable evidence guards retained; actual apply/rollback unexercised |
+| 60 帮助与隐私 | A | XW-17 | Full-row native Help/Privacy disclosures with selected expansion/focus semantics implemented; complete keyboard/VoiceOver wording matrix open |
+| 61 关于与更新 | A + C + D | XW-17 | Native update status/progress/result sheet, retry and unsupported-build explanation implemented; real eligible download/verification/install not exercised |
+| 62 加载、空、失败与过期 | A + B + D | XW-12 | Shared/destination-specific native empty states and retained-content loading/failure/stale branches implemented; complete cross-feature state matrix open |
+| 63 键盘、焦点和VoiceOver | A + C | XW-12 | Native focusable controls and separate track/Options naming implemented; complete keyboard/VoiceOver traversal and permission-window focus matrix open |
+| 64 动效、滚动和能耗 | B + D | XW-12 | Restrained activation/hover, Reduce Motion and visible/reduced-visual spectrum/vinyl gates implemented; native deck/vinyl Reduce Motion checks and system preference restoration passed; measured energy/CPU benefit unproven |
 
 ## Exact option text and user notes
 
