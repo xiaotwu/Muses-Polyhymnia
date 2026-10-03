@@ -211,6 +211,8 @@ final class PodcastLibraryService {
         episode.lastPositionMs = 0
         episode.updatedAt = now
         try saveContext(ctx)
+        pendingProgressWrites.removeValue(forKey: videoID)
+        persistenceFailed = !pendingProgressWrites.isEmpty
         revision &+= 1
     }
 
@@ -273,6 +275,8 @@ final class PodcastLibraryService {
         row.playedAt = now
         row.updatedAt = now
         try saveContext(ctx)
+        pendingProgressWrites.removeValue(forKey: videoID)
+        persistenceFailed = !pendingProgressWrites.isEmpty
         revision &+= 1
     }
 

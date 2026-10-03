@@ -8,6 +8,65 @@ import Testing
 struct PodcastLibraryTests {
     private enum SaveError: Error { case injected }
 
+    @Test("successful mark unplayed supersedes only that episode's failed completion retry")
+    func markUnplayedSupersedesPendingCompletion() throws {
+        let container = try makeModelContainer(inMemory: true)
+        let bus = PlaybackEventBus()
+        var shouldFail = false
+        let service = PodcastLibraryService(modelContainer: container, eventBus: bus,
+            saveContext: { context in
+                if shouldFail { throw SaveError.injected }
+                try context.save()
+            })
+        try service.ingest(show: item(id: "browse:MPSPshow", kind: .podcast, title: "Show"),
+            episodes: [item(id: "video:abcdefghijk", kind: .episode, title: "One"),
+                       item(id: "video:abcdefghij2", kind: .episode, title: "Two")])
+        let tracks = ["abcdefghijk", "abcdefghij2"].map {
+            TrackSnapshot(from: Track(title: $0, artist: "Show", durationMs: 300_000,
+                                      youTubeId: $0, mediaKind: .podcastEpisode))
+        }
+        shouldFail = true
+        for track in tracks { bus.post(.trackCompleted(track, listenedMs: 300_000)) }
+        #expect(service.persistenceFailed)
+        #expect(throws: SaveError.injected) { try service.markUnplayed(videoID: "abcdefghijk") }
+        #expect(service.persistenceFailed)
+        shouldFail = false
+        try service.markUnplayed(videoID: "abcdefghijk")
+        #expect(service.persistenceFailed) // The other episode still needs its retry.
+        service.retryPendingProgress()
+        #expect(!service.persistenceFailed)
+        #expect(service.episode(videoID: "abcdefghijk")?.completed == false)
+        #expect(service.episode(videoID: "abcdefghijk")?.lastPositionMs == 0)
+        #expect(service.episode(videoID: "abcdefghij2")?.completed == true)
+    }
+
+    @Test("successful mark played supersedes an older failed position checkpoint")
+    func markPlayedSupersedesPendingPosition() throws {
+        let container = try makeModelContainer(inMemory: true)
+        var shouldFail = false
+        let service = PodcastLibraryService(modelContainer: container,
+            saveContext: { context in
+                if shouldFail { throw SaveError.injected }
+                try context.save()
+            })
+        try service.ingest(show: item(id: "browse:MPSPshow", kind: .podcast, title: "Show"),
+            episodes: [item(id: "video:abcdefghijk", kind: .episode, title: "One")])
+        let track = TrackSnapshot(from: Track(title: "One", artist: "Show", durationMs: 300_000,
+                                             youTubeId: "abcdefghijk", mediaKind: .podcastEpisode))
+        shouldFail = true
+        service.checkpoint(track: track, positionMs: 42_000, durationSeconds: 300)
+        #expect(service.persistenceFailed)
+        #expect(throws: SaveError.injected) { try service.markPlayed(videoID: "abcdefghijk") }
+        #expect(service.persistenceFailed)
+        shouldFail = false
+        try service.markPlayed(videoID: "abcdefghijk")
+        #expect(!service.persistenceFailed)
+        let marked = try #require(service.episode(videoID: "abcdefghijk"))
+        service.retryPendingProgress()
+        #expect(service.episode(videoID: "abcdefghijk") == marked)
+        #expect(marked.completed)
+    }
+
     @Test("seek and stop persistence failures remain visible until a successful retry")
     func playbackEventSaveFailure() throws {
         let container = try makeModelContainer(inMemory: true)
