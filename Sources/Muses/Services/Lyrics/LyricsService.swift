@@ -173,7 +173,12 @@ final class LyricsService {
         syncRefreshAttempts.insert(key)
         let revision = selectionRevision
         let candidates = await findCandidates(track: track)
-        guard !Task.isCancelled, revision == selectionRevision else {
+        guard !Task.isCancelled else {
+            // Closing the surface before lookup completes must allow a later retry.
+            syncRefreshAttempts.remove(key)
+            return selectedCache[key] ?? cached
+        }
+        guard revision == selectionRevision else {
             return selectedCache[key] ?? cached
         }
         guard let candidate = LyricsSyncUpgrade.match(cached, candidates: candidates, track: track) else { return cached }
