@@ -236,14 +236,32 @@ final class QueueService {
 
     // MARK: - Advanced Queue
 
-    /// Locks/unlocks an entry. Looked up by id across items and upNext (first exclusive hit).
+    /// Locks/unlocks an existing collection, pending or active insertion occurrence.
     func toggleLocked(itemId: UUID) {
         if let i = items.firstIndex(where: { $0.id == itemId }) {
             items[i].locked.toggle(); persist(); return
         }
         if let i = upNext.firstIndex(where: { $0.id == itemId }) {
-            upNext[i].locked.toggle(); persist()
+            upNext[i].locked.toggle(); persist(); return
         }
+        if insertedCurrent?.id == itemId {
+            insertedCurrent?.locked.toggle(); persist()
+        }
+    }
+
+    /// A delayed menu action cannot assign an occurrence to a deleted group.
+    func setGroupId(itemId: UUID, to groupId: UUID?) {
+        guard groupId == nil || groups.contains(where: { $0.id == groupId }) else { return }
+        if let index = items.firstIndex(where: { $0.id == itemId }) {
+            items[index].groupId = groupId
+        } else if let index = upNext.firstIndex(where: { $0.id == itemId }) {
+            upNext[index].groupId = groupId
+        } else if insertedCurrent?.id == itemId {
+            insertedCurrent?.groupId = groupId
+        } else {
+            return
+        }
+        persist()
     }
 
     // MARK: Groups

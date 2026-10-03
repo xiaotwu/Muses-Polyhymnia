@@ -263,10 +263,14 @@ struct QueueDrawerView: View {
             if let item = playback.queue.current() {
                 QueueRow(item: item, isCurrent: true)
                     .queueRowActions(title: item.track.title) {
-                        TrackContextMenuItems(snapshot: item.track, onPlay: { playback.toggle() },
-                            queueItemID: item.id,
-                            videoContext: playback.queue.items.map(\.track) + playback.queue.upNext.map(\.track),
-                            videoSource: item.fromContext)
+                        if playback.queue.insertedCurrent?.id == item.id {
+                            itemContextMenu(for: item, inUpNext: false, isCurrentRow: true)
+                        } else {
+                            TrackContextMenuItems(snapshot: item.track, onPlay: { playback.toggle() },
+                                queueItemID: item.id,
+                                videoContext: playback.queue.items.map(\.track) + playback.queue.upNext.map(\.track),
+                                videoSource: item.fromContext)
+                        }
                     }
                     .focusable()
                     .onKeyPress(.return) { playback.toggle(); return .handled }
@@ -511,15 +515,16 @@ struct QueueDrawerView: View {
     /// Queue rows always expose useful track actions. Advanced Queue adds the
     /// lock and grouping operations without turning the basic menu into an empty shell.
     @ViewBuilder
-    private func itemContextMenu(for item: QueueItem, inUpNext: Bool) -> some View {
+    private func itemContextMenu(for item: QueueItem, inUpNext: Bool,
+                                 isCurrentRow: Bool = false) -> some View {
         TrackContextMenuItems(
             snapshot: item.track,
             onPlay: { playQueueItem(item) },
             queueItemID: item.id,
             videoContext: playback.queue.items.map(\.track) + playback.queue.upNext.map(\.track),
             videoSource: item.fromContext,
-            showsPlayNext: false,
-            showsAddToQueue: false
+            showsPlayNext: isCurrentRow,
+            showsAddToQueue: isCurrentRow
         )
         Divider()
         Button(tr("Move Up", "上移"), systemImage: "arrow.up") {
@@ -591,13 +596,9 @@ struct QueueDrawerView: View {
         return index != playback.queue.currentIndex
     }
 
-    /// Assigns an item to a group (rewrites items/upNext in place and persists).
+    /// Resolve the occurrence and target group again when the menu action executes.
     private func setGroupId(item: QueueItem, to gid: UUID?) {
-        if let i = playback.queue.items.firstIndex(where: { $0.id == item.id }) {
-            playback.queue.items[i].groupId = gid; playback.queue.persist()
-        } else if let i = playback.queue.upNext.firstIndex(where: { $0.id == item.id }) {
-            playback.queue.upNext[i].groupId = gid; playback.queue.persist()
-        }
+        playback.queue.setGroupId(itemId: item.id, to: gid)
     }
 }
 
