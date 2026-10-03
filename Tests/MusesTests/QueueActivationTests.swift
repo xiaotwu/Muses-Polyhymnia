@@ -122,6 +122,10 @@ struct QueueActivationTests {
         #expect(!TrackContextMenuPlaybackPolicy.isCurrent(
             snapshotID: UUID(), currentTrackID: trackID,
             queueItemID: nil, currentQueueItemID: nil))
+        #expect(!TrackContextMenuPlaybackPolicy.isCurrent(
+            snapshotID: trackID, currentTrackID: trackID,
+            queueItemID: currentID, currentQueueItemID: currentID,
+            allowsCurrentPlaybackAction: false))
     }
 
     @Test("Moving and deleting a group preserves the active insertion and unlinks restored history")
@@ -274,5 +278,56 @@ struct QueueActivationTests {
         #expect(restored.upNext.map(\.id) == [insertionID])
         #expect(restored.next()?.id == insertionID)
         #expect(restored.upNext.isEmpty)
+    }
+
+    @Test("Previous with empty history returns a directly selected insertion to its collection anchor", arguments: [0, 1])
+    func previousDirectInsertion(anchorIndex: Int) throws {
+        let container = try makeModelContainer(inMemory: true)
+        let queue = QueueService()
+        queue.modelContext = ModelContext(container)
+        let tracks = [track("first"), track("second")]
+        queue.play(tracks[anchorIndex], context: tracks, from: .playlist)
+        let collectionIDs = queue.items.map(\.id)
+        let group = queue.addGroup("Group")
+        queue.addToQueue(track("insertion"))
+        queue.upNext[0].locked = true
+        queue.upNext[0].groupId = group
+        let insertionID = queue.upNext[0].id
+        _ = queue.activateItem(id: insertionID)
+        #expect(queue.history.isEmpty)
+        #expect(queue.previous()?.id == collectionIDs[anchorIndex])
+        #expect(queue.currentIndex == anchorIndex)
+        #expect(queue.upNext.map(\.id) == [insertionID])
+        #expect(queue.upNext.first?.locked == true)
+        #expect(queue.upNext.first?.groupId == group)
+        #expect(queue.history.isEmpty)
+        let restored = QueueService()
+        restored.modelContext = ModelContext(container)
+        restored.restore()
+        #expect(restored.current()?.id == collectionIDs[anchorIndex])
+        #expect(restored.items.map(\.id) == collectionIDs)
+        #expect(restored.next()?.id == insertionID)
+        #expect(restored.current()?.collectionAnchorID == collectionIDs[anchorIndex])
+    }
+
+    @Test("Facade Previous loads a different occurrence of the same track at anchor zero")
+    func facadePreviousDuplicateInsertion() async {
+        let engine = RecordingEngine()
+        let queue = QueueService()
+        let playback = PlaybackService(engine: engine, queue: queue)
+        let repeated = track("repeat")
+        playback.playTrack(repeated, context: [repeated], from: .playlist)
+        for _ in 0..<200 where engine.loadCallCount < 1 { await Task.yield() }
+        let anchorID = queue.current()!.id
+        queue.playNext(repeated)
+        let insertionID = queue.upNext[0].id
+        playback.playQueueItem(id: insertionID)
+        for _ in 0..<200 where engine.loadCallCount < 2 { await Task.yield() }
+        playback.previous()
+        for _ in 0..<200 where engine.loadCallCount < 3 { await Task.yield() }
+        #expect(queue.current()?.id == anchorID)
+        #expect(queue.upNext.map(\.id) == [insertionID])
+        #expect(engine.loadCallCount == 3)
+        #expect(queue.history.isEmpty)
     }
 }

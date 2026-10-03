@@ -158,6 +158,12 @@ final class QueueService {
             persist()
             return current()
         }
+        if let insertedCurrent, items.indices.contains(currentIndex) {
+            upNext.insert(insertedCurrent, at: 0)
+            self.insertedCurrent = nil
+            persist()
+            return current()
+        }
         guard currentIndex > 0 else { return current() }
         currentIndex -= 1
         persist()

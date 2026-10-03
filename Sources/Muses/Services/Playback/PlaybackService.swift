@@ -503,12 +503,14 @@ final class PlaybackService {
 
     func previous() {
         retireVideoSession()
-        guard !queue.history.isEmpty || queue.currentIndex > 0 else { return }
+        guard !queue.history.isEmpty || queue.currentIndex > 0
+            || (queue.insertedCurrent != nil && queue.items.indices.contains(queue.currentIndex)) else { return }
+        let previousOccurrenceID = queue.current()?.id
         // Explicit previous: record the current track's displacement first.
         postDisplacementForCurrent()
         guard let item = queue.previous() else { return }
         // If the previous track is the one already playing (at head / empty history), skip reload to avoid flicker
-        if item.track.id == state.track?.id { return }
+        if item.id == previousOccurrenceID, item.track.id == state.track?.id { return }
         playbackRequested = true
         scheduleLoad(item.track)
     }

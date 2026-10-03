@@ -409,7 +409,8 @@ struct QueueDrawerView: View {
                                         context: [item.track],
                                         from: item.fromContext
                                     )
-                                }, videoContext: [item.track], videoSource: item.fromContext
+                                }, queueItemID: item.id, allowsCurrentPlaybackAction: false,
+                                videoContext: [item.track], videoSource: item.fromContext
                             )
                             if advancedQueue {
                                 Divider()

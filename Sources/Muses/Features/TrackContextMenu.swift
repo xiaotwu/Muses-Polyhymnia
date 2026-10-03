@@ -190,7 +190,9 @@ enum YouTubeContextMenuLink {
 
 enum TrackContextMenuPlaybackPolicy {
     static func isCurrent(snapshotID: UUID, currentTrackID: UUID?,
-                          queueItemID: UUID?, currentQueueItemID: UUID?) -> Bool {
+                          queueItemID: UUID?, currentQueueItemID: UUID?,
+                          allowsCurrentPlaybackAction: Bool = true) -> Bool {
+        guard allowsCurrentPlaybackAction else { return false }
         if let queueItemID { return queueItemID == currentQueueItemID }
         return snapshotID == currentTrackID
     }
@@ -205,6 +207,8 @@ struct TrackContextMenuItems: View {
     let onPlay: () -> Void
     /// Queue menus distinguish repeated occurrences of the same recording.
     var queueItemID: QueueItem.ID? = nil
+    /// Historical replay starts its selected context even if the recording is current.
+    var allowsCurrentPlaybackAction = true
     var videoContext: [TrackSnapshot] = []
     var videoSource: QueueSource = .search
     var onRemoveFromContainer: (() -> Void)? = nil
@@ -223,7 +227,8 @@ struct TrackContextMenuItems: View {
         TrackContextMenuPlaybackPolicy.isCurrent(
             snapshotID: snapshot.id, currentTrackID: playback.transportState.track?.id,
             queueItemID: queueItemID,
-            currentQueueItemID: queueItemID == nil ? nil : playback.queue.current()?.id)
+            currentQueueItemID: queueItemID == nil ? nil : playback.queue.current()?.id,
+            allowsCurrentPlaybackAction: allowsCurrentPlaybackAction)
     }
 
     @ViewBuilder
