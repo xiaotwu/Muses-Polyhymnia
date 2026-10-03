@@ -166,7 +166,10 @@ struct CatalogReleasesView: View {
             .padding(.bottom, AppleMusicTokens.scrollBottomInset)
         }
         .background(BrowseBackground())
-        .task(id: catalog.revision) { load() }
+        // The local projection is synchronous; populate it before the first frame
+        // so returning to cached catalog pages does not briefly show skeletons.
+        .onAppear(perform: load)
+        .onChange(of: catalog.revision) { _, _ in load() }
         .onReceive(NotificationCenter.default.publisher(for: ModelContext.didSave)) { _ in load() }
         .onReceive(NotificationCenter.default.publisher(for: .musesPlaylistsChanged)) { _ in load() }
     }
@@ -844,7 +847,10 @@ struct CatalogArtistsView: View {
             .padding(.bottom, AppleMusicTokens.scrollBottomInset)
         }
         .background(BrowseBackground())
-        .task(id: catalog.revision) { load() }
+        // The local projection is synchronous; populate it before the first frame
+        // so returning to cached catalog pages does not briefly show skeletons.
+        .onAppear(perform: load)
+        .onChange(of: catalog.revision) { _, _ in load() }
         .onReceive(NotificationCenter.default.publisher(for: ModelContext.didSave)) { _ in load() }
         .onReceive(NotificationCenter.default.publisher(for: .musesPlaylistsChanged)) { _ in load() }
     }
