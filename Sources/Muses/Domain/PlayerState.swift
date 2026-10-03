@@ -21,6 +21,12 @@ struct AudioQualityInfo: Equatable, Sendable {
     let bitDepth: Int
     let codec: String
     let isLossless: Bool
+
+    /// Preserve integer-Hz precision when presenting kilohertz across surfaces.
+    static func sampleRateLabel(_ hertz: Int) -> String {
+        (Double(hertz) / 1000).formatted(.number.locale(Locale(identifier: "en_US_POSIX"))
+            .precision(.fractionLength(0...3))) + " kHz"
+    }
 }
 
 enum PlayerError: LocalizedError, Equatable {

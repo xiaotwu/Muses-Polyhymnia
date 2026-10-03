@@ -138,7 +138,9 @@ struct AudioNerdTests {
 
     @Test("Fractional kilohertz retain the original integer-Hz precision")
     func fractionalSampleRates() {
-        for (rate, expected) in [(44100, "44.1 kHz"), (22050, "22.05 kHz"), (44101, "44.101 kHz")] {
+        for (rate, expected) in [(44100, "44.1 kHz"), (22050, "22.05 kHz"), (44101, "44.101 kHz"),
+                                 (48000, "48 kHz"), (96000, "96 kHz")] {
+            #expect(AudioQualityInfo.sampleRateLabel(rate) == expected)
             let rows = AudioInfoModel.rows(track: makeYouTubeTrack(sampleRate: rate),
                                            defaultDeviceName: nil, eqPresetId: "Flat", volume: 0)
             #expect(rows.first { $0.label == tr("Sample Rate", "采样率") }?.value == expected)

@@ -110,10 +110,7 @@ enum AudioInfoModel {
             Row(label: tr("Lossless", "无损"),
                 value: track.map { $0.isLossless ? tr("Yes", "是") : tr("No", "否") } ?? unknown),
             Row(label: tr("Sample Rate", "采样率"),
-                value: track?.sampleRate.map {
-                    (Double($0) / 1000).formatted(.number.locale(Locale(identifier: "en_US_POSIX"))
-                        .precision(.fractionLength(0...3))) + " kHz"
-                } ?? unknown),
+                value: track?.sampleRate.map(AudioQualityInfo.sampleRateLabel) ?? unknown),
             Row(label: tr("Bit Depth", "位深"),
                 value: track?.bitDepth.map { "\($0)-bit" } ?? unknown),
             Row(label: tr("Bit Rate", "比特率"),

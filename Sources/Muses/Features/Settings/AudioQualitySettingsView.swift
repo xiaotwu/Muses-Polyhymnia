@@ -125,7 +125,7 @@ struct AudioQualitySettingsView: View {
     private func playingLabel(_ q: AudioQualityInfo) -> String {
         var parts: [String] = []
         if !q.codec.isEmpty { parts.append(q.codec) }
-        if q.sampleRate > 0 { parts.append("\(q.sampleRate / 1000) kHz") }
+        if q.sampleRate > 0 { parts.append(AudioQualityInfo.sampleRateLabel(q.sampleRate)) }
         if q.bitDepth > 0 { parts.append("\(q.bitDepth)-bit") }
         let chosen = YTAudioQualityOption(rawValue: ytQuality)?.label ?? ytQuality
         parts.append(chosen)

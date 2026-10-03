@@ -748,7 +748,7 @@ struct NowPlayingView: View {
             parts.append(codec)
         }
         if quality.sampleRate > 0 {
-            parts.append("\(quality.sampleRate / 1_000) kHz")
+            parts.append(AudioQualityInfo.sampleRateLabel(quality.sampleRate))
         }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
