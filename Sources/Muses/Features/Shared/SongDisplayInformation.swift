@@ -20,7 +20,7 @@ struct SongDisplayInformation: Equatable {
             || row.snapshot.artist == row.collectionOwner
             || SongCreditCache.shared.isCollectionOwner(row.snapshot.artist, videoID: row.snapshot.youTubeId)
         artist = publisherDerived
-            ? (Self.nonEmpty(metadata.artist) ?? Self.nonEmpty(metadata.uploader) ?? row.artist)
+            ? (Self.nonEmpty(metadata.artist) ?? Self.nonEmpty(metadata.uploader) ?? row.displayArtist)
             : row.artist
         album = row.album.isEmpty ? (metadata.album ?? "") : row.album
     }

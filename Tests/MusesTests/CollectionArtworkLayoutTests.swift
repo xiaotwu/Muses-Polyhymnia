@@ -97,6 +97,30 @@ struct CollectionArtworkLayoutTests {
         #expect(SongDisplayInformation(row: row(artist: "Unknown Artist"), metadata: other).artist == "Actual video channel")
     }
 
+    @Test("incomplete metadata cannot restore a registered playlist owner as performer")
+    func incompleteMetadataOwnerFallback() {
+        let videoID = String(UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(11))
+        let snapshot = TrackSnapshot(id: UUID(), title: "Song", artist: "Playlist Owner",
+            albumTitle: nil, durationSeconds: 180, youTubeId: videoID, artworkUrl: nil,
+            sampleRate: nil, bitDepth: nil, codec: nil, isLossless: false)
+        SongCreditCache.shared.recordOwner("Playlist Owner", videoID: videoID)
+        // Generic playback rows have no collection owner after leaving that collection.
+        let generic = CollectionTrackRow(snapshot: snapshot, canonicalIndex: 0)
+        let incomplete = YTDlpBridge.YTDlpPlaylistEntry(id: videoID, title: "Song",
+            uploader: " ", artist: "Unknown Artist")
+        #expect(generic.displayArtist == tr("Artist unavailable", "艺人信息暂缺"))
+        #expect(SongDisplayInformation(row: generic, metadata: incomplete).artist == generic.displayArtist)
+        #expect(snapshot.artist == "Playlist Owner")
+
+        let publisher = YTDlpBridge.YTDlpPlaylistEntry(id: videoID, title: "Song", uploader: "Video Publisher")
+        #expect(SongDisplayInformation(row: generic, metadata: publisher).artist == "Video Publisher")
+        let edited = TrackSnapshot(id: snapshot.id, title: "Song", artist: "My Performer",
+            albumTitle: nil, durationSeconds: 180, youTubeId: videoID, artworkUrl: nil,
+            sampleRate: nil, bitDepth: nil, codec: nil, isLossless: false)
+        #expect(SongDisplayInformation(row: CollectionTrackRow(snapshot: edited, canonicalIndex: 0),
+                                     metadata: incomplete).artist == "My Performer")
+    }
+
     @Test("Playlist API credits the video publisher rather than the playlist account")
     func videoPublisherIdentity() throws {
         let raw = Data(#"{"id":"item1","snippet":{"title":"Song","channelTitle":"My account","videoOwnerChannelTitle":"Video publisher"},"contentDetails":{"videoId":"abcdefghijk"}}"#.utf8)
