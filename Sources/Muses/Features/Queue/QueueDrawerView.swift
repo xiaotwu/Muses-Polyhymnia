@@ -39,8 +39,8 @@ struct QueueDrawerView: View {
                 .frame(maxHeight: .infinity)
                 .clipShape(SidebarPaneShape.trailingShape)
                 .background {
-                    // Extend chrome behind the unified toolbar while keeping
-                    // interactive content inside the native top safe area.
+                    // The trailing pane uses its own header inset; extend chrome
+                    // through any remaining unified-toolbar safe area.
                     Color.clear
                         .musesGlass(in: SidebarPaneShape.trailingShape, role: .persistentChrome)
                         .ignoresSafeArea(.container, edges: .top)
