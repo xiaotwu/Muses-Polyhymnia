@@ -80,7 +80,7 @@ struct AudioNerdTests {
         #expect(byLabel[tr("Lossless", "无损")] == tr("No", "否"))
         #expect(byLabel[tr("Bit Depth", "位深")] == unknown) // YouTube has no bit depth
         #expect(byLabel[tr("Channels", "声道")] == tr("Mono", "单声道"))
-        #expect(byLabel[tr("Sample Rate", "采样率")] == "44 kHz")
+        #expect(byLabel[tr("Sample Rate", "采样率")] == "44.1 kHz")
         #expect(byLabel[tr("Bit Rate", "比特率")] == "128 kbps")
         #expect(byLabel[tr("ReplayGain", "回放增益")] == unknown)
         #expect(byLabel[tr("EQ Preset", "EQ 预设")] == "Rock")
@@ -136,13 +136,22 @@ struct AudioNerdTests {
 
     // MARK: - helpers
 
-    private func makeYouTubeTrack() -> TrackSnapshot {
+    @Test("Fractional kilohertz retain the original integer-Hz precision")
+    func fractionalSampleRates() {
+        for (rate, expected) in [(44100, "44.1 kHz"), (22050, "22.05 kHz"), (44101, "44.101 kHz")] {
+            let rows = AudioInfoModel.rows(track: makeYouTubeTrack(sampleRate: rate),
+                                           defaultDeviceName: nil, eqPresetId: "Flat", volume: 0)
+            #expect(rows.first { $0.label == tr("Sample Rate", "采样率") }?.value == expected)
+        }
+    }
+
+    private func makeYouTubeTrack(sampleRate: Int = 96000) -> TrackSnapshot {
         TrackSnapshot(
             id: UUID(), title: "Song", artist: "Artist",
             albumTitle: "Album", durationSeconds: 240,
             youTubeId: "test-video",
             artworkUrl: nil,
-            sampleRate: 96000, bitDepth: 24, codec: "FLAC", isLossless: true,
+            sampleRate: sampleRate, bitDepth: 24, codec: "FLAC", isLossless: true,
             liked: true, lyrics: nil, replayGain: -6.3,
             bitRate: 5_000_000, channels: 2, lyricsOffsetMs: nil)
     }

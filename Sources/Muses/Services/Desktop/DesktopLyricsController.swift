@@ -116,7 +116,7 @@ struct DesktopLyricsOverlayView: View {
 
     private func loadLyrics() async {
         guard let track = playback.transportState.track else {
-            lines = nil; loadedTrackId = nil; lrcOffsetMs = 0; isLoading = false; return
+            lines = nil; loadedTrackId = nil; lrcOffsetMs = 0; isLoading = false; source = nil; return
         }
         loadedTrackId = track.id
         lines = nil
