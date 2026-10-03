@@ -37,8 +37,14 @@ struct QueueDrawerView: View {
             drawer
                 .frame(width: QueueChromePolicy.width)
                 .frame(maxHeight: .infinity)
-                .musesGlass(in: SidebarPaneShape.trailingShape, role: .persistentChrome)
                 .clipShape(SidebarPaneShape.trailingShape)
+                .background {
+                    // Extend chrome behind the unified toolbar while keeping
+                    // interactive content inside the native top safe area.
+                    Color.clear
+                        .musesGlass(in: SidebarPaneShape.trailingShape, role: .persistentChrome)
+                        .ignoresSafeArea(.container, edges: .top)
+                }
                 .focusable()
                 .focusEffectDisabled()
                 .focused($focusedTarget, equals: .drawer)
