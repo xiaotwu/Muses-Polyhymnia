@@ -10,6 +10,7 @@ struct CollectionTableWidthObserver: NSViewRepresentable {
     final class Coordinator {
         var onWidth: (CGFloat) -> Void
         weak var table: NSTableView?
+        private let pointerFocus = CollectionTablePointerFocus()
         private var observers: [NSObjectProtocol] = []
         private var previousPostsFrameChanges = false
         private var lastWidth: CGFloat = -1
@@ -22,6 +23,7 @@ struct CollectionTableWidthObserver: NSViewRepresentable {
             guard table !== candidate else { measure(); return }
             detach()
             table = candidate
+            pointerFocus.attach(candidate)
             previousPostsFrameChanges = candidate.postsFrameChangedNotifications
             candidate.postsFrameChangedNotifications = true
             observers = [NSTableView.columnDidResizeNotification,
@@ -57,6 +59,7 @@ struct CollectionTableWidthObserver: NSViewRepresentable {
         }
 
         func detach() {
+            pointerFocus.detach()
             generation += 1
             observers.forEach(NotificationCenter.default.removeObserver)
             observers = []
