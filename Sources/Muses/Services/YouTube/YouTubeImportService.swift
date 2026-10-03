@@ -59,6 +59,7 @@ final class YouTubeImportService {
     private let modelContainer: ModelContainer
     private let artworkCache: ArtworkCache
     private let session: URLSession
+    private let saveLocalEdit: (ModelContext) throws -> Void
     private weak var catalog: YouTubeCatalogService?
     private let log = AppLog.for("YouTubeImportService")
     @ObservationIgnored private var songMetadataCache: [String: (date: Date, entry: YTDlpBridge.YTDlpPlaylistEntry?)] = [:]
@@ -157,12 +158,14 @@ final class YouTubeImportService {
          modelContainer: ModelContainer,
          artworkCache: ArtworkCache = .default,
          session: URLSession = .shared,
-         catalog: YouTubeCatalogService? = nil) {
+         catalog: YouTubeCatalogService? = nil,
+         saveLocalEdit: @escaping (ModelContext) throws -> Void = { try $0.save() }) {
         self.bridge = bridge
         self.modelContainer = modelContainer
         self.artworkCache = artworkCache
         self.session = session
         self.catalog = catalog
+        self.saveLocalEdit = saveLocalEdit
     }
 
     // MARK: - Import
@@ -380,6 +383,7 @@ final class YouTubeImportService {
     @discardableResult
     func removeRemoteItem(importId: UUID, itemId: UUID) -> Bool {
         let ctx = ModelContext(modelContainer)
+        ctx.autosaveEnabled = false
         guard let imp = fetchImportById(importId, context: ctx) else { return false }
         guard let item = (imp.items ?? []).first(where: { $0.id == itemId }) else { return false }
         if var items = imp.items {
@@ -390,23 +394,24 @@ final class YouTubeImportService {
             imp.items = items
         }
         ctx.delete(item)
-        try? ctx.save()
-        return true
+        do { try saveLocalEdit(ctx); return true }
+        catch { ctx.rollback(); return false }
     }
 
     /// Reorder YouTube-side items locally. Caller writes back to YouTube if owned.
     @discardableResult
     func moveRemoteItem(importId: UUID, from: Int, to: Int) -> Bool {
         let ctx = ModelContext(modelContainer)
+        ctx.autosaveEnabled = false
         guard let imp = fetchImportById(importId, context: ctx) else { return false }
         var items = (imp.items ?? []).sorted { $0.order < $1.order }
-        guard from < items.count, to <= items.count else { return false }
+        guard from >= 0, from < items.count, to >= 0, to <= items.count else { return false }
         let item = items.remove(at: from)
         items.insert(item, at: min(to, items.count))
         for (idx, item) in items.enumerated() { item.order = idx }
         imp.items = items
-        try? ctx.save()
-        return true
+        do { try saveLocalEdit(ctx); return true }
+        catch { ctx.rollback(); return false }
     }
 
     /// Append a YouTube video to this import (creates a lazy Track).

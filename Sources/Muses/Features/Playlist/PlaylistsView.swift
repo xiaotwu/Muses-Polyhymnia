@@ -168,8 +168,9 @@ struct PlaylistsView: View {
         .background(BrowseBackground())
         .sheet(isPresented: $showCreateSheet) {
             NewPlaylistSheet(isPresented: $showCreateSheet) { name in
-                playlistService.create(name: name)
+                guard playlistService.create(name: name) != nil else { playlistService.clearError(); return false }
                 refresh()
+                return true
             }
         }
         .sheet(isPresented: $showCreateYouTubeSheet) {
@@ -324,8 +325,9 @@ struct PlaylistsView: View {
     }
 
     private func deletePlaylist(_ playlist: Playlist) {
-        undoablePlaylistDeletion = playlistService.deleteWithUndoSnapshot(playlist)
-        if undoablePlaylistDeletion != nil { refresh() }
+        guard let snapshot = playlistService.deleteWithUndoSnapshot(playlist) else { return }
+        undoablePlaylistDeletion = snapshot
+        refresh()
     }
 
     private func deleteYouTubeImport(_ imported: YouTubeImport) {
@@ -597,14 +599,19 @@ private enum PlaylistDeletionTarget: Identifiable {
 /// Shared create-playlist prompt used by the sidebar, Playlists overview, and track menus.
 struct NewPlaylistSheet: View {
     @Binding var isPresented: Bool
-    var onCreate: (String) -> Void
+    var onCreate: (String) -> Bool
     @State private var name = ""
+    @State private var saveFailed = false
 
     var body: some View {
         VStack(spacing: 16) {
             Text(tr("New Playlist", "新建歌单")).font(MusesTypography.headline)
             TextField(tr("Playlist name", "歌单名称"), text: $name)
                 .textFieldStyle(.roundedBorder)
+            if saveFailed {
+                Text(tr("The playlist could not be saved. Your name is kept; try again.", "无法保存歌单，名称已保留，请重试。"))
+                    .font(.callout).foregroundStyle(.red)
+            }
             HStack {
                 Button(tr("Cancel", "取消")) {
                     isPresented = false
@@ -612,7 +619,7 @@ struct NewPlaylistSheet: View {
                 }
                 Button(tr("Create", "创建")) {
                     let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !trimmed.isEmpty { onCreate(trimmed) }
+                    guard !trimmed.isEmpty, onCreate(trimmed) else { saveFailed = true; return }
                     isPresented = false
                     name = ""
                 }

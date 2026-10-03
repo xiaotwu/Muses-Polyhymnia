@@ -1,5 +1,36 @@
 import SwiftUI
 
+/// Blank fields intentionally clear metadata; invalid nonblank drafts must not.
+struct TrackMetadataNumbers {
+    enum Field: Error, Equatable {
+        case track, disc, year
+
+        var message: String {
+            switch self {
+            case .track: tr("Enter a whole number for Track No., or leave it blank.", "曲目号请输入整数，或留空。")
+            case .disc: tr("Enter a whole number for Disc No., or leave it blank.", "碟号请输入整数，或留空。")
+            case .year: tr("Enter a whole number for Year, or leave it blank.", "年份请输入整数，或留空。")
+            }
+        }
+    }
+
+    let trackNo: Int?
+    let discNo: Int?
+    let year: Int?
+
+    init(trackNo: String, discNo: String, year: String) throws {
+        func parse(_ draft: String, field: Field) throws -> Int? {
+            let value = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !value.isEmpty else { return nil }
+            guard let number = Int(value) else { throw field }
+            return number
+        }
+        self.trackNo = try parse(trackNo, field: .track)
+        self.discNo = try parse(discNo, field: .disc)
+        self.year = try parse(year, field: .year)
+    }
+}
+
 /// Track metadata editing form. Modifies the DB only; never writes file tags (personal use).
 struct EditTrackSheet: View {
     let track: Track
@@ -76,15 +107,19 @@ struct EditTrackSheet: View {
     }
 
     private func save() {
+        let numbers: TrackMetadataNumbers
+        do { numbers = try TrackMetadataNumbers(trackNo: trackNo, discNo: discNo, year: year) }
+        catch let field as TrackMetadataNumbers.Field { saveError = field.message; return }
+        catch { return }
         let saved = library.updateTrack(
             id: track.id,
             title: title,
             artist: artist,
             albumTitle: albumTitle.isEmpty ? nil : albumTitle,
             albumArtist: albumArtist.isEmpty ? nil : albumArtist,
-            trackNo: Int(trackNo),
-            discNo: Int(discNo),
-            year: Int(year),
+            trackNo: numbers.trackNo,
+            discNo: numbers.discNo,
+            year: numbers.year,
             genre: genre.isEmpty ? nil : genre,
             lyrics: lyrics.isEmpty ? nil : lyrics
         )

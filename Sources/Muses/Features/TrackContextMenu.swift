@@ -49,9 +49,10 @@ struct TrackContextMenu: ViewModifier {
                 }
                 .sheet(isPresented: $showCreatePlaylist) {
                     NewPlaylistSheet(isPresented: $showCreatePlaylist) { name in
-                        guard let t = resolvedTrack(for: snapshot) else { return }
-                        let playlist = playlistService.create(name: name)
-                        playlistService.addTrack(playlist, track: t)
+                        guard let t = resolvedTrack(for: snapshot) else { return false }
+                        let saved = playlistService.create(name: name, initialTrack: t) != nil
+                        if !saved { playlistService.clearError() }
+                        return saved
                     }
                 }
         } else {

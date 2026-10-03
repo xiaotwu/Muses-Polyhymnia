@@ -6,6 +6,46 @@ import SwiftData
 @MainActor
 @Suite("YouTubeImportService", .serialized)
 struct YouTubeImportServiceTests {
+    @Test("Local imported item edits roll back save failures and reject invalid reorder indices")
+    func localItemEditFailures() throws {
+        let container = try makeModelContainer(inMemory: true)
+        let context = ModelContext(container)
+        let imported = YouTubeImport(playlistId: "PLlocal", url: "", title: "Local copy", channel: "Owner")
+        let first = YouTubeImportItem(youTubeId: "abcdefghijk", title: "First", artist: "Artist", order: 0)
+        let second = YouTubeImportItem(youTubeId: "track_b0000", title: "Second", artist: "Artist", order: 1)
+        let unrelated = Track(title: "User truth", artist: "Edited artist", youTubeId: "track_c0000", liked: true)
+        imported.items = [first, second]
+        first.import_ = imported; second.import_ = imported
+        context.insert(imported); context.insert(unrelated)
+        try context.save()
+        enum Failure: Error { case diskFull }
+        var attempts = 0
+        let failing = YouTubeImportService(bridge: MockImportBridge(), modelContainer: container,
+            saveLocalEdit: { _ in attempts += 1; throw Failure.diskFull })
+        #expect(!failing.removeRemoteItem(importId: imported.id, itemId: first.id))
+        #expect(!failing.moveRemoteItem(importId: imported.id, from: 0, to: 2))
+        #expect(attempts == 2)
+        for indices in [(-1, 0), (0, -1), (2, 0), (0, 3)] {
+            #expect(!failing.moveRemoteItem(importId: imported.id, from: indices.0, to: indices.1))
+        }
+        #expect(attempts == 2)
+        func storedItems() throws -> [YouTubeImportItem] {
+            let fresh = ModelContext(container)
+            let stored = try #require(fresh.fetch(FetchDescriptor<YouTubeImport>()).first)
+            return (stored.items ?? []).sorted { $0.order < $1.order }
+        }
+        #expect(try storedItems().map(\.id) == [first.id, second.id])
+        #expect(try storedItems().map(\.order) == [0, 1])
+        let working = YouTubeImportService(bridge: MockImportBridge(), modelContainer: container)
+        #expect(working.moveRemoteItem(importId: imported.id, from: 0, to: 2))
+        #expect(try storedItems().map(\.id) == [second.id, first.id])
+        #expect(working.removeRemoteItem(importId: imported.id, itemId: first.id))
+        #expect(try storedItems().map(\.id) == [second.id])
+        #expect(try storedItems().map(\.order) == [0])
+        let persisted = try #require(ModelContext(container).fetch(FetchDescriptor<Track>()).first)
+        #expect(persisted.id == unrelated.id && persisted.artist == "Edited artist" && persisted.liked)
+    }
+
     @Test("playlist import filters channels and malformed entries before creating items")
     func mixedPlaylistResults() async throws {
         let container = try makeModelContainer(inMemory: true)

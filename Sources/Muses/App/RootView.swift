@@ -110,6 +110,12 @@ struct RootView: View {
             )) {
                 Button(tr("OK", "好")) { externalPlaybackRouter.errorMessage = nil }
             } message: { Text(externalPlaybackRouter.errorMessage ?? "") }
+            .alert(tr("Playlist changes were not saved", "歌单更改未保存"), isPresented: Binding(
+                get: { playlistService.lastError != nil },
+                set: { if !$0 { playlistService.clearError() } }
+            )) {
+                Button(tr("OK", "好")) { playlistService.clearError() }
+            } message: { Text(playlistService.lastError ?? "") }
             .alert(tr("Podcast progress was not saved", "播客进度未保存", zhHant: "Podcast 進度未儲存"),
                    isPresented: $showPodcastSaveAlert) {
                 Button(tr("Retry", "重试", zhHant: "重試")) {

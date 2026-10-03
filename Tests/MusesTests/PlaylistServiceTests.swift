@@ -8,6 +8,54 @@ import SwiftData
 @Suite("PlaylistService")
 struct PlaylistServiceTests {
 
+    @Test("Failed playlist mutations roll back membership and canonical order; atomic create retains no orphan")
+    func mutationFailures() throws {
+        let container = try makeContainer()
+        let first = makeTrack(in: container, title: "First")
+        let second = makeTrack(in: container, title: "Second")
+        let working = PlaylistService(modelContainer: container)
+        let playlist = try #require(working.create(name: "Original", initialTrack: first))
+        #expect(working.addTrack(playlist, track: second))
+        let items = working.fetchItems(in: playlist.id)
+        let firstID = try #require(items.first?.id)
+        let context = ModelContext(container)
+        let outsider = Track(title: "Unchanged", artist: "Manual credit", youTubeId: "abcdefghijk", isInLibrary: false)
+        context.insert(outsider)
+        try context.save()
+        enum Failure: Error { case diskFull }
+        var attempts = 0
+        let failing = PlaylistService(modelContainer: container, saveContext: { _ in
+            attempts += 1; throw Failure.diskFull
+        })
+        #expect(failing.create(name: "Unsaved", initialTrack: outsider) == nil)
+        #expect(!failing.addTrack(playlist, track: outsider))
+        #expect(!failing.rename(playlist, to: "Unsaved name"))
+        #expect(!failing.togglePin(playlist))
+        #expect(!failing.moveItem(in: playlist, from: 0, to: 2))
+        #expect(!failing.removeItem(id: firstID))
+        #expect(failing.deleteWithUndoSnapshot(playlist) == nil)
+        #expect(!failing.delete(playlist))
+        #expect(attempts == 8)
+        #expect(failing.lastError != nil)
+        #expect(!failing.moveItem(in: playlist, from: -1, to: 0))
+        #expect(!failing.moveItem(in: playlist, from: 0, to: -1))
+        #expect(attempts == 8)
+        let fresh = ModelContext(container)
+        let persisted = try #require(fresh.fetch(FetchDescriptor<Playlist>()).first)
+        #expect(try fresh.fetch(FetchDescriptor<Playlist>()).count == 1)
+        #expect(persisted.name == "Original" && !persisted.pinned)
+        #expect(working.fetchItems(in: playlist.id).map(\.id) == items.map(\.id))
+        #expect(working.fetchItems(in: playlist.id).map(\.order) == [0, 1])
+        let outsiderID = outsider.id
+        let preserved = try #require(fresh.fetch(FetchDescriptor<Track>(predicate: #Predicate { $0.id == outsiderID })).first)
+        #expect(!preserved.isInLibrary && preserved.artist == "Manual credit")
+        failing.clearError()
+        #expect(failing.lastError == nil)
+        #expect(working.rename(playlist, to: "Retried"))
+        #expect(working.removeItem(id: firstID))
+        #expect(working.fetchItems(in: playlist.id).map(\.order) == [0])
+    }
+
     private func makeContainer() throws -> ModelContainer {
         try makeModelContainer(inMemory: true)
     }
@@ -25,7 +73,7 @@ struct PlaylistServiceTests {
         let container = try makeContainer()
         let service = PlaylistService(modelContainer: container)
 
-        let playlist = service.create(name: "My Playlist")
+        let playlist = try #require(service.create(name: "My Playlist"))
         #expect(playlist.name == "My Playlist")
         #expect(playlist.items == nil || playlist.items?.isEmpty == true)
 
@@ -42,7 +90,7 @@ struct PlaylistServiceTests {
         let service = PlaylistService(modelContainer: container)
         let track = makeTrack(in: container, title: "Song A")
 
-        let playlist = service.create(name: "P1")
+        let playlist = try #require(service.create(name: "P1"))
         service.addTrack(playlist, track: track)
 
         // Verify there is 1 item
@@ -66,7 +114,7 @@ struct PlaylistServiceTests {
         let track = makeTrack(in: container, title: "First")
         let secondTrack = makeTrack(in: container, title: "Second")
         let thirdTrack = makeTrack(in: container, title: "Third")
-        let playlist = service.create(name: "Visible playlist")
+        let playlist = try #require(service.create(name: "Visible playlist"))
         nonisolated(unsafe) var notifications = 0
         let observer = NotificationCenter.default.addObserver(
             forName: .musesPlaylistsChanged, object: nil, queue: .main
@@ -106,7 +154,7 @@ struct PlaylistServiceTests {
         let t2 = makeTrack(in: container, title: "B")
         let t3 = makeTrack(in: container, title: "C")
 
-        let playlist = service.create(name: "P2")
+        let playlist = try #require(service.create(name: "P2"))
         service.addTrack(playlist, track: t1)
         service.addTrack(playlist, track: t2)
         service.addTrack(playlist, track: t3)
@@ -116,10 +164,13 @@ struct PlaylistServiceTests {
         let p = try #require(try ctx.fetch(FetchDescriptor<Playlist>()).first)
         var items = (p.items ?? []).sorted { $0.order < $1.order }
         #expect(items.map { $0.track?.title } == ["A", "B", "C"])
+        let originalIDs = items.map(\.id)
 
         // Move C (index 2) to index 0
-        service.moveItem(in: p, from: 2, to: 0)
-        items = (p.items ?? []).sorted { $0.order < $1.order }
+        #expect(service.moveItem(in: p, from: 2, to: 0))
+        // Mutation crosses a fresh context; active views re-fetch on notification.
+        items = service.fetchItems(in: p.id)
+        #expect(items.map(\.id) == [originalIDs[2], originalIDs[0], originalIDs[1]])
         #expect(items.map { $0.track?.title } == ["C", "A", "B"])
         #expect(items.map { $0.order } == [0, 1, 2])
     }
@@ -130,7 +181,7 @@ struct PlaylistServiceTests {
         let service = PlaylistService(modelContainer: container)
         let track = makeTrack(in: container, title: "Doomed Song")
 
-        let playlist = service.create(name: "To Delete")
+        let playlist = try #require(service.create(name: "To Delete"))
         service.addTrack(playlist, track: track)
 
         // Verify there is 1 item
@@ -152,7 +203,7 @@ struct PlaylistServiceTests {
         let service = PlaylistService(modelContainer: container)
         let a = makeTrack(in: container, title: "A")
         let b = makeTrack(in: container, title: "B")
-        let playlist = service.create(name: "Recover me")
+        let playlist = try #require(service.create(name: "Recover me"))
         service.addTrack(playlist, track: a)
         service.addTrack(playlist, track: b)
         service.togglePin(playlist)

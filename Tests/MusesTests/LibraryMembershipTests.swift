@@ -6,6 +6,27 @@ import Testing
 @Suite("Library membership", .serialized)
 @MainActor
 struct LibraryMembershipTests {
+    @Test("Numeric metadata drafts distinguish explicit clearing from malformed input")
+    func numericMetadataDrafts() throws {
+        let values = try TrackMetadataNumbers(trackNo: " 12 ", discNo: "2", year: "2024\n")
+        #expect(values.trackNo == 12)
+        #expect(values.discNo == 2)
+        #expect(values.year == 2024)
+        let cleared = try TrackMetadataNumbers(trackNo: "", discNo: " \n", year: "")
+        #expect(cleared.trackNo == nil && cleared.discNo == nil && cleared.year == nil)
+        #expect(throws: TrackMetadataNumbers.Field.track) {
+            try TrackMetadataNumbers(trackNo: "1.5", discNo: "2", year: "2024")
+        }
+        #expect(throws: TrackMetadataNumbers.Field.disc) {
+            try TrackMetadataNumbers(trackNo: "1", discNo: "second", year: "2024")
+        }
+        for invalid in ["202x", "1e3", String(Int.max) + "0"] {
+            #expect(throws: TrackMetadataNumbers.Field.year) {
+                try TrackMetadataNumbers(trackNo: "1", discNo: "2", year: invalid)
+            }
+        }
+    }
+
     @Test("Playback resolution preserves identity without library membership; explicit import promotes it")
     func resolveThenImport() async throws {
         let container = try makeModelContainer(inMemory: true)

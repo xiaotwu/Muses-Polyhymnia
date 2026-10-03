@@ -20,64 +20,91 @@ struct PlaylistDeletionSnapshot: Sendable, Equatable {
 /// Playlist CRUD + ordering service.
 ///
 /// Mirrors the `YouTubeImportService` pattern: `@MainActor @Observable`, a fresh `ModelContext` per operation,
-/// and `try? ctx.save()` after each mutation.
+/// and atomic saves that preserve existing truth on failure.
 @Observable
 @MainActor
 final class PlaylistService {
     private let modelContainer: ModelContainer
     private let log = AppLog.for("PlaylistService")
+    private let saveContext: (ModelContext) throws -> Void
     private(set) var loadState: LoadState<[Playlist]> = .idle
+    private(set) var lastError: String?
 
-    init(modelContainer: ModelContainer) {
+    init(modelContainer: ModelContainer, saveContext: @escaping (ModelContext) throws -> Void = { try $0.save() }) {
         self.modelContainer = modelContainer
+        self.saveContext = saveContext
+    }
+
+    func clearError() { lastError = nil }
+
+    private func editingContext() -> ModelContext {
+        lastError = nil
+        let context = ModelContext(modelContainer)
+        context.autosaveEnabled = false
+        return context
+    }
+
+    private func failed() -> Bool {
+        lastError = tr("Playlist changes could not be saved. Your existing playlist is unchanged; try again.",
+                       "无法保存歌单更改，原有歌单未改变，请重试。")
+        return false
+    }
+
+    private func commit(_ context: ModelContext) -> Bool {
+        do { try saveContext(context); notifyPlaylistsChanged(); return true }
+        catch { context.rollback(); return failed() }
     }
 
     // MARK: - Playlist CRUD
 
     /// Creates a playlist and returns the new `Playlist`.
     @discardableResult
-    func create(name: String) -> Playlist {
-        let ctx = ModelContext(modelContainer)
+    func create(name: String, initialTrack: Track? = nil) -> Playlist? {
+        let ctx = editingContext()
         let playlist = Playlist(name: name.trimmingCharacters(in: .whitespacesAndNewlines))
+        guard !playlist.name.isEmpty else { _ = failed(); return nil }
         ctx.insert(playlist)
-        try? ctx.save()
-        log.info("Created playlist \(playlist.name)")
-        notifyPlaylistsChanged()
+        if let initialTrack {
+            let id = initialTrack.id
+            guard let track = try? ctx.fetch(FetchDescriptor<Track>(predicate: #Predicate { $0.id == id })).first else {
+                ctx.rollback(); _ = failed(); return nil
+            }
+            track.libraryMember = true
+            let item = PlaylistItem(order: 0, playlist: playlist, track: track)
+            ctx.insert(item)
+            playlist.items = [item]
+        }
+        guard commit(ctx) else { return nil }
         return playlist
     }
 
     /// Renames a playlist.
-    func rename(_ playlist: Playlist, to newName: String) {
+    @discardableResult
+    func rename(_ playlist: Playlist, to newName: String) -> Bool {
+        let ctx = editingContext()
         let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return }
-        playlist.name = trimmed
-        try? playlist.modelContext?.save()
-        notifyPlaylistsChanged()
+        let id = playlist.id
+        guard !trimmed.isEmpty, let stored = try? ctx.fetch(FetchDescriptor<Playlist>(predicate: #Predicate { $0.id == id })).first else { return failed() }
+        stored.name = trimmed
+        return commit(ctx)
     }
 
     /// Deletes a playlist (cascades to its items).
-    func delete(_ playlist: Playlist) {
-        let ctx = ModelContext(modelContainer)
-        let id = playlist.id
-        let descriptor = FetchDescriptor<Playlist>(
-            predicate: #Predicate { $0.id == id }
-        )
-        if let p = try? ctx.fetch(descriptor).first {
-            ctx.delete(p)
-            try? ctx.save()
-            log.info("Deleted playlist \(id)")
-            notifyPlaylistsChanged()
-        }
+    @discardableResult
+    func delete(_ playlist: Playlist) -> Bool {
+        // Materialize the occurrence snapshot before cascading deletion,
+        // including retries after a rolled-back delete.
+        deleteWithUndoSnapshot(playlist) != nil
     }
 
     /// Deletes a local playlist and returns a one-session restore capsule.
     /// The playlist's tracks remain untouched; detached item rows are restored
     /// as such if their track was removed in the meantime.
     func deleteWithUndoSnapshot(_ playlist: Playlist) -> PlaylistDeletionSnapshot? {
-        let ctx = ModelContext(modelContainer)
+        let ctx = editingContext()
         let id = playlist.id
         let descriptor = FetchDescriptor<Playlist>(predicate: #Predicate { $0.id == id })
-        guard let stored = try? ctx.fetch(descriptor).first else { return nil }
+        guard let stored = try? ctx.fetch(descriptor).first else { _ = failed(); return nil }
 
         let snapshot = PlaylistDeletionSnapshot(
             name: stored.name,
@@ -88,22 +115,14 @@ final class PlaylistService {
             }
         )
         ctx.delete(stored)
-        do {
-            try ctx.save()
-            log.info("Deleted playlist \(id), undoable in current session")
-            notifyPlaylistsChanged()
-            return snapshot
-        } catch {
-            log.warning("Failed to delete playlist: \(error.localizedDescription)")
-            return nil
-        }
+        return commit(ctx) ? snapshot : nil
     }
 
     /// Restores a deletion capsule once. Missing tracks remain represented by
     /// a detached playlist item, matching the model's existing nullify rule.
     @discardableResult
     func restore(_ snapshot: PlaylistDeletionSnapshot) -> Playlist? {
-        let ctx = ModelContext(modelContainer)
+        let ctx = editingContext()
         let restored = Playlist(name: snapshot.name, createdAt: snapshot.createdAt,
                                 pinned: snapshot.pinned)
         ctx.insert(restored)
@@ -122,14 +141,7 @@ final class PlaylistService {
             restoredItems.append(restoredItem)
         }
         restored.items = restoredItems
-        do {
-            try ctx.save()
-            notifyPlaylistsChanged()
-            return restored
-        } catch {
-            log.warning("Failed to restore deleted playlist: \(error.localizedDescription)")
-            return nil
-        }
+        return commit(ctx) ? restored : nil
     }
 
     private func notifyPlaylistsChanged() {
@@ -172,22 +184,23 @@ final class PlaylistService {
     // MARK: - Item management
 
     /// Appends a track to a playlist (order = max + 1).
-    func addTrack(_ playlist: Playlist, track: Track) {
-        let ctx = ModelContext(modelContainer)
+    @discardableResult
+    func addTrack(_ playlist: Playlist, track: Track) -> Bool {
+        let ctx = editingContext()
         let playlistId = playlist.id
         let trackId = track.id
 
         // Fetch persistent references for playlist + track in the new context
         guard let p = try? ctx.fetch(FetchDescriptor<Playlist>(
             predicate: #Predicate { $0.id == playlistId }
-        )).first else { return }
+        )).first else { return failed() }
         guard let t = try? ctx.fetch(FetchDescriptor<Track>(
             predicate: #Predicate { $0.id == trackId }
-        )).first else { return }
+        )).first else { return failed() }
 
         // Deduplicate: skip if the same track is already in the playlist
         let existingTrackIds = (p.items ?? []).compactMap { $0.track?.id }
-        if existingTrackIds.contains(trackId) { return }
+        if existingTrackIds.contains(trackId) { return true }
 
         t.libraryMember = true
         let nextOrder = (p.items ?? []).map { $0.order }.max() ?? -1
@@ -199,70 +212,62 @@ final class PlaylistService {
         } else {
             p.items = [item]
         }
-        do {
-            try ctx.save()
-            notifyPlaylistsChanged()
-        } catch {
-            log.warning("Failed to add playlist item: \(error.localizedDescription)")
-        }
+        return commit(ctx)
     }
 
     /// Removes an item from a playlist (deletes it and renumbers the remaining order).
-    func removeItem(_ item: PlaylistItem) {
+    @discardableResult
+    func removeItem(_ item: PlaylistItem) -> Bool {
         removeItem(id: item.id)
     }
 
-    func removeItem(id itemId: UUID) {
-        let ctx = ModelContext(modelContainer)
+    @discardableResult
+    func removeItem(id itemId: UUID) -> Bool {
+        let ctx = editingContext()
         guard let i = try? ctx.fetch(FetchDescriptor<PlaylistItem>(
             predicate: #Predicate { $0.id == itemId }
-        )).first else { return }
+        )).first else { return failed() }
         let playlist = i.playlist
-        ctx.delete(i)
-        do {
-            try ctx.save()
-        } catch {
-            log.warning("Failed to remove playlist item: \(error.localizedDescription)")
-            return
-        }
-
-        // Renumber the remaining order
-        if let playlist, var items = playlist.items {
-            items.sort { $0.order < $1.order }
+        if let playlist {
+            let items = (playlist.items ?? []).filter { $0.id != itemId }.sorted { $0.order < $1.order }
             for (idx, item) in items.enumerated() {
                 item.order = idx
             }
             playlist.items = items
-            try? ctx.save()
         }
-        notifyPlaylistsChanged()
+        ctx.delete(i)
+        return commit(ctx)
     }
 
     /// Drag reordering: moves the entry at `from` to `to` and renumbers order.
-    func moveItem(in playlist: Playlist, from: Int, to: Int) {
-        guard var items = playlist.items?.sorted(by: { $0.order < $1.order }),
-              from < items.count, to <= items.count else { return }
+    @discardableResult
+    func moveItem(in playlist: Playlist, from: Int, to: Int) -> Bool {
+        let ctx = editingContext()
+        let id = playlist.id
+        guard let stored = try? ctx.fetch(FetchDescriptor<Playlist>(predicate: #Predicate { $0.id == id })).first,
+              var items = stored.items?.sorted(by: { $0.order < $1.order }),
+              from >= 0, from < items.count, to >= 0, to <= items.count else { return failed() }
         let item = items.remove(at: from)
         items.insert(item, at: min(to, items.count))
         for (idx, item) in items.enumerated() {
             item.order = idx
         }
-        playlist.items = items
-        try? playlist.modelContext?.save()
+        stored.items = items
+        return commit(ctx)
     }
 
     // MARK: - Pins
 
     /// Toggles a playlist's pinned state.
-    func togglePin(_ playlist: Playlist) {
-        let ctx = ModelContext(modelContainer)
+    @discardableResult
+    func togglePin(_ playlist: Playlist) -> Bool {
+        let ctx = editingContext()
         let id = playlist.id
         guard let p = try? ctx.fetch(FetchDescriptor<Playlist>(
             predicate: #Predicate { $0.id == id }
-        )).first else { return }
+        )).first else { return failed() }
         p.pinned.toggle()
-        try? ctx.save()
-        notifyPlaylistsChanged()
+        return commit(ctx)
     }
 
     /// Fetches pinned playlists (sorted by name).

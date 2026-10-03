@@ -659,9 +659,10 @@ private struct CollectionTrackTable: View {
         .sheet(isPresented: $showCreatePlaylist) {
             NewPlaylistSheet(isPresented: $showCreatePlaylist) { name in
                 guard let id = pendingNewPlaylistTrackID,
-                      let track = library.track(by: id) else { return }
-                let playlist = playlistService.create(name: name)
-                playlistService.addTrack(playlist, track: track)
+                      let track = library.track(by: id) else { return false }
+                let saved = playlistService.create(name: name, initialTrack: track) != nil
+                if !saved { playlistService.clearError() }
+                return saved
             }
         }
     }
