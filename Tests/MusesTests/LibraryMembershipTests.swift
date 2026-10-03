@@ -6,6 +6,41 @@ import Testing
 @Suite("Library membership", .serialized)
 @MainActor
 struct LibraryMembershipTests {
+    @Test("Editor credits hide known owners, preserve untouched truth, and never replace an edited draft")
+    func artistDraftCredits() throws {
+        let id = "abcdefghijk"
+        let metadata = YTDlpBridge.YTDlpPlaylistEntry(id: id, title: "Song", uploader: "Video publisher", artist: "Verified performer")
+        var owner = TrackArtistDraft(originalArtist: "Playlist owner", videoID: id, metadata: metadata, isKnownOwner: true)
+        #expect(owner.value == "Verified performer")
+        #expect(owner.artistToSave == "Playlist owner")
+        let publisher = TrackArtistDraft(originalArtist: "Video publisher", videoID: id, metadata: metadata)
+        #expect(publisher.value == "Verified performer")
+        let manual = TrackArtistDraft(originalArtist: "My edited credit", videoID: id, metadata: metadata)
+        #expect(manual.value == "My edited credit" && manual.artistToSave == "My edited credit")
+        var unavailable = TrackArtistDraft(originalArtist: "Playlist owner", videoID: id, isKnownOwner: true)
+        #expect(unavailable.value.isEmpty && unavailable.artistToSave == "Playlist owner")
+        unavailable.refresh(metadata: .init(id: "track_b0000", title: "Other", artist: "Wrong video"), isKnownOwner: true)
+        #expect(unavailable.value.isEmpty)
+        unavailable.refresh(metadata: metadata, isKnownOwner: true)
+        #expect(unavailable.value == "Verified performer")
+        owner.edit("User draft")
+        owner.refresh(metadata: .init(id: id, title: "Song", artist: "Later metadata"), isKnownOwner: true)
+        #expect(owner.value == "User draft" && owner.artistToSave == "User draft")
+        owner.edit("")
+        #expect(owner.artistToSave.isEmpty)
+
+        let container = try makeModelContainer(inMemory: true)
+        let context = ModelContext(container)
+        let track = Track(title: "Song", artist: "Playlist owner", youTubeId: id)
+        context.insert(track)
+        try context.save()
+        let library = LibraryService(modelContainer: container)
+        #expect(library.updateTrack(id: track.id, title: "Other title edit", artist: unavailable.artistToSave,
+            albumTitle: nil, albumArtist: nil, trackNo: nil, discNo: nil, year: nil, genre: nil, lyrics: nil))
+        #expect(library.track(by: track.id)?.artist == "Playlist owner")
+        #expect(library.track(by: track.id)?.title == "Other title edit")
+    }
+
     @Test("Numeric metadata drafts distinguish explicit clearing from malformed input")
     func numericMetadataDrafts() throws {
         let values = try TrackMetadataNumbers(trackNo: " 12 ", discNo: "2", year: "2024\n")
