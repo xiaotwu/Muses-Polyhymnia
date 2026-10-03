@@ -55,7 +55,10 @@ struct SidebarView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .scrollIndicators(.hidden)
-            .scrollClipDisabled()
+            // Music and Settings have different rail lengths and must not share scroll offsets.
+            .id(selection == .settings)
+            // Expanded capsules fit the host width; retain native clipping so
+            // vertically scrolled islands cannot cover the titlebar or footer.
         }
         .padding(.vertical, 12)
         .frame(width: 234)
