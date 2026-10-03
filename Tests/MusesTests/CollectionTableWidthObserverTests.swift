@@ -91,6 +91,32 @@ struct CollectionTableWidthObserverTests {
         #expect(values.first.map { $0 < 700 } == true)
     }
 
+    @Test("Owned fixed rows restore each table's automatic-height policy without rewriting its row height")
+    func restoresAutomaticRowHeightOwnership() {
+        let automaticTable = makeTable(titleWidth: 220, detailWidth: 100)
+        automaticTable.usesAutomaticRowHeights = true
+        automaticTable.rowHeight = 42
+        let fixedTable = makeTable(titleWidth: 220, detailWidth: 100)
+        fixedTable.usesAutomaticRowHeights = false
+        fixedTable.rowHeight = 54
+        let observer = CollectionTableWidthObserver.Coordinator { _ in }
+        defer { observer.detach() }
+
+        observer.attach(automaticTable)
+        #expect(!automaticTable.usesAutomaticRowHeights)
+        #expect(automaticTable.rowHeight == 42)
+        observer.attach(automaticTable) // Re-resolution must not replace the saved policy.
+        observer.attach(fixedTable)
+        #expect(automaticTable.usesAutomaticRowHeights)
+        #expect(!fixedTable.usesAutomaticRowHeights)
+        #expect(fixedTable.rowHeight == 54)
+
+        observer.detach()
+        #expect(!fixedTable.usesAutomaticRowHeights)
+        #expect(fixedTable.rowHeight == 54)
+        #expect(automaticTable.rowHeight == 42)
+    }
+
     private func makeTable(titleWidth: CGFloat, detailWidth: CGFloat) -> NSTableView {
         let table = NSTableView(frame: NSRect(x: 0, y: 0, width: 1200, height: 300))
         table.columnAutoresizingStyle = .noColumnAutoresizing

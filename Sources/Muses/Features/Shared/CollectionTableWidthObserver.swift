@@ -13,6 +13,7 @@ struct CollectionTableWidthObserver: NSViewRepresentable {
         private let pointerFocus = CollectionTablePointerFocus()
         private var observers: [NSObjectProtocol] = []
         private var previousPostsFrameChanges = false
+        private var previousUsesAutomaticRowHeights = false
         private var lastWidth: CGFloat = -1
         private var generation = 0
         private var measurementRevision = 0
@@ -26,6 +27,11 @@ struct CollectionTableWidthObserver: NSViewRepresentable {
             }
             detach()
             table = candidate
+            // Collection cells have a fixed single-line content height. Native
+            // automatic estimates can oscillate during AX scroll-to-visible;
+            // SwiftUI still owns rowHeight through the table's minimum setting.
+            previousUsesAutomaticRowHeights = candidate.usesAutomaticRowHeights
+            candidate.usesAutomaticRowHeights = false
             pointerFocus.attach(candidate)
             previousPostsFrameChanges = candidate.postsFrameChangedNotifications
             candidate.postsFrameChangedNotifications = true
@@ -68,6 +74,7 @@ struct CollectionTableWidthObserver: NSViewRepresentable {
             observers.forEach(NotificationCenter.default.removeObserver)
             observers = []
             table?.postsFrameChangedNotifications = previousPostsFrameChanges
+            table?.usesAutomaticRowHeights = previousUsesAutomaticRowHeights
             table = nil
             lastWidth = -1
         }

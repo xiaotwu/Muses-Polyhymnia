@@ -598,6 +598,9 @@ private struct CollectionTrackTable: View {
 
                     }
                     .tableStyle(.inset(alternatesRowBackgrounds: false))
+                    // The single-line title cell already has a 42-point content
+                    // height. Let SwiftUI maintain the same native row minimum.
+                    .environment(\.defaultMinListRowHeight, 42)
                     .tint(BrandColors.accent)
                     // In measured overflow cases, accessibility queries were expensive with
                     // Table owning both axes. Keep horizontal scrolling in the outer view.
