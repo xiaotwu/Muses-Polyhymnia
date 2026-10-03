@@ -129,7 +129,10 @@ final class TrayController: NSObject, NSPopoverDelegate {
         let playing = isPlayingProvider()
         let menu = NSMenu()
         menu.autoenablesItems = false
-        for spec in TrayMenuModel.items(track: track, isPlaying: playing, information: songInformationTrackID == track?.id ? songInformation : nil) {
+        for spec in TrayMenuModel.items(track: track, isPlaying: playing,
+                                       information: songInformationTrackID == track?.id ? songInformation : nil,
+                                       primaryAction: playbackService?.primaryAction,
+                                       miniEnabled: UserDefaults.standard.bool(forKey: PrefKey.ffMiniPlayer)) {
             if spec.kind == .separator {
                 menu.addItem(.separator()); continue
             }
@@ -366,7 +369,8 @@ enum TrayMenuModel {
     static func tag(for kind: Item.Kind) -> Int { kind.rawValue }
     static func kind(for tag: Int) -> Item.Kind? { Item.Kind(rawValue: tag) }
 
-    static func items(track: TrackSnapshot?, isPlaying: Bool, information: SongDisplayInformation? = nil) -> [Item] {
+    static func items(track: TrackSnapshot?, isPlaying: Bool, information: SongDisplayInformation? = nil,
+                      primaryAction: PlaybackPrimaryAction? = nil, miniEnabled: Bool = true) -> [Item] {
         var out: [Item] = []
         let headerTitle: String
         if let track {
@@ -377,14 +381,14 @@ enum TrayMenuModel {
         out.append(Item(kind: .header, title: headerTitle, enabled: false))
         out.append(Item(kind: .separator, title: "", enabled: false))
         out.append(Item(kind: .playPause,
-                       title: isPlaying ? tr("Pause", "暂停") : tr("Play", "播放"),
+                       title: (primaryAction ?? (isPlaying ? .pause : .play)).title,
                        enabled: track != nil))
         out.append(Item(kind: .previous, title: tr("Previous", "上一首"), enabled: track != nil))
         out.append(Item(kind: .next, title: tr("Next", "下一首"), enabled: track != nil))
         out.append(Item(kind: .separator, title: "", enabled: false))
         out.append(Item(kind: .like, title: tr("Like", "收藏"), enabled: track != nil))
         out.append(Item(kind: .separator, title: "", enabled: false))
-        out.append(Item(kind: .openMini, title: tr("Open Mini Player", "打开迷你播放器"), enabled: true))
+        out.append(Item(kind: .openMini, title: tr("Open Mini Player", "打开迷你播放器"), enabled: miniEnabled))
         out.append(Item(kind: .openMain, title: tr("Open Muses", "打开 Muses"), enabled: true))
         out.append(Item(kind: .separator, title: "", enabled: false))
         out.append(Item(kind: .quit, title: tr("Quit Muses", "退出 Muses"), enabled: true))

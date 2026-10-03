@@ -92,6 +92,20 @@ struct DesktopIntegrationTests {
         #expect(paused.first { $0.kind == .playPause }?.title == tr("Play", "播放"))
     }
 
+    @Test("Tray transport follows requested pause and retry, and disabled Mini cannot be opened")
+    func trayRequestedTransportAndMiniGate() {
+        let buffering = TrayMenuModel.items(track: snap("Song"), isPlaying: false,
+                                            primaryAction: .pause, miniEnabled: false)
+        #expect(buffering.first { $0.kind == .playPause }?.title == tr("Pause", "暂停"))
+        #expect(buffering.first { $0.kind == .openMini }?.enabled == false)
+        #expect(buffering.first { $0.kind == .openMain }?.enabled == true)
+        let failed = TrayMenuModel.items(track: snap("Song"), isPlaying: false,
+                                         primaryAction: .retry, miniEnabled: true)
+        #expect(failed.first { $0.kind == .playPause }?.title == tr("Retry", "重试", zhHant: "重試"))
+        #expect(failed.first { $0.kind == .playPause }?.enabled == true)
+        #expect(failed.first { $0.kind == .openMini }?.enabled == true)
+    }
+
     @Test("TrayMenuModel tag/kind round-trip")
     func trayMenuTagRoundTrip() {
         for kind in [TrayMenuModel.Item.Kind.playPause, .next, .previous, .like,
