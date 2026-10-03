@@ -24,11 +24,12 @@ struct YouTubeImportServiceTests {
             saveLocalEdit: { _ in attempts += 1; throw Failure.diskFull })
         #expect(!failing.removeRemoteItem(importId: imported.id, itemId: first.id))
         #expect(!failing.moveRemoteItem(importId: imported.id, from: 0, to: 2))
-        #expect(attempts == 2)
+        #expect(!failing.addRemoteVideo(importId: imported.id, videoId: "track_d0000", title: "Append", artist: "Artist"))
+        #expect(attempts == 3)
         for indices in [(-1, 0), (0, -1), (2, 0), (0, 3)] {
             #expect(!failing.moveRemoteItem(importId: imported.id, from: indices.0, to: indices.1))
         }
-        #expect(attempts == 2)
+        #expect(attempts == 3)
         func storedItems() throws -> [YouTubeImportItem] {
             let fresh = ModelContext(container)
             let stored = try #require(fresh.fetch(FetchDescriptor<YouTubeImport>()).first)
@@ -36,6 +37,7 @@ struct YouTubeImportServiceTests {
         }
         #expect(try storedItems().map(\.id) == [first.id, second.id])
         #expect(try storedItems().map(\.order) == [0, 1])
+        #expect(try ModelContext(container).fetch(FetchDescriptor<Track>()).map(\.id) == [unrelated.id])
         let working = YouTubeImportService(bridge: MockImportBridge(), modelContainer: container)
         #expect(working.moveRemoteItem(importId: imported.id, from: 0, to: 2))
         #expect(try storedItems().map(\.id) == [second.id, first.id])
@@ -44,6 +46,34 @@ struct YouTubeImportServiceTests {
         #expect(try storedItems().map(\.order) == [0])
         let persisted = try #require(ModelContext(container).fetch(FetchDescriptor<Track>()).first)
         #expect(persisted.id == unrelated.id && persisted.artist == "Edited artist" && persisted.liked)
+        #expect(working.addRemoteVideo(importId: imported.id, videoId: "track_d0000", title: "Append", artist: "Artist"))
+        #expect(try storedItems().map(\.youTubeId) == [second.youTubeId, "track_d0000"])
+    }
+
+    @Test("Stale local edit actions cannot mutate a Recently Deleted import")
+    func deletedImportRejectsLocalEdits() throws {
+        let container = try makeModelContainer(inMemory: true)
+        let context = ModelContext(container)
+        let imported = YouTubeImport(playlistId: "PLdeleted", url: "", title: "Deleted", channel: "Owner")
+        let first = YouTubeImportItem(youTubeId: "abcdefghijk", title: "First", artist: "Artist", order: 0)
+        let second = YouTubeImportItem(youTubeId: "track_b0000", title: "Second", artist: "Artist", order: 1)
+        imported.items = [first, second]
+        first.import_ = imported; second.import_ = imported
+        let deletedAt = Date()
+        imported.deletedAt = deletedAt
+        context.insert(imported)
+        try context.save()
+        let service = makeService(bridge: MockImportBridge(), container: container)
+        #expect(!service.moveRemoteItem(importId: imported.id, from: 0, to: 2))
+        #expect(!service.removeRemoteItem(importId: imported.id, itemId: first.id))
+        #expect(!service.addRemoteVideo(importId: imported.id, videoId: "track_d0000", title: "Append", artist: "Artist"))
+        let fresh = ModelContext(container)
+        let stored = try #require(fresh.fetch(FetchDescriptor<YouTubeImport>()).first)
+        #expect(stored.deletedAt == deletedAt)
+        let items = (stored.items ?? []).sorted { $0.order < $1.order }
+        #expect(items.map(\.id) == [first.id, second.id])
+        #expect(items.map(\.order) == [0, 1])
+        #expect(try fresh.fetch(FetchDescriptor<Track>()).isEmpty)
     }
 
     @Test("playlist import filters channels and malformed entries before creating items")

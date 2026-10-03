@@ -384,7 +384,7 @@ final class YouTubeImportService {
     func removeRemoteItem(importId: UUID, itemId: UUID) -> Bool {
         let ctx = ModelContext(modelContainer)
         ctx.autosaveEnabled = false
-        guard let imp = fetchImportById(importId, context: ctx) else { return false }
+        guard let imp = fetchImportById(importId, context: ctx), imp.deletedAt == nil else { return false }
         guard let item = (imp.items ?? []).first(where: { $0.id == itemId }) else { return false }
         if var items = imp.items {
             items.removeAll { $0.id == itemId }
@@ -403,7 +403,7 @@ final class YouTubeImportService {
     func moveRemoteItem(importId: UUID, from: Int, to: Int) -> Bool {
         let ctx = ModelContext(modelContainer)
         ctx.autosaveEnabled = false
-        guard let imp = fetchImportById(importId, context: ctx) else { return false }
+        guard let imp = fetchImportById(importId, context: ctx), imp.deletedAt == nil else { return false }
         var items = (imp.items ?? []).sorted { $0.order < $1.order }
         guard from >= 0, from < items.count, to >= 0, to <= items.count else { return false }
         let item = items.remove(at: from)
@@ -422,7 +422,7 @@ final class YouTubeImportService {
               durationMs >= 0 else { return false }
         let ctx = ModelContext(modelContainer)
         ctx.autosaveEnabled = false
-        guard let imp = fetchImportById(importId, context: ctx) else { return false }
+        guard let imp = fetchImportById(importId, context: ctx), imp.deletedAt == nil else { return false }
         if (imp.items ?? []).contains(where: { $0.youTubeId == videoId }) { return true }
         let nextOrder = (imp.items ?? []).map(\.order).max() ?? -1
         let item = YouTubeImportItem(
@@ -439,7 +439,7 @@ final class YouTubeImportService {
         } else {
             imp.items = [item]
         }
-        do { try ctx.save(); return true }
+        do { try saveLocalEdit(ctx); return true }
         catch { ctx.rollback(); return false }
     }
 
