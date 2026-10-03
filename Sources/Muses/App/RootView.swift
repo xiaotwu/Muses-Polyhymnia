@@ -563,7 +563,7 @@ struct RootView: View {
                 }
                 if showQueue {
                     QueueDrawerView(isPresented: $showQueue, showsScrim: false)
-                        .ignoresSafeArea(.container, edges: [.top, .bottom])
+                        .ignoresSafeArea(.container, edges: .bottom)
                         .transition(.move(edge: .trailing))
                 }
             }
