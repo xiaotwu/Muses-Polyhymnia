@@ -84,6 +84,7 @@ private struct SettingsFontPicker: View {
             TypographyLiveSamples(compact: true)
         }
         .padding(16)
+        .multilineTextAlignment(.leading)
         .frame(width: 380, height: 360)
         .onExitCommand { dismiss() }
         .task {

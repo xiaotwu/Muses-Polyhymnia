@@ -4,6 +4,7 @@ import SwiftUI
 /// Measure the owned native table's columns without asking its subtree for a fitting size.
 /// The outer horizontal scroll view uses this extent while Table retains vertical scrolling.
 struct CollectionTableWidthObserver: NSViewRepresentable {
+    static let uniformRowHeight: CGFloat = 50
     let onWidth: (CGFloat) -> Void
 
     @MainActor
@@ -16,13 +17,22 @@ struct CollectionTableWidthObserver: NSViewRepresentable {
         private var lastWidth: CGFloat = -1
         private var generation = 0
         private var measurementRevision = 0
+        private var previousAutomaticRowHeights: Bool?
+        private var previousRowHeight: CGFloat?
 
         init(onWidth: @escaping (CGFloat) -> Void) { self.onWidth = onWidth }
 
         func attach(_ candidate: NSTableView) {
-            guard table !== candidate else { measure(); return }
+            guard table !== candidate else {
+                applyUniformRowHeight(to: candidate)
+                measure()
+                return
+            }
             detach()
             table = candidate
+            previousAutomaticRowHeights = candidate.usesAutomaticRowHeights
+            previousRowHeight = candidate.rowHeight
+            applyUniformRowHeight(to: candidate)
             pointerFocus.attach(candidate)
             previousPostsFrameChanges = candidate.postsFrameChangedNotifications
             candidate.postsFrameChangedNotifications = true
@@ -46,6 +56,7 @@ struct CollectionTableWidthObserver: NSViewRepresentable {
             let leadingInset = max(0, headerRects.map(\.minX).min() ?? 0)
             let headerExtent = (headerRects.map(\.maxX).max() ?? 0) + leadingInset
             let width = max(columnWidths + gaps, headerExtent).rounded(.up)
+
             guard width.isFinite, width > 0, abs(width - lastWidth) > 0.5 else { return }
             lastWidth = width
             measurementRevision += 1
@@ -58,8 +69,25 @@ struct CollectionTableWidthObserver: NSViewRepresentable {
             }
         }
 
+        // Artwork and single-line cells have a bounded height. Native automatic
+        // all-row estimation caused sustained compact-window layout churn.
+        // Reapply only after a hosting update resets the owned table's policy.
+        private func applyUniformRowHeight(to table: NSTableView) {
+            if table.usesAutomaticRowHeights { table.usesAutomaticRowHeights = false }
+            if table.rowHeight != CollectionTableWidthObserver.uniformRowHeight {
+                table.rowHeight = CollectionTableWidthObserver.uniformRowHeight
+            }
+        }
+
         func detach() {
             pointerFocus.detach()
+            if let table, let automaticRowHeights = previousAutomaticRowHeights,
+               let rowHeight = previousRowHeight {
+                table.usesAutomaticRowHeights = automaticRowHeights
+                table.rowHeight = rowHeight
+            }
+            previousAutomaticRowHeights = nil
+            previousRowHeight = nil
             generation += 1
             observers.forEach(NotificationCenter.default.removeObserver)
             observers = []

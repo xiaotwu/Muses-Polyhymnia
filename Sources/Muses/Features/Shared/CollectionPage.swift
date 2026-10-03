@@ -515,7 +515,7 @@ private struct CollectionTrackTable: View {
                     ) {
                         TableColumn(tr("Order", "顺序"), value: \.canonicalIndex) { row in
                             Text("\(row.canonicalIndex + 1)")
-                                .foregroundStyle(BrandColors.textSecondary)
+                                .foregroundStyle(CollectionTableForegroundStyle(BrandColors.textSecondary, secondary: true))
                                 .monospacedDigit()
                         }
                         .width(min: 44, ideal: 52, max: 72)
@@ -598,6 +598,7 @@ private struct CollectionTrackTable: View {
 
                     }
                     .tableStyle(.inset(alternatesRowBackgrounds: false))
+                    .tint(BrandColors.accent)
                     // In measured overflow cases, accessibility queries were expensive with
                     // Table owning both axes. Keep horizontal scrolling in the outer view.
                     .scrollIndicators(.hidden, axes: .horizontal)
@@ -722,7 +723,7 @@ private struct CollectionTrackTable: View {
     private func secondaryText(_ value: String) -> some View {
         Text(value.isEmpty ? "—" : value)
             .font(MusesTypography.song(size: 12.5))
-            .foregroundStyle(BrandColors.textSecondary)
+            .foregroundStyle(CollectionTableForegroundStyle(BrandColors.textSecondary, secondary: true))
             .lineLimit(1)
     }
 
@@ -779,7 +780,7 @@ private struct CollectionTrackTitleCell: View {
 
             Text(row.title)
                 .font(MusesTypography.song(size: 13, emphasized: isPlaying, text: row.title))
-                .foregroundStyle(isPlaying ? BrandColors.accent : BrandColors.textPrimary)
+                .foregroundStyle(CollectionTableForegroundStyle(isPlaying ? BrandColors.accent : BrandColors.textPrimary))
                 .lineLimit(1)
 
             Spacer(minLength: 4)
@@ -787,7 +788,7 @@ private struct CollectionTrackTitleCell: View {
             Button(action: onToggleLike) {
                 Image(systemName: liked ? "heart.fill" : "heart")
                     .font(MusesTypography.system(size: 12, weight: .semibold))
-                    .foregroundStyle(liked ? BrandColors.accent : BrandColors.textSecondary)
+                    .foregroundStyle(CollectionTableForegroundStyle(liked ? BrandColors.accent : BrandColors.textSecondary, secondary: !liked))
                     .frame(width: 28, height: 28)
                     .contentShape(Rectangle())
             }
@@ -801,7 +802,7 @@ private struct CollectionTrackTitleCell: View {
                 Button(role: .destructive, action: onRemove) {
                     Image(systemName: "minus.circle")
                         .font(MusesTypography.system(size: 12, weight: .semibold))
-                        .foregroundStyle(BrandColors.textSecondary)
+                        .foregroundStyle(CollectionTableForegroundStyle(BrandColors.textSecondary, secondary: true))
                         .frame(width: 28, height: 28)
                         .contentShape(Rectangle())
                 }

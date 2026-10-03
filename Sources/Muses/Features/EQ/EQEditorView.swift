@@ -260,6 +260,8 @@ struct EQEditorView: View {
                 .cornerRadius(6)
         }
         .buttonStyle(.fullAreaPlain)
+        .accessibilityAddTraits(isActive ? .isSelected : [])
+        .accessibilityValue(isActive ? tr("Selected", "已选中", zhHant: "已選取") : "")
     }
 
     // MARK: - Actions

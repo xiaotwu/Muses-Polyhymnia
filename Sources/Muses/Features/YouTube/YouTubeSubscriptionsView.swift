@@ -82,7 +82,10 @@ struct YouTubeSubscriptionsView: View {
                                 }
                             }
                         }
-                    }.padding(28).padding(.bottom, 100)
+                    }
+                    .padding(.horizontal, AppleMusicTokens.contentPaddingX)
+                    .padding(.top, AppleMusicSpacing.browseTitleTop)
+                    .padding(.bottom, AppleMusicTokens.scrollBottomInset)
                 }
             }
         }
@@ -236,7 +239,10 @@ private struct YouTubeChannelVideosView: View {
                         refreshID = UUID()
                     }.musesAction().disabled(state.isLoading)
                 }
-            }.padding(28).padding(.bottom, 100)
+            }
+            .padding(.horizontal, AppleMusicTokens.contentPaddingX)
+            .padding(.top, AppleMusicSpacing.browseTitleTop)
+            .padding(.bottom, AppleMusicTokens.scrollBottomInset)
         }
         .task(id: refreshID) { await load() }
         .galleryMediaPreview(item: $galleryPreview)

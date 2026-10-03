@@ -112,16 +112,16 @@ struct MiniPlayerView: View {
                         .fill(BrandColors.textPrimary)
                         .frame(width: 30, height: 30)
 
-                    Image(systemName: playback.transportState.isPlaying ? "pause.fill" : "play.fill")
+                    Image(systemName: playback.primaryAction.symbol)
                         .font(MusesTypography.system(size: 12, weight: .bold))
                         .foregroundStyle(BrandColors.background)
-                        .offset(x: playback.transportState.isPlaying ? 0 : 1)
+                        .offset(x: playback.primaryAction == .play ? 1 : 0)
                 }
                 .contentShape(Circle())
             }
             .buttonStyle(.fullAreaPlain)
-            .help(playback.transportState.isPlaying ? tr("Pause", "暂停") : tr("Play", "播放"))
-            .accessibilityLabel(playback.transportState.isPlaying ? tr("Pause", "暂停") : tr("Play", "播放"))
+            .help(playback.primaryAction.title)
+            .accessibilityLabel(playback.primaryAction.title)
             .disabled(playback.transportState.track == nil)
         }
     }
@@ -144,7 +144,10 @@ struct MiniPlayerView: View {
     // MARK: - Helpers
 
     private var title: String { playback.transportState.track?.title ?? tr("Not Playing", "未在播放") }
-    private var artist: String { playback.transportState.track?.artist ?? "Muses" }
+    private var artist: String {
+        guard let track = playback.transportState.track else { return "Muses" }
+        return SongCreditCache.shared.artist(snapshot: track)
+    }
 }
 
 /// SwiftUI window accessor: gets the underlying `NSWindow` so native properties like autosave/level can be set.

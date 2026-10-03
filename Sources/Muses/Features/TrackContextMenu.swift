@@ -16,6 +16,7 @@ struct TrackContextMenu: ViewModifier {
     var showsMenuButton = false
     var menuButtonAlignment: Alignment = .topTrailing
     var menuButtonTrailingInset: CGFloat = 40
+    var menuButtonRegionHeight: CGFloat? = nil
     var onRemoveFromContainer: (() -> Void)? = nil
     @Environment(LibraryService.self) private var library
     @Environment(PlaylistService.self) private var playlistService
@@ -36,6 +37,7 @@ struct TrackContextMenu: ViewModifier {
                         ChromeIconMenu(systemName: "ellipsis", title: tr("Options for \(snapshot.title)", "\(snapshot.title) 的选项")) {
                             menu(snapshot)
                         }.padding(8).padding(.trailing, menuButtonTrailingInset)
+                            .frame(height: menuButtonRegionHeight, alignment: .topTrailing)
                     }
                 }
                 .contextMenu { menu(snapshot) }
@@ -92,6 +94,7 @@ private struct YouTubeEntryContextMenu: ViewModifier {
     var showsMenuButton = false
     var menuButtonAlignment: Alignment = .topTrailing
     var menuButtonTrailingInset: CGFloat = 40
+    var menuButtonRegionHeight: CGFloat? = nil
     @State private var saveFailed = false
 
     @Environment(YouTubeSearchService.self) private var search
@@ -108,6 +111,7 @@ private struct YouTubeEntryContextMenu: ViewModifier {
                 }
                 .padding(6)
                 .padding(.trailing, menuButtonTrailingInset)
+                .frame(height: menuButtonRegionHeight, alignment: .topTrailing)
             }
         }
         .alert(tr("Could not save to Library", "无法保存到资料库", zhHant: "無法儲存至資料庫"), isPresented: $saveFailed) {
@@ -342,6 +346,7 @@ extension View {
                           showsMenuButton: Bool = false,
                           menuButtonAlignment: Alignment = .topTrailing,
                           menuButtonTrailingInset: CGFloat = 40,
+        menuButtonRegionHeight: CGFloat? = nil,
                           onRemoveFromContainer: (() -> Void)? = nil) -> some View {
         modifier(TrackContextMenu(snapshot: snapshot, track: track,
                                   playlists: playlists, onPlay: onPlay,
@@ -349,6 +354,7 @@ extension View {
                                   showsMenuButton: showsMenuButton,
                                   menuButtonAlignment: menuButtonAlignment,
                                   menuButtonTrailingInset: menuButtonTrailingInset,
+                menuButtonRegionHeight: menuButtonRegionHeight,
                                   onRemoveFromContainer: onRemoveFromContainer))
     }
 
@@ -364,13 +370,15 @@ extension View {
         showsMenuButton: Bool = false,
         menuButtonAlignment: Alignment = .topTrailing,
         menuButtonTrailingInset: CGFloat = 40,
+        menuButtonRegionHeight: CGFloat? = nil,
         onPlay: @escaping () -> Void
     ) -> some View {
         modifier(YouTubeEntryContextMenu(entry: entry, mediaKind: mediaKind, onPlay: onPlay,
                                         videoContext: videoContext, videoSelectedIndex: videoSelectedIndex,
                                         videoResumeAtMs: videoResumeAtMs, videoSource: videoSource,
                                         showsMenuButton: showsMenuButton, menuButtonAlignment: menuButtonAlignment,
-                                        menuButtonTrailingInset: menuButtonTrailingInset))
+                                        menuButtonTrailingInset: menuButtonTrailingInset,
+                                        menuButtonRegionHeight: menuButtonRegionHeight))
     }
 
     @ViewBuilder
@@ -380,6 +388,7 @@ extension View {
         showsMenuButton: Bool = false,
         menuButtonAlignment: Alignment = .topTrailing,
         menuButtonTrailingInset: CGFloat = 40,
+        menuButtonRegionHeight: CGFloat? = nil,
         onPlay: @escaping () -> Void
     ) -> some View {
         if let videoID = card.playableVideoID {
@@ -398,6 +407,7 @@ extension View {
                 showsMenuButton: showsMenuButton,
                 menuButtonAlignment: menuButtonAlignment,
                 menuButtonTrailingInset: menuButtonTrailingInset,
+                menuButtonRegionHeight: menuButtonRegionHeight,
                 onPlay: onPlay
             )
         } else {
