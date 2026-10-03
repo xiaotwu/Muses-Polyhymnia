@@ -610,13 +610,11 @@ private struct CollectionTrackTable: View {
                         guard let row = firstRow(in: selectedIDs) else { return }
                         onPlay(row)
                     }
-                    .safeAreaInset(edge: .bottom, spacing: 0) {
-                        Color.clear.frame(height: OverlayChromeMetrics.scrollBottomInset)
-                    }
                     .background(CollectionTableWidthObserver { nativeTableContentWidth = $0 })
                     .frame(width: max(viewport.size.width, nativeTableContentWidth), height: viewport.size.height)
                 }
             }
+            .padding(.bottom, OverlayChromeMetrics.scrollBottomInset)
         }
         }
         .onAppear {
@@ -812,7 +810,7 @@ private struct CollectionTrackTitleCell: View {
                 .accessibilityLabel(tr("Remove \(row.title)", "移除 \(row.title)", zhHant: "移除 \(row.title)"))
             }
         }
-        .frame(minHeight: 42)
+        .frame(height: 42)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(row.title)
         .accessibilityValue(row.displayArtist)

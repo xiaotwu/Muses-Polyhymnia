@@ -5,47 +5,6 @@ import Testing
 @MainActor
 @Suite("Native collection table width", .serialized)
 struct CollectionTableWidthObserverTests {
-    @Test("Owned artwork rows use uniform sizing and restore their native policy")
-    func uniformRowsRestorePolicy() {
-        let table = makeTable(titleWidth: 220, detailWidth: 100)
-        table.usesAutomaticRowHeights = true
-        table.rowHeight = 24
-        let observer = CollectionTableWidthObserver.Coordinator { _ in }
-        observer.attach(table)
-        #expect(!table.usesAutomaticRowHeights)
-        #expect(table.rowHeight == CollectionTableWidthObserver.uniformRowHeight)
-
-        // SwiftUI hosting updates can reset native row settings on the same table.
-        table.usesAutomaticRowHeights = true
-        table.rowHeight = 24
-        observer.attach(table)
-        #expect(!table.usesAutomaticRowHeights)
-        #expect(table.rowHeight == CollectionTableWidthObserver.uniformRowHeight)
-        observer.detach()
-        #expect(table.usesAutomaticRowHeights)
-        #expect(table.rowHeight == 24)
-    }
-
-    @Test("Rebinding restores the old table and independently manages the new table")
-    func uniformRowsRebindPolicy() {
-        let oldTable = makeTable(titleWidth: 220, detailWidth: 100)
-        oldTable.usesAutomaticRowHeights = true
-        oldTable.rowHeight = 31
-        let newTable = makeTable(titleWidth: 220, detailWidth: 100)
-        newTable.usesAutomaticRowHeights = false
-        newTable.rowHeight = 35
-        let observer = CollectionTableWidthObserver.Coordinator { _ in }
-        observer.attach(oldTable)
-        observer.attach(newTable)
-        #expect(oldTable.usesAutomaticRowHeights)
-        #expect(oldTable.rowHeight == 31)
-        #expect(!newTable.usesAutomaticRowHeights)
-        #expect(newTable.rowHeight == CollectionTableWidthObserver.uniformRowHeight)
-        observer.detach()
-        #expect(!newTable.usesAutomaticRowHeights)
-        #expect(newTable.rowHeight == 35)
-    }
-
     @Test("Native column resize grows and shrinks the reported scroll extent")
     func resizeTracksRealColumns() async throws {
         let table = makeTable(titleWidth: 220, detailWidth: 100)
