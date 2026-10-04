@@ -80,7 +80,12 @@ struct GlobalSearchView: View {
             searchFieldFocused = true
         }
         .onChange(of: search.query) { _, _ in expandedResultSections.removeAll() }
+        .onChange(of: search.youtubeResults.map(\.id)) { _, ids in
+            guard !ids.isEmpty else { return }
+            refreshSavedYouTubeIDs()
+        }
         .onReceive(NotificationCenter.default.publisher(for: ModelContext.didSave)) { _ in
+            guard !search.youtubeResults.isEmpty else { return }
             refreshSavedYouTubeIDs()
         }
         .onDisappear { if search.isSearchingYouTube { search.cancelSearch() } }
