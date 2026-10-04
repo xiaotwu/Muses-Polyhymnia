@@ -273,8 +273,16 @@ struct QueueDrawerView: View {
                         }
                     }
                     .focusable()
-                    .onKeyPress(.return) { playback.toggle(); return .handled }
-                    .accessibilityAction(named: Text(tr("Play or pause", "播放或暂停"))) { playback.toggle() }
+                    .onKeyPress(.return) {
+                        guard playback.isPrimaryActionAvailable else { return .ignored }
+                        playback.toggle()
+                        return .handled
+                    }
+                    .accessibilityActions {
+                        if playback.isPrimaryActionAvailable {
+                            Button(tr("Play or pause", "播放或暂停")) { playback.toggle() }
+                        }
+                    }
             } else {
                 queueEmptyRow(tr("Choose a song to start listening", "选择歌曲开始收听"))
             }

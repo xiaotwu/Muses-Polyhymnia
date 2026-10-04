@@ -128,6 +128,7 @@ private struct YouTubeEntryContextMenu: ViewModifier {
                systemImage: isCurrent ? playback.primaryAction.symbol : "play.fill") {
             if isCurrent { playback.toggle() } else { onPlay() }
         }
+        .disabled(isCurrent && !playback.isPrimaryActionAvailable)
         Button(tr("Play Next", "下一首播放"), systemImage: "text.insert") {
             resolve { playback.queue.playNext($0) }
         }
@@ -238,6 +239,7 @@ struct TrackContextMenuItems: View {
                    systemImage: isCurrent ? playback.primaryAction.symbol : "play.fill") {
                 if isCurrent { playback.toggle() } else { onPlay() }
             }
+            .disabled(isCurrent && !playback.isPrimaryActionAvailable)
         if showsPlayNext {
             Button(tr("Play Next", "下一首播放"), systemImage: "text.insert") {
                 playback.queue.playNext(snapshot)
