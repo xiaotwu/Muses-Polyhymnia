@@ -220,7 +220,7 @@ private struct CollectionEmptyPanel<Controls: View>: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            CollectionPageHeader(title: title, youTubeURL: youTubeURL) {
+            CollectionPageHeader(title: title, youTubeURL: youTubeURL, showsActions: youTubeURL != nil) {
                 controls
             }
             .padding(.horizontal, AppleMusicTokens.contentPaddingX)
@@ -245,14 +245,17 @@ struct CollectionPageHeader<Controls: View>: View {
     let title: String
     let youTubeURL: URL?
     private let controls: Controls
+    private let showsActions: Bool
 
     init(
         title: String,
         youTubeURL: URL? = nil,
+        showsActions: Bool = true,
         @ViewBuilder controls: () -> Controls
     ) {
         self.title = title
         self.youTubeURL = youTubeURL
+        self.showsActions = showsActions
         self.controls = controls()
     }
 
@@ -271,30 +274,32 @@ struct CollectionPageHeader<Controls: View>: View {
 
             Spacer(minLength: AppleMusicSpacing.related)
 
-            MusesGlassGroup(spacing: 8) {
-            HStack(spacing: 16) {
-                controls
-                if youTubeURL != nil { Divider().frame(height: 20) }
-                if let youTubeURL {
-                    if let target = YouTubeShareTarget(url: youTubeURL) {
-                        YouTubeShareMenu(target: target, chrome: true)
+            if showsActions {
+                MusesGlassGroup(spacing: 8) {
+                HStack(spacing: 16) {
+                    controls
+                    if youTubeURL != nil { Divider().frame(height: 20) }
+                    if let youTubeURL {
+                        if let target = YouTubeShareTarget(url: youTubeURL) {
+                            YouTubeShareMenu(target: target, chrome: true)
+                        }
+                        Link(destination: youTubeURL) {
+                            YouTubeMark(size: 14).chromeActionCircle()
+                        }
+                        .buttonStyle(.fullAreaPlain)
+                        .help(tr("Open on YouTube", "在 YouTube 打开"))
+                        .accessibilityLabel(tr(
+                            "Open playlist on YouTube",
+                            "在 YouTube 打开此歌单"
+                        ))
+                        .fixedSize()
                     }
-                    Link(destination: youTubeURL) {
-                        YouTubeMark(size: 14).chromeActionCircle()
-                    }
-                    .buttonStyle(.fullAreaPlain)
-                    .help(tr("Open on YouTube", "在 YouTube 打开"))
-                    .accessibilityLabel(tr(
-                        "Open playlist on YouTube",
-                        "在 YouTube 打开此歌单"
-                    ))
-                    .fixedSize()
                 }
-            }
-            .padding(.horizontal, 8)
-            .frame(minHeight: 44, alignment: .trailing)
-            .environment(\.groupedChromeActions, true)
-            .musesGlass(in: Capsule(), role: .compactControl)
+                .padding(.horizontal, 8)
+                .frame(minHeight: 44, alignment: .trailing)
+                .environment(\.groupedChromeActions, true)
+                .musesGlass(in: Capsule(), role: .compactControl)
+                }
             }
         }
         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
