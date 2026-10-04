@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 import Testing
 @testable import Muses
 
@@ -135,6 +136,67 @@ struct GlobalSearchStateTests {
         #expect(service.youtubeError == nil)
         #expect(!service.wasCancelled)
     }
+
+    @Test("Suspending for a catalog detail retains the query, source and results for Back and Forward")
+    func localDetailReturnRetainsSearch() async throws {
+        let container = try makeModelContainer(inMemory: true)
+        let library = LibraryService(modelContainer: container)
+        let resolver = YouTubeSearchService(bridge: MockImportBridge(), modelContainer: container)
+        let snapshot = try await resolver.resolveTrack(entry: .init(id: "abcdefghijk", title: "Return Song"),
+                                                        saveToLibrary: true)
+        var remoteCalls = 0
+        let service = GlobalSearchService(library: library, debounceMs: 60_000,
+            remoteSearch: { _, _ in remoteCalls += 1; return [] })
+        service.scope = .library
+        service.query = "Return"
+        await service.performSearch(query: service.query)
+        var history = BrowseNavigationHistory(initial: .section(.search))
+        history.visit(.release("browse:detail"))
+        service.cancelSearch()
+        #expect(service.query == "Return")
+        #expect(service.scope == .library)
+        #expect(service.trackResults.map(\.id) == [snapshot.id])
+        #expect(history.back() == .section(.search))
+        service.retrySearch()
+        for _ in 0..<100 where service.wasCancelled { await Task.yield() }
+        #expect(!service.wasCancelled)
+        #expect(service.query == "Return")
+        #expect(service.scope == .library)
+        #expect(service.trackResults.map(\.id) == [snapshot.id])
+        #expect(history.forward() == .release("browse:detail"))
+        #expect(remoteCalls == 0)
+        service.cancelSearch()
+    }
+
+    @Test("Saving a transient search result emits the established save invalidation and preserves its identity")
+    func savedResultProjectionInvalidates() async throws {
+        let container = try makeModelContainer(inMemory: true)
+        let library = LibraryService(modelContainer: container)
+        let resolver = YouTubeSearchService(bridge: MockImportBridge(), modelContainer: container)
+        let entry = YTDlpBridge.YTDlpPlaylistEntry(id: "abcdefghijk", title: "Save Song")
+        let preview = try await resolver.resolveTrack(entry: entry)
+        #expect(library.allTracks().isEmpty)
+        let projection = SavedSearchProjectionProbe()
+        let token = NotificationCenter.default.addObserver(forName: ModelContext.didSave, object: nil,
+                                                           queue: .main) { _ in
+            MainActor.assumeIsolated {
+                projection.ids = Set(library.allTracks().map(\.youTubeId))
+                projection.notifications += 1
+            }
+        }
+        defer { NotificationCenter.default.removeObserver(token) }
+        let saved = try await resolver.resolveTrack(entry: entry, saveToLibrary: true)
+        #expect(saved.id == preview.id)
+        #expect(projection.notifications > 0)
+        #expect(projection.ids == [entry.id])
+        #expect(try ModelContext(container).fetchCount(FetchDescriptor<Track>()) == 1)
+    }
+}
+
+@MainActor
+private final class SavedSearchProjectionProbe {
+    var ids = Set<String>()
+    var notifications = 0
 }
 
 private actor SearchStatusCatalogFixture: MusicCatalogProviding {

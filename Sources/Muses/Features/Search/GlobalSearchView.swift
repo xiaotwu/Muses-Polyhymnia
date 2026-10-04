@@ -1,4 +1,5 @@
 import AppKit
+import SwiftData
 import SwiftUI
 
 enum GlobalSearchRoute {
@@ -79,6 +80,9 @@ struct GlobalSearchView: View {
             searchFieldFocused = true
         }
         .onChange(of: search.query) { _, _ in expandedResultSections.removeAll() }
+        .onReceive(NotificationCenter.default.publisher(for: ModelContext.didSave)) { _ in
+            refreshSavedYouTubeIDs()
+        }
         .onDisappear { if search.isSearchingYouTube { search.cancelSearch() } }
         .onAppear {
             if search.wasCancelled { search.retrySearch() }
@@ -377,12 +381,10 @@ struct GlobalSearchView: View {
     }
 
     private func open(_ release: CatalogReleaseProjection) {
-        search.reset()
         onRoute(.release(release))
     }
 
     private func open(_ artist: CatalogArtistProjection) {
-        search.reset()
         onRoute(.artist(artist))
     }
 
