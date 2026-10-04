@@ -249,17 +249,25 @@ final class PodcastLibraryService {
     }
 
     private func saveProgress(_ write: PendingProgressWrite) {
+        // A later checkpoint cannot discard an unsaved natural completion.
+        // Successful explicit marks clear pending writes independently.
+        let effectiveWrite: PendingProgressWrite
+        if case .completed? = pendingProgressWrites[write.videoID] {
+            effectiveWrite = .completed(videoID: write.videoID)
+        } else {
+            effectiveWrite = write
+        }
         do {
-            switch write {
+            switch effectiveWrite {
             case .position(let videoID, let positionMs, let durationMs):
                 try updateProgress(videoID: videoID, positionMs: positionMs,
                                    durationMs: durationMs)
             case .completed(let videoID):
                 try markPlayed(videoID: videoID)
             }
-            pendingProgressWrites.removeValue(forKey: write.videoID)
+            pendingProgressWrites.removeValue(forKey: effectiveWrite.videoID)
         } catch {
-            pendingProgressWrites[write.videoID] = write
+            pendingProgressWrites[effectiveWrite.videoID] = effectiveWrite
             AppLog.for("PodcastLibraryService").error("Podcast progress save failed: \(error.localizedDescription)")
         }
         persistenceFailed = !pendingProgressWrites.isEmpty

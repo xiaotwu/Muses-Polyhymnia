@@ -8,6 +8,43 @@ import Testing
 struct PodcastLibraryTests {
     private enum SaveError: Error { case injected }
 
+    @Test("unknown-duration completion retry survives later position checkpoints", arguments: [false, true])
+    func completionRetrySurvivesCheckpoint(checkpointFails: Bool) throws {
+        let container = try makeModelContainer(inMemory: true)
+        let bus = PlaybackEventBus()
+        var shouldFail = false
+        let service = PodcastLibraryService(modelContainer: container, eventBus: bus,
+            saveContext: { context in
+                if shouldFail { throw SaveError.injected }
+                try context.save()
+            })
+        try service.ingest(show: item(id: "browse:MPSPshow", kind: .podcast, title: "Show"),
+            episodes: [item(id: "video:abcdefghijk", kind: .episode, title: "Unknown duration"),
+                       item(id: "video:abcdefghij2", kind: .episode, title: "Other episode")])
+        let completed = TrackSnapshot(from: Track(title: "Unknown duration", artist: "Show",
+            youTubeId: "abcdefghijk", mediaKind: .podcastEpisode))
+        let other = TrackSnapshot(from: Track(title: "Other episode", artist: "Show",
+            durationMs: 300_000, youTubeId: "abcdefghij2", mediaKind: .podcastEpisode))
+        shouldFail = true
+        bus.post(.trackCompleted(completed, listenedMs: 40_000))
+        service.checkpoint(track: other, positionMs: 22_000, durationSeconds: 300)
+        #expect(service.persistenceFailed)
+        shouldFail = checkpointFails
+        service.checkpoint(track: completed, positionMs: 40_000, durationSeconds: 0)
+        #expect(service.persistenceFailed) // The other episode remains pending.
+        shouldFail = false
+        service.retryPendingProgress()
+        #expect(!service.persistenceFailed)
+        #expect(service.episode(videoID: "abcdefghijk")?.completed == true)
+        #expect(service.episode(videoID: "abcdefghijk")?.durationMs == nil)
+        #expect(service.episode(videoID: "abcdefghij2")?.lastPositionMs == 22_000)
+        #expect(service.episode(videoID: "abcdefghij2")?.completed == false)
+        try service.markUnplayed(videoID: "abcdefghijk")
+        service.retryPendingProgress()
+        #expect(service.episode(videoID: "abcdefghijk")?.completed == false)
+        #expect(service.episode(videoID: "abcdefghijk")?.lastPositionMs == 0)
+    }
+
     @Test("successful mark unplayed supersedes only that episode's failed completion retry")
     func markUnplayedSupersedesPendingCompletion() throws {
         let container = try makeModelContainer(inMemory: true)
