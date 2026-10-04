@@ -132,6 +132,7 @@ final class TrayController: NSObject, NSPopoverDelegate {
         for spec in TrayMenuModel.items(track: track, isPlaying: playing,
                                        information: songInformationTrackID == track?.id ? songInformation : nil,
                                        primaryAction: playbackService?.primaryAction,
+                                       primaryActionAvailable: playbackService?.isPrimaryActionAvailable ?? (track != nil),
                                        miniEnabled: UserDefaults.standard.bool(forKey: PrefKey.ffMiniPlayer)) {
             if spec.kind == .separator {
                 menu.addItem(.separator()); continue
@@ -370,7 +371,8 @@ enum TrayMenuModel {
     static func kind(for tag: Int) -> Item.Kind? { Item.Kind(rawValue: tag) }
 
     static func items(track: TrackSnapshot?, isPlaying: Bool, information: SongDisplayInformation? = nil,
-                      primaryAction: PlaybackPrimaryAction? = nil, miniEnabled: Bool = true) -> [Item] {
+                      primaryAction: PlaybackPrimaryAction? = nil,
+                      primaryActionAvailable: Bool = true, miniEnabled: Bool = true) -> [Item] {
         var out: [Item] = []
         let headerTitle: String
         if let track {
@@ -382,7 +384,7 @@ enum TrayMenuModel {
         out.append(Item(kind: .separator, title: "", enabled: false))
         out.append(Item(kind: .playPause,
                        title: (primaryAction ?? (isPlaying ? .pause : .play)).title,
-                       enabled: track != nil))
+                       enabled: track != nil && primaryActionAvailable))
         out.append(Item(kind: .previous, title: tr("Previous", "上一首"), enabled: track != nil))
         out.append(Item(kind: .next, title: tr("Next", "下一首"), enabled: track != nil))
         out.append(Item(kind: .separator, title: "", enabled: false))

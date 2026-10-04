@@ -93,7 +93,7 @@ struct MenuBarPlayerView: View {
                 }
                 .buttonStyle(.fullAreaPlain)
                 .modifier(PlaybackCoreSurface()).help(playback.primaryAction.title)
-                .disabled(track == nil)
+                .disabled(!playback.isPrimaryActionAvailable)
                 .accessibilityLabel(playback.primaryAction.title)
                 ChromeIconButton(systemName: "forward.fill", help: tr("Next", "下一首"),
                                  accessibility: tr("Next", "下一首")) { playback.next() }

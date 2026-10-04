@@ -122,7 +122,7 @@ struct MiniPlayerView: View {
             .buttonStyle(.fullAreaPlain)
             .help(playback.primaryAction.title)
             .accessibilityLabel(playback.primaryAction.title)
-            .disabled(playback.transportState.track == nil)
+            .disabled(!playback.isPrimaryActionAvailable)
         }
     }
 

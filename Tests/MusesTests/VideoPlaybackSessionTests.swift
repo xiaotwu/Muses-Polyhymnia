@@ -5,6 +5,38 @@ import Testing
 @MainActor
 @Suite("Video transport ownership")
 struct VideoPlaybackSessionTests {
+    @Test("primary availability rejects idle, failed and closing video but retains buffering and native retry")
+    func primaryAvailability() {
+        let idle = PlaybackService(engine: RecordingEngine(), queue: QueueService())
+        #expect(!idle.isPrimaryActionAvailable)
+        let (playback, engine) = fixture()
+        engine.state.buffering = true
+        playback.play()
+        #expect(playback.isPrimaryActionAvailable)
+        #expect(playback.primaryAction == .pause)
+        let session = playback.beginVideoSession(videoId: engine.state.track!.youTubeId)
+        #expect(playback.isPrimaryActionAvailable)
+        #expect(playback.primaryAction == .pause)
+        session.fail()
+        #expect(!playback.isPrimaryActionAvailable)
+        let failedMenu = TrayMenuModel.items(track: engine.state.track, isPlaying: false,
+            primaryAction: playback.primaryAction, primaryActionAvailable: playback.isPrimaryActionAvailable)
+        #expect(failedMenu.first { $0.kind == .playPause }?.enabled == false)
+        #expect(failedMenu.first { $0.kind == .openMain }?.enabled == true)
+        playback.finishVideoSession(session, resume: false)
+        engine.state.error = .embedUnavailable
+        #expect(playback.isPrimaryActionAvailable)
+        #expect(playback.primaryAction == .retry)
+        let retryMenu = TrayMenuModel.items(track: engine.state.track, isPlaying: false,
+            primaryAction: playback.primaryAction, primaryActionAvailable: playback.isPrimaryActionAvailable)
+        #expect(retryMenu.first { $0.kind == .playPause }?.enabled == true)
+        engine.state.error = nil
+        let closing = playback.beginVideoSession(videoId: engine.state.track!.youTubeId)
+        closing.requestClose()
+        #expect(!playback.isPrimaryActionAvailable)
+        playback.finishVideoSession(closing, resume: false)
+    }
+
     @Test("old progress and completion cannot undo a newer seek or end its collection")
     func seekAcknowledgment() {
         let session = VideoPlaybackSession(videoId: "video00000a", track: nil,

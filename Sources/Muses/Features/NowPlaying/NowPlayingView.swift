@@ -627,19 +627,20 @@ struct NowPlayingView: View {
                 }
 
                 Button { playback.toggle() } label: {
-                    Image(systemName: playback.state.isPlaying ? "pause.fill" : "play.fill")
+                    Image(systemName: playback.primaryAction.symbol)
                         .font(MusesTypography.system(size: 22, weight: .semibold))
                         .foregroundStyle(BrandColors.playback)
-                        .offset(x: playback.state.isPlaying ? 0 : 1)
+                        .offset(x: playback.primaryAction == .play ? 1 : 0)
                         .frame(width: 44, height: 44)
                         .background(Color.clear, in: Circle())
                         .contentShape(Circle())
                 }
                 .buttonStyle(.fullAreaPlain)
                 .modifier(PlaybackCoreSurface())
-                .help(playback.state.isPlaying ? tr("Pause", "暂停") : tr("Play", "播放"))
+                .help(playback.primaryAction.title)
+                .disabled(!playback.isPrimaryActionAvailable)
                 .accessibilityLabel(
-                    playback.state.isPlaying ? tr("Pause", "暂停") : tr("Play", "播放")
+                    playback.primaryAction.title
                 )
 
                 transportButton(

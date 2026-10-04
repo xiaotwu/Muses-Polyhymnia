@@ -237,6 +237,12 @@ final class PlaybackService {
         }
     }
 
+    var isPrimaryActionAvailable: Bool {
+        guard transportState.track != nil else { return false }
+        if let videoSession { return !videoSession.closing && videoSession.state.error == nil }
+        return true
+    }
+
     var primaryAction: PlaybackPrimaryAction {
         if let videoSession { return videoSession.requestedPlay ? .pause : .play }
         if state.error != nil { return .retry }

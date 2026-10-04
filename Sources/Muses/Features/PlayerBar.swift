@@ -280,10 +280,10 @@ struct PlaybackTransport: View {
             Button { playback.toggle() } label: {
                 ZStack {
                     Circle().fill(Color.clear)
-                    Image(systemName: playback.state.isPlaying ? "pause.fill" : "play.fill")
+                    Image(systemName: playback.primaryAction.symbol)
                         .font(MusesTypography.system(size: 13, weight: .semibold))
                         .foregroundStyle(BrandColors.playback)
-                        .offset(x: playback.state.isPlaying ? 0 : 1)
+                        .offset(x: playback.primaryAction == .play ? 1 : 0)
                 }
                 .frame(width: playHit, height: playHit)
                 .contentShape(Circle())
@@ -294,8 +294,9 @@ struct PlaybackTransport: View {
             .modifier(PlaybackCoreSurface())
             .onHover { isPlayHovered = $0 }
             .animation(MusesMotion.hoverAnimation(reduceMotion: reduceMotion), value: isPlayHovered)
-            .help(playback.state.isPlaying ? tr("Pause", "暂停") : tr("Play", "播放"))
-            .accessibilityLabel(playback.state.isPlaying ? tr("Pause", "暂停") : tr("Play", "播放"))
+            .help(playback.primaryAction.title)
+            .disabled(!playback.isPrimaryActionAvailable)
+            .accessibilityLabel(playback.primaryAction.title)
             transportButton("forward.fill", help: tr("Next", "下一首")) {
                 playback.next()
             }
