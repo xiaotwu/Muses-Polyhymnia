@@ -408,7 +408,7 @@ struct QueueDrawerView: View {
     private var historySection: some View {
         Section {
             if historyExpanded {
-                ForEach(playback.queue.history) { item in
+                ForEach(playback.queue.history, id: \.historyRecordID) { item in
                     QueueRow(item: item, isCurrent: false, showHistoryBadge: advancedQueue)
                         .queueRowActions(title: item.track.title) {
                             TrackContextMenuItems(
@@ -425,9 +425,8 @@ struct QueueDrawerView: View {
                             if advancedQueue {
                                 Divider()
                                 Button(tr("Restore to queue", "还原到队列")) {
-                                    if let idx = playback.queue.history.firstIndex(where: { $0.id == item.id }) {
-                                        playback.queue.restoreFromHistory(at: idx)
-                                    }
+                                    guard let id = item.historyRecordID else { return }
+                                    playback.queue.restoreHistoryRecord(id: id)
                                 }
                                 Button(tr("Remove from history", "从历史移除"), role: .destructive) {
                                     pendingRemoval = ActionConfirmation(
@@ -435,10 +434,8 @@ struct QueueDrawerView: View {
                                         message: tr("Remove \(item.track.title) from queue history. Playlists are unchanged.", "从队列历史中移除「\(item.track.title)」，歌单不受影响。"),
                                         actionTitle: tr("Remove", "移除"),
                                         action: {
-                                            if let idx = playback.queue.history.firstIndex(where: { $0.id == item.id }) {
-                                                playback.queue.history.remove(at: idx)
-                                                playback.queue.persist()
-                                            }
+                                            guard let id = item.historyRecordID else { return }
+                                            playback.queue.removeHistoryRecord(id: id)
                                         }
                                     )
                                 }

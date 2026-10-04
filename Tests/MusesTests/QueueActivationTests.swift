@@ -6,6 +6,117 @@ import Testing
 @MainActor
 @Suite("Existing queue occurrence activation", .serialized)
 struct QueueActivationTests {
+    @Test("Repeated occurrence history actions target the selected older record, not its newer snapshot", arguments: [false, true])
+    func repeatedHistoryRecordTarget(restore: Bool) throws {
+        let queue = QueueService()
+        let recording = track("repeated")
+        queue.play(recording, context: [recording], from: .playlist)
+        let firstGroup = queue.addGroup("First"), secondGroup = queue.addGroup("Second")
+        let occurrenceID = try #require(queue.current()).id
+        queue.setRepeat(.one)
+        queue.setGroupId(itemId: occurrenceID, to: firstGroup)
+        _ = queue.next(as: .skipped)
+        let selected = try #require(queue.history.first)
+        queue.toggleLocked(itemId: occurrenceID)
+        queue.setGroupId(itemId: occurrenceID, to: secondGroup)
+        _ = queue.next(as: .played)
+        #expect(queue.history.map(\.id) == [occurrenceID, occurrenceID])
+        let selectedRecordID = try #require(selected.historyRecordID)
+        #expect(Set(queue.history.compactMap(\.historyRecordID)).count == 2)
+        if restore {
+            queue.restoreHistoryRecord(id: selectedRecordID)
+            #expect(queue.upNext.last?.locked == false)
+            #expect(queue.upNext.last?.groupId == firstGroup)
+            #expect(queue.upNext.last?.historyRecordID == nil)
+        } else {
+            queue.removeHistoryRecord(id: selectedRecordID)
+            #expect(queue.upNext.isEmpty)
+        }
+        #expect(queue.history.first?.historyState == .played)
+        #expect(queue.current()?.id == occurrenceID)
+        #expect(queue.current()?.locked == true)
+        #expect(queue.current()?.groupId == secondGroup)
+        let remainingRecordID = try #require(queue.history.first?.historyRecordID)
+        queue.removeHistoryRecord(id: selectedRecordID) // A delayed confirmation for the consumed record is stale.
+        queue.restoreHistoryRecord(id: selectedRecordID)
+        #expect(queue.history.first?.historyRecordID == remainingRecordID)
+        #expect(queue.history.count == 1)
+        queue.removeHistoryRecord(id: remainingRecordID)
+        #expect(queue.history.isEmpty)
+    }
+
+    @Test("legacy repeated history gains stable record identities without changing occurrence truth", arguments: [false, true])
+    func legacyHistoryRecordIdentity(duplicateRecordID: Bool) throws {
+        let container = try makeModelContainer(inMemory: true)
+        let queue = QueueService()
+        queue.modelContext = ModelContext(container)
+        let recording = track("repeated")
+        queue.play(recording, context: [recording], from: .playlist)
+        let occurrenceID = try #require(queue.current()).id
+        let group = queue.addGroup("Group")
+        queue.setRepeat(.one)
+        _ = queue.next(as: .skipped)
+        queue.toggleLocked(itemId: occurrenceID)
+        queue.setGroupId(itemId: occurrenceID, to: group)
+        _ = queue.next(as: .played)
+        let context = ModelContext(container)
+        let saved = try #require(context.fetch(FetchDescriptor<QueueState>()).first)
+        var legacy = try #require(JSONSerialization.jsonObject(with: Data(saved.historyJSON.utf8)) as? [[String: Any]])
+        let sharedRecordID = UUID().uuidString
+        for index in legacy.indices {
+            if duplicateRecordID { legacy[index]["historyRecordID"] = sharedRecordID }
+            else { legacy[index].removeValue(forKey: "historyRecordID") }
+        }
+        let canonicalJSON = saved.itemsJSON, groupsJSON = saved.groupsJSON
+        let savedAt = saved.savedAt
+        saved.historyJSON = String(decoding: try JSONSerialization.data(withJSONObject: legacy), as: UTF8.self)
+        try context.save()
+        let restored = QueueService()
+        restored.modelContext = ModelContext(container)
+        restored.restore()
+        let records = restored.history.compactMap(\.historyRecordID)
+        #expect(records.count == 2 && Set(records).count == 2)
+        #expect(restored.history.map(\.id) == [occurrenceID, occurrenceID])
+        #expect(restored.history.map(\.historyState) == [.played, .skipped])
+        #expect(restored.history.map(\.locked) == [true, false])
+        #expect(restored.history.map(\.groupId) == [group, nil])
+        #expect(restored.items.map(\.id) == [occurrenceID])
+        #expect(restored.current()?.historyRecordID == nil)
+        let persisted = try #require(ModelContext(container).fetch(FetchDescriptor<QueueState>()).first)
+        #expect(persisted.itemsJSON == canonicalJSON)
+        #expect(persisted.groupsJSON == groupsJSON)
+        #expect(persisted.savedAt == savedAt)
+        let reopened = QueueService()
+        reopened.modelContext = ModelContext(container)
+        reopened.restore()
+        #expect(reopened.history.compactMap(\.historyRecordID) == records)
+        reopened.restoreHistoryRecord(id: records[1])
+        #expect(reopened.upNext.first?.historyRecordID == nil)
+        #expect(reopened.upNext.first?.id != occurrenceID)
+        #expect(reopened.upNext.first?.locked == false)
+        #expect(reopened.upNext.first?.groupId == nil)
+        #expect(reopened.history.first?.historyRecordID == records[0])
+    }
+
+    @Test("Previous clears a consumed history record identity before an insertion plays again")
+    func previousClearsHistoryRecord() throws {
+        let queue = QueueService()
+        let first = track("first")
+        queue.play(first, context: [first], from: .playlist)
+        queue.playNext(track("inserted"))
+        _ = queue.next()
+        let insertionID = try #require(queue.current()).id
+        queue.setRepeat(.one)
+        _ = queue.next()
+        let recordID = try #require(queue.history.first?.historyRecordID)
+        _ = queue.previous()
+        #expect(queue.current()?.id == insertionID)
+        #expect(queue.current()?.historyRecordID == nil)
+        _ = queue.next()
+        #expect(queue.history.first?.id == insertionID)
+        #expect(queue.history.first?.historyRecordID != recordID)
+    }
+
     private func track(_ title: String) -> TrackSnapshot {
         TrackSnapshot(id: UUID(), title: title, artist: "Artist", albumTitle: nil,
                       durationSeconds: 120, youTubeId: title, artworkUrl: nil,

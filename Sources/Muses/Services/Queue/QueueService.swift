@@ -96,6 +96,7 @@ final class QueueService {
         }
         if var cur = current() {
             cur.historyState = state
+            cur.historyRecordID = UUID()
             history.insert(cur, at: 0)
             if history.count > 200 { history.removeLast() }
         }
@@ -149,6 +150,7 @@ final class QueueService {
             } else {
                 var restored = h
                 restored.historyState = nil
+                restored.historyRecordID = nil
                 insertedCurrent = restored
                 if let anchor = h.collectionAnchorID,
                    let index = items.firstIndex(where: { $0.id == anchor }) {
@@ -357,6 +359,7 @@ final class QueueService {
         guard upNext.indices.contains(index) else { return }
         var entry = upNext.remove(at: index)
         entry.historyState = .removed
+        entry.historyRecordID = UUID()
         history.insert(entry, at: 0)
         if history.count > 200 { history.removeLast() }
         persist()
@@ -367,9 +370,22 @@ final class QueueService {
         guard items.indices.contains(index), index != currentIndex else { return }
         var entry = items.remove(at: index)
         entry.historyState = .removed
+        entry.historyRecordID = UUID()
         history.insert(entry, at: 0)
         if history.count > 200 { history.removeLast() }
         if index < currentIndex { currentIndex -= 1 }
+        persist()
+    }
+
+    /// Resolve a history record again when a delayed menu action executes.
+    func restoreHistoryRecord(id: UUID) {
+        guard let index = history.firstIndex(where: { $0.historyRecordID == id }) else { return }
+        restoreFromHistory(at: index)
+    }
+
+    func removeHistoryRecord(id: UUID) {
+        guard let index = history.firstIndex(where: { $0.historyRecordID == id }) else { return }
+        history.remove(at: index)
         persist()
     }
 
@@ -389,6 +405,7 @@ final class QueueService {
             entry = insertion
         }
         entry.historyState = nil
+        entry.historyRecordID = nil
         entry.recommendationSourceVideoID = nil
         upNext.append(entry)
         persist()
@@ -523,7 +540,7 @@ final class QueueService {
         let decoder = JSONDecoder()
         let decodedItems: [QueueItem]
         let decodedUpNext: [QueueItem]
-        let decodedHistory: [QueueItem]
+        var decodedHistory: [QueueItem]
         do {
             decodedItems = try decoder.decode([QueueItem].self, from: Data(row.itemsJSON.utf8))
             decodedUpNext = try decoder.decode([QueueItem].self, from: Data(row.upNextJSON.utf8))
@@ -555,6 +572,15 @@ final class QueueService {
             AppLog.for("QueueService").error("Queue metadata decode failed: \(error.localizedDescription)")
             return
         }
+        var seenHistoryRecords = Set<UUID>()
+        var assignedHistoryRecords = false
+        for index in decodedHistory.indices {
+            if let id = decodedHistory[index].historyRecordID, seenHistoryRecords.insert(id).inserted { continue }
+            let id = UUID()
+            decodedHistory[index].historyRecordID = id
+            seenHistoryRecords.insert(id)
+            assignedHistoryRecords = true
+        }
         items = decodedItems
         upNext = decodedUpNext
         history = decodedHistory
@@ -572,6 +598,16 @@ final class QueueService {
         lastPositionMs = row.lastPositionMs
         originalOrderIDs = decodedOriginalOrderIDs
         persistenceFailed = false
+        if assignedHistoryRecords {
+            do {
+                // Record identities are the only legacy snapshot field normalized here.
+                row.historyJSON = String(decoding: try JSONEncoder().encode(history), as: UTF8.self)
+                try saveContext(ctx)
+            } catch {
+                persistenceFailed = true
+                AppLog.for("QueueService").error("Queue history identity save failed: \(error.localizedDescription)")
+            }
+        }
     }
 
     // MARK: - Crash-recovery slot (Listening Sessions)

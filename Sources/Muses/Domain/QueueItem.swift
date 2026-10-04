@@ -13,6 +13,9 @@ struct QueueItem: Identifiable, Equatable, Sendable, Codable {
     var priority: Int?
     /// History state label. Set only once the item moves into `history`; always nil in items/upNext.
     var historyState: QueueHistoryState?
+    /// One history recording, independent of the repeatable queue occurrence ID.
+    /// Optional so snapshots written before record identities remain decodable.
+    var historyRecordID: UUID?
     /// Collection occurrence to resume after this manually inserted item.
     var collectionAnchorID: UUID?
     /// Source video of the public YouTube Music Mix; nil for explicit user items.
