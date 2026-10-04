@@ -134,11 +134,19 @@ private struct FloatingVideoView: View {
     var body: some View {
         ZStack(alignment: .topTrailing) {
             YouTubeWKEmbed(surface: surface, floating: true)
+                .opacity(surface.session.state.error == nil ? 1 : 0)
+                .allowsHitTesting(surface.session.state.error == nil)
                 .background(.black)
                 .overlay {
                     if surface.session.state.error != nil {
-                        Text(tr("Video unavailable", "视频暂不可用", zhHant: "影片暫不可用"))
-                            .foregroundStyle(.white).padding()
+                        Text(tr("Video unavailable. Close to return to audio.",
+                                "视频暂不可用，关闭后返回音频。", zhHant: "影片暫不可用，關閉後返回音訊。"))
+                            .font(MusesTypography.callout)
+                            .foregroundStyle(.white)
+                            .multilineTextAlignment(.center)
+                            .padding(24)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .background(.black)
                     }
                 }
             HStack(spacing: 12) {

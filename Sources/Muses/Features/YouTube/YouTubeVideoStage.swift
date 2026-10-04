@@ -154,6 +154,8 @@ struct YouTubeVideoOverlay: View {
                         Group {
                             if let surface = videoSession.surface { YouTubeWKEmbed(surface: surface) }
                         }
+                        .opacity(videoSession.state.error == nil ? 1 : 0)
+                        .background(.black)
                         .allowsHitTesting(videoSession.ready && videoSession.state.error == nil)
                         if !videoSession.ready, videoSession.state.error == nil {
                             ProgressView().tint(.white)
@@ -164,7 +166,10 @@ struct YouTubeVideoOverlay: View {
                                     "视频暂不可用，关闭后返回音频。", zhHant: "影片暫不可用，關閉後返回音訊。"))
                                 .font(MusesTypography.callout)
                                 .foregroundStyle(.white)
+                                .multilineTextAlignment(.center)
                                 .padding(24)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .background(.black)
                         }
                     } else {
                         Color.black
