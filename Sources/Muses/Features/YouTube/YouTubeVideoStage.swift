@@ -154,6 +154,7 @@ struct YouTubeVideoOverlay: View {
                         Group {
                             if let surface = videoSession.surface { YouTubeWKEmbed(surface: surface) }
                         }
+                        .accessibilityHidden(videoSession.state.error != nil)
                         .opacity(videoSession.state.error == nil ? 1 : 0)
                         .background(.black)
                         .allowsHitTesting(videoSession.ready && videoSession.state.error == nil)

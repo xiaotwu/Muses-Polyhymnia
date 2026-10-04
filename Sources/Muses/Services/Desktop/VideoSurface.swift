@@ -134,6 +134,7 @@ private struct FloatingVideoView: View {
     var body: some View {
         ZStack(alignment: .topTrailing) {
             YouTubeWKEmbed(surface: surface, floating: true)
+                .accessibilityHidden(surface.session.state.error != nil)
                 .opacity(surface.session.state.error == nil ? 1 : 0)
                 .allowsHitTesting(surface.session.state.error == nil)
                 .background(.black)
