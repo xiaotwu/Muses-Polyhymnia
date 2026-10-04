@@ -141,7 +141,7 @@ struct SettingsPage: View {
             }
         }
         .onChange(of: languageRaw) { _, value in LanguagePreferences.shared.update(value) }
-        .padding(.bottom, OverlayChromeMetrics.scrollBottomInset)
+        .padding(.bottom, 16)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(BrandColors.background)
         .tint(BrandColors.accent)

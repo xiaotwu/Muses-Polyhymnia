@@ -32,6 +32,40 @@ struct CatalogIdentityReviewView: View {
     }
 
     var body: some View {
+        GeometryReader { geometry in
+            // Keep the native table usable when the header and controls exceed a compact pane.
+            // The footer remains outside this scroll view so confirmation is always reachable.
+            if geometry.size.height < 400 {
+                ScrollView {
+                    reviewContent(compact: true, availableWidth: geometry.size.width - 40)
+                }
+            } else {
+                reviewContent(compact: false, availableWidth: geometry.size.width - 40)
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            reviewFooter
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .task { await refresh() }
+        .confirmationDialog(
+            undoRequested
+                ? tr("Roll back the last identity migration?", "回滚上次身份迁移？", zhHant: "回復上次身分移轉？")
+                : tr("Apply release relationships (\(candidateCount))?", "应用 \(candidateCount) 条发行关系？", zhHant: "套用 \(candidateCount) 條發行關係？"),
+            isPresented: $confirmMigration, titleVisibility: .visible
+        ) {
+            Button(undoRequested ? tr("Roll Back", "回滚", zhHant: "回復") : tr("Apply", "应用", zhHant: "套用")) {
+                Task { await performMigration() }
+            }
+            Button(tr("Cancel", "取消", zhHant: "取消"), role: .cancel) {}
+        } message: {
+            Text(undoRequested
+                 ? tr("Only identities changed by this migration are restored. Later likes, notes and history are retained. Conflicting identities stop the operation.", "只恢复本次迁移改动的身份，保留之后的收藏、笔记和历史。身份冲突时停止操作。", zhHant: "只復原本次移轉變更的身分，保留之後的喜愛項目、筆記和歷史。身分衝突時停止操作。")
+                 : tr("An independent recovery snapshot is saved first. Every direct source-backed relationship in this preview is applied, including those hidden by search. Unsupported or indirect candidates stay unresolved.", "先保存独立恢复快照，再应用本预览中全部有直接来源证据的关系，包括搜索隐藏的条目。不受支持或间接候选保持未解析。", zhHant: "先儲存獨立復原快照，再套用本預覽中全部有直接來源證據的關係，包括搜尋隱藏的項目。不受支援或間接候選保持未解析。"))
+        }
+    }
+
+    private func reviewContent(compact: Bool, availableWidth: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             if preview != nil {
                 ViewThatFits(in: .horizontal) {
@@ -79,10 +113,12 @@ struct CatalogIdentityReviewView: View {
                         } else {
                             VStack(spacing: 12) {
                                 evidenceTable
+                                    .frame(minHeight: compact ? 220 : nil)
                                 evidencePreview.frame(maxHeight: 200)
                             }
                         }
                     }
+                    .frame(height: compact ? (availableWidth > 640 ? 260 : 432) : nil)
                 } else {
                     List {
                         ForEach(["arrow.down.circle", "exclamationmark.triangle", "questionmark.circle", "checkmark.circle"], id: \.self) { symbol in
@@ -137,37 +173,22 @@ struct CatalogIdentityReviewView: View {
                     .scrollContentBackground(.hidden)
                     .background(.background, in: RoundedRectangle(cornerRadius: 12))
                     .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .frame(height: compact ? 260 : nil)
                 }
             }
         }
         .padding(20)
-        .safeAreaInset(edge: .bottom) {
-            HStack(spacing: 12) {
-                Text(tr("Verified relationships · \(candidateCount)", "已核实关系 · \(candidateCount)"))
-                    .font(.caption).foregroundStyle(.secondary)
-                Spacer()
-                applyButton
-            }
-            .padding(.horizontal, 20).padding(.vertical, 12)
-            .background(.background)
+    }
+
+    private var reviewFooter: some View {
+        HStack(spacing: 12) {
+            Text(tr("Verified relationships · \(candidateCount)", "已核实关系 · \(candidateCount)"))
+                .font(.caption).foregroundStyle(.secondary)
+            Spacer()
+            applyButton
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .task { await refresh() }
-        .confirmationDialog(
-            undoRequested
-                ? tr("Roll back the last identity migration?", "回滚上次身份迁移？", zhHant: "回復上次身分移轉？")
-                : tr("Apply release relationships (\(candidateCount))?", "应用 \(candidateCount) 条发行关系？", zhHant: "套用 \(candidateCount) 條發行關係？"),
-            isPresented: $confirmMigration, titleVisibility: .visible
-        ) {
-            Button(undoRequested ? tr("Roll Back", "回滚", zhHant: "回復") : tr("Apply", "应用", zhHant: "套用")) {
-                Task { await performMigration() }
-            }
-            Button(tr("Cancel", "取消", zhHant: "取消"), role: .cancel) {}
-        } message: {
-            Text(undoRequested
-                 ? tr("Only identities changed by this migration are restored. Later likes, notes and history are retained. Conflicting identities stop the operation.", "只恢复本次迁移改动的身份，保留之后的收藏、笔记和历史。身份冲突时停止操作。", zhHant: "只復原本次移轉變更的身分，保留之後的喜愛項目、筆記和歷史。身分衝突時停止操作。")
-                 : tr("An independent recovery snapshot is saved first. Every direct source-backed relationship in this preview is applied, including those hidden by search. Unsupported or indirect candidates stay unresolved.", "先保存独立恢复快照，再应用本预览中全部有直接来源证据的关系，包括搜索隐藏的条目。不受支持或间接候选保持未解析。", zhHant: "先儲存獨立復原快照，再套用本預覽中全部有直接來源證據的關係，包括搜尋隱藏的項目。不受支援或間接候選保持未解析。"))
-        }
+        .padding(.horizontal, 20).padding(.vertical, 12)
+        .background(.background)
     }
 
     private var evidenceTable: some View {
