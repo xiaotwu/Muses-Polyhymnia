@@ -2,6 +2,16 @@ import SwiftUI
 
 private enum QueueFocusTarget: Hashable {
     case drawer
+    case list
+}
+
+private enum QueueListSelection: Hashable {
+    case nowPlaying(UUID)
+    case upNext(UUID)
+    case collection(UUID)
+    case history(UUID)
+    case group(UUID)
+    case recommendation(UUID)
 }
 
 /// Integrated trailing pane showing Current Queue / Up Next / History.
@@ -20,6 +30,7 @@ struct QueueDrawerView: View {
     @State private var upNextExpanded = true
     @State private var historyExpanded = false
     @State private var groupsExpanded = false
+    @State private var selectedRow: QueueListSelection?
     @State private var showsSmartShuffleInfo = false
     @State private var smartShuffleFocusTask: Task<Void, Never>?
     @FocusState private var smartShuffleInfoFocused: Bool
@@ -230,31 +241,52 @@ struct QueueDrawerView: View {
     }
 
     private var list: some View {
-        List {
-            nowPlayingSection
-            upNextSection
-            recommendationSection
-            collectionSection
-            groupsSection
-            historySection
-        }
-        .listStyle(.plain)
-        .listRowSeparator(.visible)
-        .scrollContentBackground(.hidden)
-        .background(.clear)
-        .environment(\.defaultMinListRowHeight, 44)
-        .alert(tr("Rename group", "重命名分组"), isPresented: Binding(
-            get: { renameTarget != nil },
-            set: { if !$0 { renameTarget = nil } })) {
-            TextField(tr("Group name", "分组名"), text: $renameText)
-            Button(tr("Rename", "重命名")) {
-                let name = renameText.trimmingCharacters(in: .whitespaces)
-                if !name.isEmpty, let id = renameTarget {
-                    playback.queue.renameGroup(id: id, to: name)
-                }
-                renameTarget = nil
+        ScrollViewReader { proxy in
+            List(selection: $selectedRow) {
+                nowPlayingSection
+                upNextSection
+                recommendationSection
+                collectionSection
+                groupsSection
+                historySection
             }
-            Button(tr("Cancel", "取消"), role: .cancel) { renameTarget = nil }
+            .listStyle(.plain)
+            .listRowSeparator(.visible)
+            .scrollContentBackground(.hidden)
+            .background(.clear)
+            .environment(\.defaultMinListRowHeight, 44)
+            .focusable()
+            .focused($focusedTarget, equals: .list)
+            .onChange(of: selectedRow) { _, selection in
+                guard selection != nil, renameTarget == nil, pendingRemoval == nil,
+                      !showsSmartShuffleInfo else { return }
+                focusedTarget = .list
+            }
+            .onKeyPress(.return) { activateSelectedRow() }
+            // Composite row menus leave native List arrow selection unavailable inside
+            // the focus wrapper. Route keys through the same visible, tagged rows.
+            .onKeyPress(.upArrow) { moveSelectedRow(by: -1, using: proxy) }
+            .onKeyPress(.downArrow) { moveSelectedRow(by: 1, using: proxy) }
+            .onKeyPress(.home) { selectRow(visibleRowSelections.first, using: proxy) }
+            .onKeyPress(.end) { selectRow(visibleRowSelections.last, using: proxy) }
+            .onKeyPress(.escape) {
+                guard renameTarget == nil, pendingRemoval == nil else { return .ignored }
+                dismissUnlessRenaming()
+                return .handled
+            }
+            .alert(tr("Rename group", "重命名分组"), isPresented: Binding(
+                get: { renameTarget != nil },
+                set: { if !$0 { renameTarget = nil } })) {
+                TextField(tr("Group name", "分组名"), text: $renameText)
+                Button(tr("Rename", "重命名")) {
+                    let name = renameText.trimmingCharacters(in: .whitespaces)
+                    if !name.isEmpty, let id = renameTarget {
+                        playback.queue.renameGroup(id: id, to: name)
+                    }
+                    renameTarget = nil
+                }
+                Button(tr("Cancel", "取消"), role: .cancel) { renameTarget = nil }
+            }
         }
     }
 
@@ -272,12 +304,8 @@ struct QueueDrawerView: View {
                                 videoSource: item.fromContext)
                         }
                     }
-                    .focusable()
-                    .onKeyPress(.return) {
-                        guard playback.isPrimaryActionAvailable else { return .ignored }
-                        playback.toggle()
-                        return .handled
-                    }
+                    .tag(QueueListSelection.nowPlaying(item.id))
+                    .id(QueueListSelection.nowPlaying(item.id))
                     .accessibilityActions {
                         if playback.isPrimaryActionAvailable {
                             Button(tr("Play or pause", "播放或暂停")) { playback.toggle() }
@@ -296,8 +324,8 @@ struct QueueDrawerView: View {
                     QueueRow(item: item, isCurrent: false, showHistoryBadge: advancedQueue)
                         .queueRowActions(title: item.track.title) { itemContextMenu(for: item, inUpNext: true) }
                         .onTapGesture(count: 2) { playQueueItem(item) }
-                        .focusable()
-                        .onKeyPress(.return) { playQueueItem(item); return .handled }
+                        .tag(QueueListSelection.upNext(item.id))
+                        .id(QueueListSelection.upNext(item.id))
                         .accessibilityAction(named: Text(tr("Play", "播放"))) { playQueueItem(item) }
                 }
                 .onMove { indices, destination in
@@ -324,9 +352,13 @@ struct QueueDrawerView: View {
                              showHistoryBadge: advancedQueue)
                         .queueRowActions(title: item.track.title) { itemContextMenu(for: item, inUpNext: false) }
                         .onTapGesture(count: 2) { playQueueItem(item) }
-                        .focusable()
-                        .onKeyPress(.return) { playQueueItem(item); return .handled }
-                        .accessibilityAction(named: Text(tr("Play", "播放"))) { playQueueItem(item) }
+                        .tag(QueueListSelection.collection(item.id))
+                        .id(QueueListSelection.collection(item.id))
+                        .accessibilityActions {
+                            if playback.queue.current()?.id != item.id || playback.isPrimaryActionAvailable {
+                                Button(tr("Play", "播放")) { playQueueItem(item) }
+                            }
+                        }
                 }
                 .onMove { indices, destination in
                     guard playback.queue.groups.allSatisfy({ !$0.collapsed }) else { return }
@@ -372,6 +404,8 @@ struct QueueDrawerView: View {
                                 .font(MusesTypography.caption2).foregroundStyle(BrandColors.textSecondary)
                         }
                         .queueRowActions(title: group.name) { groupActions(group) }
+                        .tag(QueueListSelection.group(group.id))
+                        .id(QueueListSelection.group(group.id))
                     }
                 }
             } header: {
@@ -449,6 +483,8 @@ struct QueueDrawerView: View {
                                 }
                             }
                         }
+                        .tag(item.historyRecordID.map(QueueListSelection.history))
+                        .id(QueueListSelection.history(item.historyRecordID ?? item.id))
                 }
                 if playback.queue.history.isEmpty {
                     queueEmptyRow(tr("Played songs will appear here", "播放过的歌曲会显示在这里"))
@@ -470,6 +506,8 @@ struct QueueDrawerView: View {
                             playback.queue.playNext(recommendation.track)
                         }
                     }
+                    .tag(QueueListSelection.recommendation(recommendation.id))
+                    .id(QueueListSelection.recommendation(recommendation.id))
             }
         }
     }
@@ -589,7 +627,60 @@ struct QueueDrawerView: View {
         else { playback.queue.move(from: index, to: index + offset) }
     }
 
+    private var visibleRowSelections: [QueueListSelection] {
+        var rows: [QueueListSelection] = []
+        if let current = playback.queue.current() { rows.append(.nowPlaying(current.id)) }
+        if upNextExpanded { rows += playback.queue.upNext.map { .upNext($0.id) } }
+        if let recommendation = playback.queue.smartShuffle.pending { rows.append(.recommendation(recommendation.id)) }
+        if collectionExpanded { rows += visibleQueueItems.map { .collection($0.id) } }
+        if advancedQueue, groupsExpanded { rows += playback.queue.groups.map { .group($0.id) } }
+        if historyExpanded {
+            rows += playback.queue.history.compactMap { $0.historyRecordID.map(QueueListSelection.history) }
+        }
+        return rows
+    }
+
+    private func moveSelectedRow(by offset: Int, using proxy: ScrollViewProxy) -> KeyPress.Result {
+        let rows = visibleRowSelections
+        guard !rows.isEmpty else { return .ignored }
+        let index = selectedRow.flatMap { rows.firstIndex(of: $0) }
+            .map { min(max($0 + offset, 0), rows.count - 1) }
+            ?? (offset > 0 ? 0 : rows.count - 1)
+        return selectRow(rows[index], using: proxy)
+    }
+
+    private func selectRow(_ selection: QueueListSelection?, using proxy: ScrollViewProxy) -> KeyPress.Result {
+        guard renameTarget == nil, pendingRemoval == nil, !showsSmartShuffleInfo,
+              let selection, visibleRowSelections.contains(selection) else { return .ignored }
+        selectedRow = selection
+        focusedTarget = .list
+        proxy.scrollTo(selection)
+        return .handled
+    }
+
+    /// Return operates on the native List selection, never a stale captured row.
+    private func activateSelectedRow() -> KeyPress.Result {
+        guard renameTarget == nil, pendingRemoval == nil, !showsSmartShuffleInfo else { return .ignored }
+        switch selectedRow {
+        case .nowPlaying(let id):
+            guard playback.queue.current()?.id == id, playback.isPrimaryActionAvailable else { return .ignored }
+            playback.toggle()
+        case .upNext(let id):
+            guard upNextExpanded, let item = playback.queue.upNext.first(where: { $0.id == id }) else { return .ignored }
+            playQueueItem(item)
+        case .collection(let id):
+            guard collectionExpanded, let item = visibleQueueItems.first(where: { $0.id == id }),
+                  playback.queue.current()?.id != id || playback.isPrimaryActionAvailable else { return .ignored }
+            playQueueItem(item)
+        case .history, .group, .recommendation, nil:
+            // These rows retain their existing menu actions, without adding an implicit operation.
+            return .ignored
+        }
+        return .handled
+    }
+
     private func playQueueItem(_ item: QueueItem) {
+        guard playback.queue.current()?.id != item.id || playback.isPrimaryActionAvailable else { return }
         playback.playQueueItem(id: item.id)
     }
 
