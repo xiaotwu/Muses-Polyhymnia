@@ -17,7 +17,25 @@ final class StreamPrecacheService {
     private var resource: SharedStreamResource?
     private var generation = UUID()
     var completedCount = 0
-    var status = tr("Off", "已关闭")
+    private var preparationStatus = PreparationStatus.off
+
+    var status: String { preparationStatus.localizedDescription }
+
+    private enum PreparationStatus {
+        case off, waitingForIdle, budgetReached
+        case preparing(title: String)
+        case finished(downloaded: Int)
+
+        var localizedDescription: String {
+            switch self {
+            case .off: tr("Off", "已关闭")
+            case .waitingForIdle: tr("Waiting for idle playback", "等待播放空闲")
+            case .budgetReached: tr("Cache budget reached", "已达到缓存容量限制")
+            case .preparing(let title): tr("Preparing \(title)", "正在准备 \(title)")
+            case .finished(let count): tr("Preparation finished: \(count) downloaded", "预下载已结束：新增 \(count) 首")
+            }
+        }
+    }
 
     init(resolution: StreamResolutionCoordinator, defaults: UserDefaults = .standard,
          candidates: @escaping (Scope) -> [TrackSnapshot], isBusy: @escaping () -> Bool,
@@ -36,13 +54,13 @@ final class StreamPrecacheService {
         work = nil
         if let resource { Task { await resource.cancel() } }
         resource = nil
-        if defaults.bool(forKey: PrefKey.streamPrecacheEnabled) { status = tr("Waiting for idle playback", "等待播放空闲") }
+        if defaults.bool(forKey: PrefKey.streamPrecacheEnabled) { preparationStatus = .waitingForIdle }
     }
 
     func configure() {
         pauseForPlayback()
         completedCount = 0
-        guard defaults.bool(forKey: PrefKey.streamPrecacheEnabled) else { status = tr("Off", "已关闭"); return }
+        guard defaults.bool(forKey: PrefKey.streamPrecacheEnabled) else { preparationStatus = .off; return }
         let generation = generation
         let scope = Scope(rawValue: defaults.string(forKey: PrefKey.streamPrecacheScope) ?? "favorites") ?? .favorites
         let quality = defaults.string(forKey: PrefKey.ytAudioQuality) ?? "bestaudio"
@@ -63,8 +81,8 @@ final class StreamPrecacheService {
                 let directory = directory
                 let used = await Task.detached(priority: .utility) { MediaFileCache.totalBytes(in: directory) }.value
                 guard !Task.isCancelled, self.generation == generation, !isBusy() else { return }
-                guard used < budget else { status = tr("Cache budget reached", "已达到缓存容量限制"); return }
-                status = tr("Preparing \(track.title)", "正在准备 \(track.title)")
+                guard used < budget else { preparationStatus = .budgetReached; return }
+                preparationStatus = .preparing(title: track.title)
                 var ownedResource: SharedStreamResource?
                 do {
                     let url = try await YTDlpRequestPriority.$interactive.withValue(false) {
@@ -97,7 +115,7 @@ final class StreamPrecacheService {
                     self.resource = nil
                 }
             }
-            if self.generation == generation { status = tr("Preparation finished: \(completedCount) downloaded", "预下载已结束：新增 \(completedCount) 首") }
+            if self.generation == generation { preparationStatus = .finished(downloaded: completedCount) }
         }
     }
 

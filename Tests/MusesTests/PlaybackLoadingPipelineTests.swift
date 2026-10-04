@@ -72,6 +72,48 @@ struct PlaybackLoadingPipelineTests {
         #expect(!StreamPrecacheService.fits(size: 101, used: 900, budget: 1000))
         #expect(!StreamPrecacheService.fits(size: Int64.max, used: 1, budget: 1000))
     }
+
+    @Test("Pre-download status follows language changes without restarting preparation")
+    func precacheStatusLanguageSwitch() async {
+        let domain = "com.muses.tests.precache.\(UUID())"
+        let defaults = UserDefaults(suiteName: domain)!
+        let originalLanguage = UserDefaults.standard.object(forKey: PrefKey.language)
+        let originalObservedLanguage = LanguagePreferences.shared.rawValue
+        defer {
+            defaults.removePersistentDomain(forName: domain)
+            if let originalLanguage {
+                UserDefaults.standard.set(originalLanguage, forKey: PrefKey.language)
+            } else {
+                UserDefaults.standard.removeObject(forKey: PrefKey.language)
+            }
+            LanguagePreferences.shared.update(originalObservedLanguage)
+        }
+        func switchLanguage(_ language: String) {
+            UserDefaults.standard.set(language, forKey: PrefKey.language)
+            LanguagePreferences.shared.update(language)
+        }
+        switchLanguage("en")
+        let bridge = MockYTDlpBridge()
+        var candidateReads = 0
+        let service = StreamPrecacheService(
+            resolution: StreamResolutionCoordinator(bridge: bridge, cache: StreamURLCache()),
+            defaults: defaults, candidates: { _ in candidateReads += 1; return [] }, isBusy: { false })
+        service.configure()
+        #expect(service.status == "Off")
+        switchLanguage("zh-Hans")
+        #expect(service.status == "已关闭")
+        #expect(candidateReads == 0)
+
+        defaults.set(true, forKey: PrefKey.streamPrecacheEnabled)
+        service.configure()
+        await service.awaitWorkForTests()
+        #expect(service.status == "预下载已结束：新增 0 首")
+        switchLanguage("en")
+        #expect(service.status == "Preparation finished: 0 downloaded")
+        #expect(candidateReads == 1)
+        #expect(bridge.callCount == 0)
+        #expect(service.completedCount == 0)
+    }
 }
 
 @Suite("Shared stream resource", .serialized)
