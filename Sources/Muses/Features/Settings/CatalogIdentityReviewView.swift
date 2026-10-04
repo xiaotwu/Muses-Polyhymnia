@@ -88,7 +88,12 @@ struct CatalogIdentityReviewView: View {
                 Picker(tr("Evidence layout", "证据布局"), selection: $showEvidenceList) {
                     Text(tr("Table", "表格")).tag(false)
                     Text(tr("Problems", "问题列表")).tag(true)
-                }.pickerStyle(.menu).frame(maxWidth: 140)
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+                .accessibilityLabel(tr("Evidence layout", "证据布局"))
+                .help(tr("Evidence layout", "证据布局"))
+                .frame(width: 120)
             }
             migrationControls
             if loading {
