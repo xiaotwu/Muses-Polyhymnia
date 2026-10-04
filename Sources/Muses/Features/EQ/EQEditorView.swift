@@ -145,11 +145,8 @@ struct EQEditorView: View {
                         .foregroundStyle(BrandColors.textSecondary)
                     Slider(value: Binding(
                         get: { Double(bands[idx].gain) },
-                        set: { v in
-                            bands[idx].gain = Float(v)
-                            activePresetIdRaw = "Custom"
-                            applyBands()
-                        }), in: Double(gainRange.lowerBound)...Double(gainRange.upperBound))
+                        set: { setGain(Float($0), at: idx) }),
+                           in: Double(gainRange.lowerBound)...Double(gainRange.upperBound))
                     .accessibilityLabel(formatFreq(bands[idx].frequency) + " Hz")
                     .accessibilityValue(String(format: "%+.1f dB", bands[idx].gain))
                     .labelsHidden()
@@ -193,7 +190,9 @@ struct EQEditorView: View {
 
     private func setGain(_ gain: Float, at index: Int) {
         guard bands.indices.contains(index), gain.isFinite else { return }
-        bands[index].gain = min(gainRange.upperBound, max(gainRange.lowerBound, gain))
+        let clampedGain = min(gainRange.upperBound, max(gainRange.lowerBound, gain))
+        guard bands[index].gain != clampedGain else { return }
+        bands[index].gain = clampedGain
         activePresetIdRaw = "Custom"
         applyBands()
     }
