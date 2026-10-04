@@ -152,7 +152,9 @@ struct YouTubeVideoOverlay: View {
                 ZStack {
                     if let videoSession {
                         Group {
-                            if let surface = videoSession.surface { YouTubeWKEmbed(surface: surface) }
+                            if let surface = videoSession.surface {
+                                YouTubeWKEmbed(surface: surface, unavailable: videoSession.state.error != nil)
+                            }
                         }
                         .accessibilityHidden(videoSession.state.error != nil)
                         .opacity(videoSession.state.error == nil ? 1 : 0)
@@ -320,6 +322,7 @@ struct YouTubeVideoOverlay: View {
 struct YouTubeWKEmbed: NSViewRepresentable {
     let surface: VideoSurface
     var floating = false
+    var unavailable = false
 
     final class PlayerCoordinator: NSObject, WKScriptMessageHandler {
         weak var session: VideoPlaybackSession?
@@ -390,12 +393,12 @@ struct YouTubeWKEmbed: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSView {
         let host = NSView()
-        surface.attach(to: host, floating: floating)
+        surface.attach(to: host, floating: floating, unavailable: unavailable)
         return host
     }
 
     func updateNSView(_ host: NSView, context: Context) {
-        surface.attach(to: host, floating: floating)
+        surface.attach(to: host, floating: floating, unavailable: unavailable)
     }
 
     static func dismantleNSView(_ host: NSView, coordinator: ()) {

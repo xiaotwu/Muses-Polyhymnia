@@ -40,8 +40,14 @@ final class VideoSurface: NSObject, NSWindowDelegate {
         session.onClose = { [weak self] in self?.close() }
     }
 
-    func attach(to host: NSView, floating: Bool) {
-        guard !isClosing, floating == isFloating, playerView.superview !== host else { return }
+    func attach(to host: NSView, floating: Bool, unavailable: Bool = false) {
+        guard !isClosing, floating == isFloating else { return }
+        // The retained native player must leave both rendering and accessibility
+        // when unavailable, including updates that reuse its current host.
+        let hidden = unavailable || session.state.error != nil
+        playerView.isHidden = hidden
+        playerView.setAccessibilityHidden(hidden)
+        guard playerView.superview !== host else { return }
         playerView.removeFromSuperview()
         playerView.translatesAutoresizingMaskIntoConstraints = false
         host.addSubview(playerView)
@@ -133,7 +139,7 @@ private struct FloatingVideoView: View {
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            YouTubeWKEmbed(surface: surface, floating: true)
+            YouTubeWKEmbed(surface: surface, floating: true, unavailable: surface.session.state.error != nil)
                 .accessibilityHidden(surface.session.state.error != nil)
                 .opacity(surface.session.state.error == nil ? 1 : 0)
                 .allowsHitTesting(surface.session.state.error == nil)

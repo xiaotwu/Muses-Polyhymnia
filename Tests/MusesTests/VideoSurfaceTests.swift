@@ -5,6 +5,44 @@ import Testing
 @MainActor
 @Suite("Video surface ownership", .serialized)
 struct VideoSurfaceTests {
+    @Test("Unavailable player stays hidden across repeat attachment and host moves without stopping")
+    func unavailablePlayerPresentation() {
+        let playback = PlaybackService(engine: RecordingEngine(), queue: QueueService())
+        let session = playback.beginVideoSession(videoId: "video00000a")
+        let player = NSView(), overlay = NSView(), floating = NSView()
+        var stopCount = 0
+        let surface = VideoSurface(session: session, playback: playback, resume: false,
+            playerView: player, presentsWindow: false) { _ in stopCount += 1 }
+        session.surface = surface
+        surface.attach(to: overlay, floating: false)
+        #expect(!player.isHidden)
+        session.fail()
+        surface.attach(to: overlay, floating: false, unavailable: true)
+        #expect(player.isHidden)
+        #expect(player.superview === overlay)
+        surface.attach(to: overlay, floating: false, unavailable: true)
+        #expect(player.isHidden)
+        surface.float()
+        surface.attach(to: floating, floating: true, unavailable: true)
+        surface.attach(to: overlay, floating: false, unavailable: false)
+        #expect(player.isHidden)
+        #expect(player.superview === floating)
+        surface.dock()
+        surface.attach(to: overlay, floating: false, unavailable: true)
+        #expect(player.isHidden)
+        #expect(player.superview === overlay)
+        // Exercise visibility restoration without navigating or creating another player.
+        session.state.error = nil
+        surface.attach(to: overlay, floating: false, unavailable: false)
+        #expect(!player.isHidden)
+        #expect(player.superview === overlay)
+        #expect(playback.videoSession === session)
+        #expect(stopCount == 0)
+        surface.close()
+        #expect(stopCount == 1)
+        playback.finishVideoSession(session, resume: false)
+    }
+
     @Test("Moving between hosts keeps one player and ignores old host updates")
     func movesSamePlayer() {
         let engine = RecordingEngine()
