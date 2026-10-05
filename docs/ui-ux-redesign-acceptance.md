@@ -550,3 +550,18 @@ Candidate Release passed243.19s;35focused tests/3suites passed0.118s; diff check
 The Mac locked again during continued native inspection. Owned guest stopped by exact UID/executable check; all27SQLite tables and complete isolated preferences restored/compared, integrityOK. Keyboard Navigation remains temporarily ON; previously authorized restoration to OFF requires an unlocked desktop. Task-owned System Settings and current guest build are retained for that restoration/active validation. No complete-cleanup claim. Production/user browser unchanged; current builds/data/private evidence retained.
 
 Remaining order: XW-47 final native keyboard/scroll/failure/menu acceptance and system-setting restoration → XW-25 minimum Diagnostics/config-preview cancellation, populated catalog/connected channels, auxiliary/menu/desktop/modes and uncovered focus paths, actualmacOS26 environment → XW-26/31 workflows → XW-19 screenshot/credit regression → XW-27 journey/performance/reconciliation → coordinator closures.
+
+
+## Scoped XW-47 closure and new XW-49 — 2026-10-04
+
+XW-47 primary-availability acceptance is complete. Healthy current Return Play/Pause, pointer selection, Down/Up/Home, menu Escape→Down and subsequent Queue Escape passed. Final controlled video fixture reached actual native Video unavailable; main Play and current-row menu Play disabled. Selecting current row then Return preserved failed state; Down→Up confirmed active key routing, followed by Return again preserved unavailable state. Shared failed Spotlight AX-disabled Play retained preceding evidence. Complete new VoiceOver traversal is not asserted.
+
+A distinct High/In Progress XW-49 under25 records655-item End failing to reveal canonical last `鳥の詩 (Cover)`, scroll-position drift and temporary blank body/More-only AX rows. The native backing was measured662rows/automaticHeights=true/delegateHeight=false. Deferred SwiftUI anchoring, native boundary row scrolling and actual-document two-phase alignment all failed runtime acceptance; the height gate never applied. All native bridge/height/diagnostic experiments were withdrawn;3a99cd8 was reverted at7cb2223. This finding is not waived by47 closure.
+
+Current executable sources/tests/package exactly match1b161a3. Final signed Release UUID56C74927-6681-3F5B-A562-C42426DC7CB7, latest build66.70s, final/guest strictdeep Developer ID passed. Identical-source848tests/112suites24.462s and35focused queue tests/3suites0.118s retained; no new full-suite run claimed.
+
+Diagnostics ordinary720×660 configuration preview showed current None/new Chrome draft and modal-only AX. Cancel and Escape both dismissed; closing/reopening reset Browser None/Preview disabled. No Apply or actual browser-source permission change. Minimum520×480 drag again did not reliably resize; remains unaccepted.
+
+Temporary Keyboard Navigation restoredOFF and read back before task-owned System Settings exited. Guest and System Settings stopped, independently verified by exact process and app inventory. Failure fixture removed; original27tables and full isolated preferences restored+compared/integrityOK, final cold Home/Queueclosed/paused1000日間20s/80% passed; baseline restored again after quit. Exact owned guest bundle/cache/signing file removed. Private logs/screenshots/cleanup manifest remain permission-restricted; production/browser/data/final build untouched.
+
+Updated Linear:47Done;49High/In Progress;25In Progress with current authoritative checkpoint and order49→remaining25minimum/catalog/connected-channel/auxiliary/modes/focus→26(31)→19→27→coordinators12/5. ActualmacOS26 unavailable on host27.0.1 remains explicit.
