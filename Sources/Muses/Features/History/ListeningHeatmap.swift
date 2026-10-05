@@ -36,8 +36,12 @@ struct ListeningHeatmapView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(tr("Listening heatmap", "收听热力图"))
                         .font(MusesTypography.title3.weight(.bold))
-                    Text(tr("Calendar days by local hour. The scale is fixed across ranges.",
-                            "按本地日期与小时显示；切换范围时使用固定色阶。"))
+                    Text(heatmap.range == .allTime
+                         ? tr("Weekdays by local hour. The scale is fixed across ranges.",
+                              "按星期与本地小时显示；切换范围时使用固定色阶。",
+                              zhHant: "按星期與本地小時顯示；切換範圍時使用固定色階。")
+                         : tr("Calendar days by local hour. The scale is fixed across ranges.",
+                              "按本地日期与小时显示；切换范围时使用固定色阶。"))
                         .font(MusesTypography.caption)
                         .foregroundStyle(BrandColors.textSecondary)
                 }
@@ -97,7 +101,9 @@ struct ListeningHeatmapView: View {
         ScrollView([.horizontal, .vertical]) {
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 5) {
-                    Text(tr("Date", "日期"))
+                    Text(heatmap.range == .allTime
+                         ? tr("Weekday", "星期", zhHant: "星期")
+                         : tr("Date", "日期"))
                         .font(MusesTypography.caption2.weight(.semibold))
                         .foregroundStyle(BrandColors.textSecondary)
                         .frame(width: rowLabelWidth, alignment: .leading)
@@ -130,9 +136,12 @@ struct ListeningHeatmapView: View {
             .padding(.bottom, 4)
         }
         .frame(maxHeight: chartHeight)
-        .accessibilityHint(tr(
-            "Use arrow keys to move by hour and date. Switch to Data Table to skip empty intervals.",
-            "使用方向键按小时和日期移动；切换到数据表可跳过空时段。"))
+        .accessibilityHint(heatmap.range == .allTime
+            ? tr("Use arrow keys to move by hour and weekday. Switch to Data Table to skip empty intervals.",
+                 "使用方向键按小时和星期移动；切换到数据表可跳过空时段。",
+                 zhHant: "使用方向鍵按小時和星期移動；切換到數據表可跳過空時段。")
+            : tr("Use arrow keys to move by hour and date. Switch to Data Table to skip empty intervals.",
+                 "使用方向键按小时和日期移动；切换到数据表可跳过空时段。"))
     }
 
     private func heatmapCell(_ cell: ListeningHeatmapCell,
