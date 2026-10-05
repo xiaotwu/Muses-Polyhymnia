@@ -227,15 +227,30 @@ struct RootView: View {
         }
     }
 
+    private var hasPresentedBrowseModal: Bool {
+        showQuickSearch || showAudioInfo || lyricsSearchRequest != nil
+            || showYouTubeLink || galleryPresentation.preview != nil
+    }
+
+    private var acceptsBrowseCommands: Bool {
+        !hasPresentedBrowseModal
+            && MusesSingleInstance.mainWindow(in: NSApp.windows)?.attachedSheet == nil
+    }
+
     private var windowBrowseNavigationCommands: BrowseNavigationCommands {
         BrowseNavigationCommands(
             canGoBack: (showNowPlaying || canNavigateBack) && !showYouTubeVideo,
             canGoForward: canNavigateForward && !showNowPlaying && !showYouTubeVideo,
+            isModalPresented: hasPresentedBrowseModal,
             back: {
+                guard acceptsBrowseCommands else { return }
                 if showNowPlaying { returnFromNowPlaying() }
                 else { navigateHistory(back: true) }
             },
-            forward: { navigateHistory(back: false) }
+            forward: {
+                guard acceptsBrowseCommands else { return }
+                navigateHistory(back: false)
+            }
         )
     }
 
@@ -247,6 +262,7 @@ struct RootView: View {
     }
 
     private func navigateHistory(back: Bool) {
+        guard acceptsBrowseCommands else { return }
         if section == .search && globalSearch.scope.searchesYouTube {
             if back && globalSearch.musicCatalog.canGoBack { globalSearch.musicCatalog.back(); return }
             if !back && globalSearch.musicCatalog.canGoForward { globalSearch.musicCatalog.forward(); return }
@@ -309,6 +325,7 @@ struct RootView: View {
     private var notificationWired: some View {
         navigationWired
             .onReceive(NotificationCenter.default.publisher(for: .musesOpenSettings)) { note in
+                guard acceptsBrowseCommands else { return }
                 openIntegratedSettings()
                 if let category = note.object as? SettingsCategory {
                     settingsPane = category.destination.rawValue
@@ -336,6 +353,7 @@ struct RootView: View {
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: .musesQuickSearch)) { _ in
+                guard acceptsBrowseCommands else { return }
                 showQuickSearch = true
             }
             .onReceive(NotificationCenter.default.publisher(for: .musesFocusSearch)) { _ in
@@ -390,6 +408,7 @@ struct RootView: View {
                 section = .playlists
             }
             .onReceive(NotificationCenter.default.publisher(for: .musesNavigateFromSearch)) { note in
+                guard acceptsBrowseCommands else { return }
                 guard let route = note.object as? GlobalSearchRoute else { return }
                 applySearchRoute(route)
             }
@@ -587,10 +606,10 @@ struct RootView: View {
         .background(BrandColors.background)
         .overlay(alignment: .leading) {
             SidebarView(onSettingsCategoryChange: { settingsPath = [] },
-                        canGoBack: canNavigateBack && !showYouTubeVideo,
-                        canGoForward: canNavigateForward && !showNowPlaying && !showYouTubeVideo,
-                        onBack: { navigateHistory(back: true) },
-                        onForward: { navigateHistory(back: false) },
+                        canGoBack: windowBrowseNavigationCommands.canGoBack,
+                        canGoForward: windowBrowseNavigationCommands.canGoForward,
+                        onBack: windowBrowseNavigationCommands.back,
+                        onForward: windowBrowseNavigationCommands.forward,
                         selection: $section,
                         selectedPlaylist: $selectedPlaylist,
                         selectedYouTubeImport: $selectedYouTubeImport)
@@ -784,10 +803,10 @@ struct RootView: View {
                         },
                         onKeyboardFocusChange: { immersiveNavigationFocused = $0 },
                         onPointerHoverChange: { immersiveNavigationHovered = $0 },
-                        canGoBack: !showYouTubeVideo,
-                        canGoForward: false,
-                        onBack: returnFromNowPlaying,
-                        onForward: { navigateHistory(back: false) },
+                        canGoBack: windowBrowseNavigationCommands.canGoBack,
+                        canGoForward: windowBrowseNavigationCommands.canGoForward,
+                        onBack: windowBrowseNavigationCommands.back,
+                        onForward: windowBrowseNavigationCommands.forward,
                         selection: $section,
                         selectedPlaylist: $selectedPlaylist,
                         selectedYouTubeImport: $selectedYouTubeImport

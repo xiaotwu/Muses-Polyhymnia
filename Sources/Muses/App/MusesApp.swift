@@ -539,9 +539,11 @@ private struct MusesAppCommands: Commands {
         let _ = languageRaw
         CommandGroup(replacing: .appSettings) {
             Button(tr("Settings…", "设置…", zhHant: "設定…")) {
+                guard browseNavigation?.canBrowse != false else { return }
                 MusesSingleInstance.requestSettings()
             }
             .keyboardShortcut(",", modifiers: .command)
+            .disabled(browseNavigation?.canBrowse == false)
         }
 
         CommandGroup(replacing: .appInfo) {
@@ -549,10 +551,11 @@ private struct MusesAppCommands: Commands {
                 NSApp.orderFrontStandardAboutPanel(nil)
             }
             Button(tr("Check for Updates…", "检查更新…")) {
+                guard browseNavigation?.canBrowse != false else { return }
                 MusesSingleInstance.requestSettings(.about)
                 Task { await updater.checkForUpdates() }
             }
-            .disabled(!updater.canCheck)
+            .disabled(!updater.canCheck || browseNavigation?.canBrowse == false)
         }
 
         CommandGroup(replacing: .newItem) {
@@ -572,6 +575,7 @@ private struct MusesAppCommands: Commands {
                 commandRegistry.execute(CommandRegistry.focusSearch)
             }
             .keyboardShortcut("f", modifiers: .command)
+            .disabled(browseNavigation?.canSearch == false)
         }
 
         CommandGroup(replacing: .sidebar) {
@@ -585,22 +589,27 @@ private struct MusesAppCommands: Commands {
             Divider()
 
             Button(tr("Focus Navigation", "聚焦导航", zhHant: "聚焦導覽")) {
+                guard browseNavigation?.canBrowse != false else { return }
                 NotificationCenter.default.post(name: .musesFocusNavigation, object: nil)
             }
             .keyboardShortcut("s", modifiers: [.command, .control])
+            .disabled(browseNavigation?.canBrowse == false)
 
             Divider()
 
-            Button(SidebarSection.home.title) { navigate(.home) }
-            Button(SidebarSection.new.title) { navigate(.new) }
-            Button(SidebarSection.songs.title) { navigate(.songs) }
-            Button(SidebarSection.albums.title) { navigate(.albums) }
-            Button(SidebarSection.artists.title) { navigate(.artists) }
-            Button(SidebarSection.liked.title) { navigate(.liked) }
-            Button(SidebarSection.musicVideos.title) { navigate(.musicVideos) }
-            Button(SidebarSection.subscriptions.title) { navigate(.subscriptions) }
-            Button(SidebarSection.history.title) { navigate(.history) }
-            Button(SidebarSection.playlists.title) { navigate(.playlists) }
+            Group {
+                Button(SidebarSection.home.title) { navigate(.home) }
+                Button(SidebarSection.new.title) { navigate(.new) }
+                Button(SidebarSection.songs.title) { navigate(.songs) }
+                Button(SidebarSection.albums.title) { navigate(.albums) }
+                Button(SidebarSection.artists.title) { navigate(.artists) }
+                Button(SidebarSection.liked.title) { navigate(.liked) }
+                Button(SidebarSection.musicVideos.title) { navigate(.musicVideos) }
+                Button(SidebarSection.subscriptions.title) { navigate(.subscriptions) }
+                Button(SidebarSection.history.title) { navigate(.history) }
+                Button(SidebarSection.playlists.title) { navigate(.playlists) }
+            }
+            .disabled(browseNavigation?.canBrowse == false)
         }
 
         CommandMenu(tr("Playback", "播放")) {
@@ -684,6 +693,7 @@ private struct MusesAppCommands: Commands {
     }
 
     private func navigate(_ section: SidebarSection) {
+        guard browseNavigation?.canBrowse != false else { return }
         NotificationCenter.default.post(
             name: .musesNavigateFromSearch,
             object: GlobalSearchRoute.section(section)

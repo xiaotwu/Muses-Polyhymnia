@@ -54,4 +54,32 @@ struct BrowseNavigationHistoryTests {
         #expect(channel.route(activeChannelID: "UCowner") == .channel("UCchannel"))
     }
 
+    @Test func modalCommandsPreserveHistoryUntilDismissal() {
+        var history = BrowseNavigationHistory()
+        history.visit(.section(.songs))
+        history.visit(.section(.artists))
+        #expect(history.back() == .section(.songs))
+        let before = history.entries
+
+        let blocked = BrowseNavigationCommands(
+            canGoBack: history.canGoBack, canGoForward: history.canGoForward,
+            isModalPresented: true,
+            back: { _ = history.back() }, forward: { _ = history.forward() })
+        #expect(!blocked.canGoBack && !blocked.canGoForward && !blocked.canSearch && !blocked.canBrowse)
+        blocked.back()
+        #expect(history.entries[history.index] == .section(.songs))
+        blocked.forward()
+        #expect(history.entries == before)
+        #expect(history.entries[history.index] == .section(.songs))
+
+        let restored = BrowseNavigationCommands(
+            canGoBack: history.canGoBack, canGoForward: history.canGoForward,
+            back: { _ = history.back() }, forward: { _ = history.forward() })
+        #expect(restored.canGoBack && restored.canGoForward && restored.canSearch && restored.canBrowse)
+        restored.forward()
+        #expect(history.entries[history.index] == .section(.artists))
+        restored.back()
+        #expect(history.entries[history.index] == .section(.songs))
+    }
+
 }

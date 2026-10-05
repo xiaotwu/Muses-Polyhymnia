@@ -261,8 +261,25 @@ private struct SidebarIslandBoundsKey: PreferenceKey {
 struct BrowseNavigationCommands {
     let canGoBack: Bool
     let canGoForward: Bool
+    let canBrowse: Bool
+    var canSearch: Bool { canBrowse }
     let back: () -> Void
     let forward: () -> Void
+
+    init(canGoBack: Bool, canGoForward: Bool, isModalPresented: Bool = false,
+         back: @escaping () -> Void, forward: @escaping () -> Void) {
+        self.canGoBack = canGoBack && !isModalPresented
+        self.canGoForward = canGoForward && !isModalPresented
+        self.canBrowse = !isModalPresented
+        self.back = {
+            guard canGoBack, !isModalPresented else { return }
+            back()
+        }
+        self.forward = {
+            guard canGoForward, !isModalPresented else { return }
+            forward()
+        }
+    }
 }
 
 private struct BrowseNavigationCommandsKey: FocusedValueKey {
