@@ -49,6 +49,9 @@ struct RootView: View {
     /// Now Playing has already been opened from the current artwork.
     @State private var nowPlayingShowLyrics = false
     @State private var windowWidth: CGFloat = 1440
+    @State private var minimumWindowSize = WindowChromeMetrics.minimumContentSize(
+        visibleSize: NSScreen.main?.visibleFrame.size,
+        titlebarHeight: WindowChromeMetrics.trafficLightClearanceHeight)
     @State private var showQueue = false
     @State private var showLyricsDrawer = false
     @State private var showAudioInfo = false
@@ -83,6 +86,13 @@ struct RootView: View {
                 }
             }
             .environment(galleryPresentation)
+            .frame(minWidth: minimumWindowSize.width, minHeight: minimumWindowSize.height)
+            .background {
+                MainWindowConfigurator { size in
+                    if minimumWindowSize != size { minimumWindowSize = size }
+                }
+                .frame(width: 0, height: 0)
+            }
             .toolbar { windowNavigationToolbar }
             .focusedSceneValue(\.musesBrowseNavigation, windowBrowseNavigationCommands)
             .toolbarVisibility(showNowPlaying && !immersiveToolbarRevealed ? .hidden : .visible,
@@ -584,10 +594,6 @@ struct RootView: View {
                         selection: $section,
                         selectedPlaylist: $selectedPlaylist,
                         selectedYouTubeImport: $selectedYouTubeImport)
-        }
-        .background {
-            MainWindowConfigurator()
-                .frame(width: 0, height: 0)
         }
         .ignoresSafeArea(edges: [.bottom, .leading])
         .tint(BrandColors.accent)

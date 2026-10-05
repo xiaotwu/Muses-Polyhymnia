@@ -23,7 +23,7 @@ struct SidebarView: View {
     var body: some View {
         GeometryReader { geometry in
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: SidebarNavigationMetrics.groupSpacing) {
                     backAction
                     if selection == .settings {
                         settingsIsland(Array(SettingsCategory.allCases.prefix(5)), key: "settings-primary")
@@ -48,7 +48,7 @@ struct SidebarView: View {
                     }
                     settingsAction
                 }
-                .padding(.vertical, 8)
+                .padding(.vertical, SidebarNavigationMetrics.innerVerticalPadding)
                 .padding(.horizontal, 16)
                 .frame(minHeight: geometry.size.height, alignment: .center)
                 .frame(width: AppleMusicTokens.sidebarCollapsedWidth)
@@ -60,7 +60,7 @@ struct SidebarView: View {
             // Expanded capsules fit the host width; retain native clipping so
             // vertically scrolled islands cannot cover the titlebar or footer.
         }
-        .padding(.vertical, 12)
+        .padding(.vertical, SidebarNavigationMetrics.outerVerticalPadding)
         .frame(width: 234)
         .frame(maxHeight: .infinity)
         .coordinateSpace(name: "muses-navigation")
@@ -103,7 +103,7 @@ struct SidebarView: View {
                 .font(MusesTypography.system(size: 18, weight: .semibold))
                 .foregroundStyle(BrandColors.textPrimary)
                 .opacity(canGoBack ? 1 : 0.38)
-                .frame(width: 56, height: 56)
+                .frame(width: SidebarNavigationMetrics.circleSize, height: SidebarNavigationMetrics.circleSize)
                 .contentShape(Circle())
         }
         .buttonStyle(.fullAreaPlain)
@@ -127,7 +127,7 @@ struct SidebarView: View {
             Image(systemName: selection == .settings ? "house.fill" : "gearshape.fill")
                 .font(MusesTypography.system(size: 18, weight: .semibold))
                 .foregroundStyle(BrandColors.textPrimary)
-                .frame(width: 56, height: 56)
+                .frame(width: SidebarNavigationMetrics.circleSize, height: SidebarNavigationMetrics.circleSize)
                 .contentShape(Circle())
         }
         .buttonStyle(.fullAreaPlain)
@@ -142,14 +142,14 @@ struct SidebarView: View {
         let expanded = hoveredIsland == key || focusKeys.contains(focusedItem ?? "")
         // The anchor reserves only the rail; the actual capsule owns its complete hit region.
         return Color.clear
-            .frame(width: 56, height: CGFloat(focusKeys.count) * 44 + 12)
+            .frame(width: SidebarNavigationMetrics.circleSize, height: CGFloat(focusKeys.count) * SidebarNavigationMetrics.rowHeight + 2 * SidebarNavigationMetrics.islandPadding)
             .allowsHitTesting(false)
             .overlay(alignment: .leading) {
                 VStack(spacing: 0) {
                     content(expanded)
                 }
-                .padding(6)
-                .frame(width: expanded ? 218 : 56, alignment: .leading)
+                .padding(SidebarNavigationMetrics.islandPadding)
+                .frame(width: expanded ? 218 : SidebarNavigationMetrics.circleSize, alignment: .leading)
                 .background {
                     GeometryReader { proxy in
                         Color.clear.preference(key: SidebarIslandBoundsKey.self,
@@ -204,7 +204,7 @@ struct SidebarView: View {
         HStack(spacing: 10) {
             Image(systemName: icon)
                 .font(MusesTypography.system(size: 17, weight: .semibold))
-                .frame(width: 44, height: 44)
+                .frame(width: SidebarNavigationMetrics.rowHeight, height: SidebarNavigationMetrics.rowHeight)
                 .accessibilityHidden(true)
             if expanded {
                 Text(title)
@@ -213,7 +213,7 @@ struct SidebarView: View {
                 Spacer(minLength: 0)
             }
         }
-        .frame(width: expanded ? 206 : 44, height: 44, alignment: .leading)
+        .frame(width: expanded ? 206 : SidebarNavigationMetrics.rowHeight, height: SidebarNavigationMetrics.rowHeight, alignment: .leading)
         .foregroundStyle(selected ? BrandColors.accent : BrandColors.textPrimary)
         .background(selected ? BrandColors.accent.opacity(0.16) : Color.clear,
                     in: RoundedRectangle(cornerRadius: 22))

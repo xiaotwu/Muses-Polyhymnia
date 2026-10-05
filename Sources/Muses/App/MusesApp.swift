@@ -487,6 +487,7 @@ struct MusesApp: App {
         // content beneath it without letting scene updates replace the native
         // traffic-light cluster.
         .windowToolbarStyle(.unified)
+        .windowResizability(.contentMinSize)
         .defaultSize(
             width: WindowChromeMetrics.defaultWidth,
             height: WindowChromeMetrics.defaultHeight

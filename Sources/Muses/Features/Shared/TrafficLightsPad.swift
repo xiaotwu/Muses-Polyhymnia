@@ -44,21 +44,39 @@ struct TrafficLightsPad: View {
 
 /// The one narrow AppKit boundary used to configure the SwiftUI main window.
 struct MainWindowConfigurator: NSViewRepresentable {
+    var onMinimumSizeChange: (CGSize) -> Void = { _ in }
+
     func makeNSView(context: Context) -> MainWindowConfigurationView {
         MainWindowConfigurationView()
     }
 
     func updateNSView(_ nsView: MainWindowConfigurationView, context: Context) {
-        guard let window = nsView.window else { return }
-        MusesSingleInstance.configureMainWindow(window)
+        nsView.onMinimumSizeChange = onMinimumSizeChange
+        nsView.configure()
     }
 }
 
 final class MainWindowConfigurationView: NSView {
+    var onMinimumSizeChange: (CGSize) -> Void = { _ in }
+
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
+        NotificationCenter.default.removeObserver(self)
         guard let window else { return }
-        MusesSingleInstance.configureMainWindow(window)
+        NotificationCenter.default.addObserver(self, selector: #selector(screenChanged),
+                                               name: NSWindow.didChangeScreenNotification, object: window)
+        NotificationCenter.default.addObserver(self, selector: #selector(screenChanged),
+                                               name: NSApplication.didChangeScreenParametersNotification, object: nil)
+        configure()
+    }
+
+    @objc private func screenChanged(_ notification: Notification) { configure() }
+
+    func configure() {
+        guard let window else { return }
+        let minimumSize = MusesSingleInstance.configureMainWindow(window)
+        // Publish after the representable update; the scene owns the final sizing contract.
+        Task { @MainActor [weak self] in self?.onMinimumSizeChange(minimumSize) }
     }
 }
 

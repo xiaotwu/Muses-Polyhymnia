@@ -86,7 +86,8 @@ enum MusesSingleInstance {
     /// Idempotent main-window configuration. Standard traffic-light buttons
     /// remain in AppKit's native titlebar hierarchy.
     @MainActor
-    static func configureMainWindow(_ window: NSWindow) {
+    @discardableResult
+    static func configureMainWindow(_ window: NSWindow) -> CGSize {
         configuredMainWindows.add(window)
         window.identifier = mainWindowIdentifier
         window.setFrameAutosaveName(mainWindowAutosaveName)
@@ -102,10 +103,10 @@ enum MusesSingleInstance {
         window.toolbar?.isVisible = true
         window.toolbar?.allowsUserCustomization = false
         window.toolbarStyle = .unified
-        window.contentMinSize = NSSize(
-            width: WindowChromeMetrics.minimumWidth,
-            height: WindowChromeMetrics.minimumHeight
-        )
+        let minimumSize = WindowChromeMetrics.minimumContentSize(
+            visibleSize: (window.screen ?? NSScreen.main)?.visibleFrame.size,
+            titlebarHeight: window.frame.height - window.contentLayoutRect.height)
+        window.contentMinSize = minimumSize
         for type in [
             NSWindow.ButtonType.closeButton,
             .miniaturizeButton,
@@ -113,5 +114,6 @@ enum MusesSingleInstance {
         ] {
             window.standardWindowButton(type)?.isHidden = false
         }
+        return minimumSize
     }
 }

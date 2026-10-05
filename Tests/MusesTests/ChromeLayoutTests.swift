@@ -412,7 +412,24 @@ struct ChromeLayoutTests {
         #expect(WindowChromeMetrics.trafficLightClearanceHeight == 28)
         #expect(WindowChromeMetrics.trafficLightTopInset == 0)
         #expect(WindowChromeMetrics.minimumWidth == 840)
-        #expect(WindowChromeMetrics.minimumHeight == 600)
+        #expect(WindowChromeMetrics.minimumHeight == 752)
+    }
+
+    @Test("Main window fits both complete navigation rails without exceeding a small display")
+    func mainWindowMinimumFitsNavigationAndDisplay() {
+        let musicHeight = SidebarNavigationMetrics.completeHeight(rowCount: SidebarNavigationMetrics.musicRowCount)
+        let settingsHeight = SidebarNavigationMetrics.completeHeight(rowCount: SettingsCategory.allCases.count)
+        #expect(musicHeight == 752)
+        #expect(settingsHeight == 664)
+        #expect(WindowChromeMetrics.minimumHeight >= max(musicHeight, settingsHeight))
+        let ordinary = WindowChromeMetrics.minimumContentSize(
+            visibleSize: CGSize(width: 1280, height: 900), titlebarHeight: 38)
+        #expect(ordinary == CGSize(width: 840, height: 752))
+        let small = WindowChromeMetrics.minimumContentSize(
+            visibleSize: CGSize(width: 640, height: 480), titlebarHeight: 38)
+        #expect(small == CGSize(width: 640, height: 442))
+        #expect(small.height + 38 <= 480)
+        #expect(WindowChromeMetrics.minimumContentSize(visibleSize: nil, titlebarHeight: 38) == ordinary)
     }
 
     @Test("main window configuration preserves native traffic light ownership")
@@ -444,10 +461,9 @@ struct ChromeLayoutTests {
         #expect(window.titleVisibility == .hidden)
         #expect(window.title == "Muses")
         #expect(window.subtitle.isEmpty)
-        #expect(window.contentMinSize == NSSize(
-            width: WindowChromeMetrics.minimumWidth,
-            height: WindowChromeMetrics.minimumHeight
-        ))
+        #expect(window.contentMinSize == WindowChromeMetrics.minimumContentSize(
+            visibleSize: (window.screen ?? NSScreen.main)?.visibleFrame.size,
+            titlebarHeight: window.frame.height - window.contentLayoutRect.height))
     }
 
     @Test("main-window lookup rejects Search and Mini Player windows")
@@ -707,7 +723,7 @@ struct ChromeLayoutTests {
         #expect(WindowChromeMetrics.defaultWidth == 1280)
         #expect(WindowChromeMetrics.defaultHeight == 800)
         #expect(WindowChromeMetrics.minimumWidth == 840)
-        #expect(WindowChromeMetrics.minimumHeight == 600)
+        #expect(WindowChromeMetrics.minimumHeight == 752)
     }
 
     @Test("dead runtime capabilities and orphan lyrics flag stay gone")

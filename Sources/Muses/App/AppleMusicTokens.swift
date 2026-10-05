@@ -317,6 +317,22 @@ enum TrafficLightsPolicy {
     static let usesDelayedLayoutRetries = false
 }
 
+enum SidebarNavigationMetrics {
+    static let rowHeight: CGFloat = 44
+    static let circleSize: CGFloat = 56
+    static let islandPadding: CGFloat = 6
+    static let groupSpacing: CGFloat = 16
+    static let innerVerticalPadding: CGFloat = 8
+    static let outerVerticalPadding: CGFloat = 12
+    static let musicRowCount = 12
+    static let settingsRowCount = 10
+
+    static func completeHeight(rowCount: Int) -> CGFloat {
+        CGFloat(rowCount) * rowHeight + 4 * islandPadding + 2 * circleSize
+            + 3 * groupSpacing + 2 * innerVerticalPadding + 2 * outerVerticalPadding
+    }
+}
+
 enum WindowChromeMetrics {
     /// Live pane is flush to the window's top, bottom, and leading edges.
     /// The 8pt Apple Music Web measurement remains `AppleMusicTokens.sidebarInset`.
@@ -331,7 +347,17 @@ enum WindowChromeMetrics {
     static let defaultWidth: CGFloat = 1280
     static let defaultHeight: CGFloat = 800
     static let minimumWidth: CGFloat = 840
-    static let minimumHeight: CGFloat = 600
+    /// Fits the complete music rail; Settings has fewer rows and uses the same minimum.
+    static let minimumHeight = SidebarNavigationMetrics.completeHeight(rowCount: SidebarNavigationMetrics.musicRowCount)
+
+    /// Small displays retain the scrollable navigation fallback instead of an oversized window.
+    static func minimumContentSize(visibleSize: CGSize?, titlebarHeight: CGFloat) -> CGSize {
+        guard let visibleSize, visibleSize.width > 0, visibleSize.height > 0 else {
+            return CGSize(width: minimumWidth, height: minimumHeight)
+        }
+        return CGSize(width: min(minimumWidth, visibleSize.width),
+                      height: min(minimumHeight, max(1, visibleSize.height - max(0, titlebarHeight))))
+    }
 }
 
 /// Same-round verification lock: one appearance and one main-window geometry.
