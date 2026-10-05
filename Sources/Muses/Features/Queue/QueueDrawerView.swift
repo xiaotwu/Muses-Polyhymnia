@@ -31,6 +31,8 @@ struct QueueDrawerView: View {
     @State private var historyExpanded = false
     @State private var groupsExpanded = false
     @State private var selectedRow: QueueListSelection?
+    @State private var rowScrollTask: Task<Void, Never>?
+    @State private var rowScrollTarget: QueueListSelection?
     @State private var showsSmartShuffleInfo = false
     @State private var smartShuffleFocusTask: Task<Void, Never>?
     @FocusState private var smartShuffleInfoFocused: Bool
@@ -72,7 +74,10 @@ struct QueueDrawerView: View {
         .onChange(of: renameTarget) { _, target in
             focusedTarget = target == nil ? .drawer : nil
         }
-        .onDisappear { smartShuffleFocusTask?.cancel(); smartShuffleFocusTask = nil }
+        .onDisappear {
+            smartShuffleFocusTask?.cancel(); smartShuffleFocusTask = nil
+            rowScrollTask?.cancel(); rowScrollTask = nil; rowScrollTarget = nil
+        }
         .onChange(of: showsSmartShuffleInfo) { _, shown in
             smartShuffleFocusTask?.cancel()
             smartShuffleFocusTask = nil
@@ -258,6 +263,9 @@ struct QueueDrawerView: View {
             .focusable()
             .focused($focusedTarget, equals: .list)
             .onChange(of: selectedRow) { _, selection in
+                if selection != rowScrollTarget {
+                    rowScrollTask?.cancel(); rowScrollTask = nil; rowScrollTarget = nil
+                }
                 guard selection != nil, renameTarget == nil, pendingRemoval == nil,
                       !showsSmartShuffleInfo else { return }
                 focusedTarget = .list
@@ -267,8 +275,8 @@ struct QueueDrawerView: View {
             // the focus wrapper. Route keys through the same visible, tagged rows.
             .onKeyPress(.upArrow) { moveSelectedRow(by: -1, using: proxy) }
             .onKeyPress(.downArrow) { moveSelectedRow(by: 1, using: proxy) }
-            .onKeyPress(.home) { selectRow(visibleRowSelections.first, using: proxy) }
-            .onKeyPress(.end) { selectRow(visibleRowSelections.last, using: proxy) }
+            .onKeyPress(.home) { selectRow(visibleRowSelections.first, using: proxy, anchor: .top) }
+            .onKeyPress(.end) { selectRow(visibleRowSelections.last, using: proxy, anchor: .bottom) }
             .onKeyPress(.escape) {
                 guard renameTarget == nil, pendingRemoval == nil else { return .ignored }
                 dismissUnlessRenaming()
@@ -649,12 +657,24 @@ struct QueueDrawerView: View {
         return selectRow(rows[index], using: proxy)
     }
 
-    private func selectRow(_ selection: QueueListSelection?, using proxy: ScrollViewProxy) -> KeyPress.Result {
+    private func selectRow(_ selection: QueueListSelection?, using proxy: ScrollViewProxy,
+                           anchor: UnitPoint? = nil) -> KeyPress.Result {
         guard renameTarget == nil, pendingRemoval == nil, !showsSmartShuffleInfo,
               let selection, visibleRowSelections.contains(selection) else { return .ignored }
         selectedRow = selection
         focusedTarget = .list
-        proxy.scrollTo(selection)
+        rowScrollTask?.cancel()
+        rowScrollTarget = selection
+        rowScrollTask = Task { @MainActor in
+            // Let List apply the selected row before resolving an offscreen lazy row.
+            await Task.yield()
+            guard !Task.isCancelled, isPresented, selectedRow == selection,
+                  renameTarget == nil, pendingRemoval == nil, !showsSmartShuffleInfo,
+                  visibleRowSelections.contains(selection) else { return }
+            proxy.scrollTo(selection, anchor: anchor)
+            rowScrollTask = nil
+            rowScrollTarget = nil
+        }
         return .handled
     }
 
