@@ -387,6 +387,11 @@ struct ListeningHeatmapView: View {
     private var summaryAccessibilityLabel: String {
         let peak = heatmap.peakCell.map(cellTimeLabel) ?? tr("none", "无")
         let active = mostActiveRow.map(rowLabel) ?? tr("none", "无")
+        if heatmap.range == .allTime {
+            return tr(
+                "Listening summary. Total \(ListeningFormat.duration(heatmap.totalMs)). Peak interval \(peak). Most active weekday \(active).",
+                "收听摘要。总计 \(ListeningFormat.duration(heatmap.totalMs))。高峰时段 \(peak)。最活跃星期 \(active)。", zhHant: "收聽摘要。總計 \(ListeningFormat.duration(heatmap.totalMs))。高峰時段 \(peak)。最活躍星期 \(active)。")
+        }
         return tr(
             "Listening summary. Total \(ListeningFormat.duration(heatmap.totalMs)). Peak interval \(peak). Most active date \(active).",
             "收听摘要。总计 \(ListeningFormat.duration(heatmap.totalMs))。高峰时段 \(peak)。最活跃日期 \(active)。", zhHant: "收聽摘要。總計 \(ListeningFormat.duration(heatmap.totalMs))。高峰時段 \(peak)。最活躍日期 \(active)。")
