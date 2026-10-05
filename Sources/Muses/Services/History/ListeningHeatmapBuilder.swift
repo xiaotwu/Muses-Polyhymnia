@@ -18,7 +18,9 @@ enum ListeningHeatmapBuilder {
             totalMs += milliseconds
             eventIDs.insert(event.id)
             trackIDs.insert(event.trackId)
-            artists.insert(event.artist)
+            if !SongDisplayInformation.isMissingCredit(event.artist) {
+                artists.insert(event.artist)
+            }
             let current = slices[event.trackId]
             slices[event.trackId] = .init(
                 trackId: event.trackId,

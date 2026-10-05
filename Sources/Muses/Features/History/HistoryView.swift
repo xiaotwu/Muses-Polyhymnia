@@ -6,6 +6,7 @@ struct HistoryView: View {
     @Environment(HistoryService.self) private var history
     @Environment(LibraryService.self) private var library
     @Environment(PlaybackService.self) private var playback
+    @Environment(YouTubeImportService.self) private var importService: YouTubeImportService?
     @AppStorage(PrefKey.ffSmartHistory) private var enabled = true
     @State private var range: RecapRange = .week
     @State private var dashboard: ListeningHistoryDashboard?
@@ -13,6 +14,7 @@ struct HistoryView: View {
     @State private var isLoading = true
     @State private var showClearConfirm = false
     @State private var heatmapExpanded = false
+    @State private var rankingVideoIDs: [String] = []
 
     private let metricColumns = [
         GridItem(.adaptive(minimum: 148, maximum: 220), spacing: 12)
@@ -38,6 +40,15 @@ struct HistoryView: View {
         .onChange(of: enabled) { _, _ in reload() }
         .onChange(of: range) { _, _ in reload() }
         .onChange(of: history.historyRevision) { _, _ in reload() }
+        .onChange(of: SongCreditCache.shared.revision) { _, _ in reload() }
+        .onChange(of: library.metadataRevision) { _, _ in reload() }
+        .task(id: rankingVideoIDs) {
+            guard let importService else { return }
+            for videoID in rankingVideoIDs {
+                guard !Task.isCancelled else { return }
+                _ = await importService.songMetadata(videoID: videoID)
+            }
+        }
         .alert(
             tr("Clear all listening history?", "清空全部收听历史？"),
             isPresented: $showClearConfirm
@@ -303,15 +314,35 @@ struct HistoryView: View {
         guard enabled else {
             isLoading = false
             dashboard = nil
+            rankingVideoIDs = []
             loadError = nil
             return
         }
         isLoading = true
         do {
-            dashboard = try history.dashboard(range: range)
+            var tracks: [UUID: TrackSnapshot] = [:]
+            var missingTracks: Set<UUID> = []
+            let value = try history.dashboard(range: range) { trackID, storedArtist in
+                if tracks[trackID] == nil, !missingTracks.contains(trackID) {
+                    if let track = library.track(by: trackID) {
+                        tracks[trackID] = TrackSnapshot(from: track)
+                    } else {
+                        missingTracks.insert(trackID)
+                    }
+                }
+                guard let track = tracks[trackID] else { return storedArtist }
+                return SongCreditCache.shared.historicalArtist(
+                    videoID: track.youTubeId, storedArtist: storedArtist)
+            }
+            dashboard = value
+            rankingVideoIDs = value.recap.topTracks.prefix(5).compactMap { tracks[$0.id]?.youTubeId }
+                .reduce(into: [String]()) { result, videoID in
+                    if !videoID.isEmpty, !result.contains(videoID) { result.append(videoID) }
+                }
             loadError = nil
         } catch {
             loadError = error.localizedDescription
+            rankingVideoIDs = []
         }
         isLoading = false
     }
@@ -357,7 +388,7 @@ private struct HistoryTimelineRow: View {
 
     @Environment(YouTubeImportService.self) private var importService: YouTubeImportService?
     private var displayArtist: String {
-        track.map { SongCreditCache.shared.artist(snapshot: $0) } ?? event.artist
+        track.map { SongCreditCache.shared.historicalArtist(videoID: $0.youTubeId, storedArtist: event.artist) } ?? event.artist
     }
 
     private var isPlayable: Bool { track?.youTubeId != nil }

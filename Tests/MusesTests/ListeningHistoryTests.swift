@@ -276,6 +276,94 @@ struct ListeningHistoryTests {
         _ = svc
     }
 
+    @Test("History display repairs exact owner credits without rewriting historical truth")
+    func dashboardDisplayCreditsPreserveHistory() throws {
+        let container = try makeContainer()
+        let context = ModelContext(container)
+        let library = LibraryService(modelContainer: container)
+        let service = HistoryService(modelContainer: container, eventBus: PlaybackEventBus(),
+                                     enabledProvider: { true })
+        let cache = SongCreditCache()
+        let ownerTrack = Track(title: "Same title", artist: "Playlist owner", youTubeId: "historyA001")
+        let verifiedTrack = Track(title: "Verified", artist: "Verified performer", youTubeId: "historyB001")
+        let otherTrack = Track(title: "Same title", artist: "Playlist owner", youTubeId: "historyC001")
+        let editedTrack = Track(title: "Edited today", artist: "Today's edit", youTubeId: "historyD001")
+        for track in [ownerTrack, verifiedTrack, otherTrack, editedTrack] { context.insert(track) }
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let storedCredits: [(UUID, String)] = [
+            (ownerTrack.id, "Playlist owner"), (verifiedTrack.id, "Verified performer"),
+            (otherTrack.id, "Playlist owner"), (editedTrack.id, "Historical manual credit"),
+            (UUID(), "Deleted song credit")
+        ]
+        for (index, credit) in storedCredits.enumerated() {
+            context.insert(ListeningEvent(
+                trackId: credit.0, trackTitle: "Historical title \(index)", artist: credit.1,
+                startedAt: now.addingTimeInterval(-600 + Double(index) * 60),
+                endedAt: now.addingTimeInterval(-590 + Double(index) * 60),
+                listenedMs: 10_000, completionRatio: 0.5, outcome: .stopped))
+        }
+        try context.save()
+        cache.recordOwner("Playlist owner", videoID: ownerTrack.youTubeId)
+        cache.recordOwner("Playlist owner", videoID: otherTrack.youTubeId)
+        let raw = try service.dashboard(range: .allTime, now: now)
+        func displayed() throws -> ListeningHistoryDashboard {
+            try service.dashboard(range: .allTime, now: now) { trackID, storedArtist in
+                guard let track = library.track(by: trackID) else { return storedArtist }
+                return cache.historicalArtist(videoID: track.youTubeId, storedArtist: storedArtist)
+            }
+        }
+        let beforeMetadata = try displayed()
+        #expect(beforeMetadata.recap.topTracks.first(where: { $0.id == ownerTrack.id })?.artist
+                == tr("Artist unavailable", "艺人信息暂缺"))
+        #expect(beforeMetadata.recap.topTracks.first(where: { $0.id == verifiedTrack.id })?.artist
+                == "Verified performer")
+        #expect(beforeMetadata.recap.uniqueArtists == 3)
+        #expect(beforeMetadata.recap.topArtists.allSatisfy {
+            !SongDisplayInformation.isMissingCredit($0.name)
+        })
+        #expect(beforeMetadata.recap.totalListenedMs == raw.recap.totalListenedMs)
+        #expect(beforeMetadata.heatmap.nonzeroCells.allSatisfy { cell in
+            cell.artistCount == Set(cell.slices.filter {
+                !SongDisplayInformation.isMissingCredit($0.artist)
+            }.map(\.artist)).count
+        })
+        cache.store(.init(id: editedTrack.youTubeId, title: "Edited today", artist: "Current verified performer"))
+        cache.store(.init(id: ownerTrack.youTubeId, title: "Same title", uploader: "Publisher A",
+                          artist: "Verified performer"))
+        cache.store(.init(id: otherTrack.youTubeId, title: "Same title", uploader: "Publisher C",
+                          artist: "Different performer"))
+        let resolved = try displayed()
+        #expect(resolved.recap.topArtists.first(where: { $0.name == "Verified performer" })?.plays == 2)
+        #expect(resolved.recap.topArtists.first(where: { $0.name == "Verified performer" })?.listenedMs == 20_000)
+        #expect(resolved.recap.topTracks.first(where: { $0.id == otherTrack.id })?.artist == "Different performer")
+        #expect(resolved.recap.topTracks.first(where: { $0.id == editedTrack.id })?.artist == "Historical manual credit")
+        #expect(resolved.recap.topArtists.contains { $0.name == "Deleted song credit" })
+        #expect(resolved.recap.uniqueArtists == 4)
+        #expect(resolved.recap.eventCount == raw.recap.eventCount)
+        #expect(resolved.recap.uniqueTracks == raw.recap.uniqueTracks)
+        #expect(resolved.recap.totalListenedMs == raw.recap.totalListenedMs)
+        #expect(resolved.heatmap.totalMs == raw.heatmap.totalMs)
+        #expect(resolved.heatmap.nonzeroCells.flatMap(\.slices).contains {
+            $0.trackId == ownerTrack.id && $0.artist == "Verified performer"
+        })
+        #expect(resolved.recent == raw.recent)
+        let reloadedRaw = try service.dashboard(range: .allTime, now: now)
+        // Equal-count rankings do not promise an ordering; compare stable identities.
+        #expect(reloadedRaw.recap.topTracks.sorted { $0.id.uuidString < $1.id.uuidString }
+                == raw.recap.topTracks.sorted { $0.id.uuidString < $1.id.uuidString })
+        #expect(reloadedRaw.recap.topArtists.sorted { $0.id < $1.id }
+                == raw.recap.topArtists.sorted { $0.id < $1.id })
+        #expect(reloadedRaw.recap.totalListenedMs == raw.recap.totalListenedMs)
+        #expect(reloadedRaw.recap.eventCount == raw.recap.eventCount)
+        #expect(reloadedRaw.heatmap == raw.heatmap)
+        #expect(reloadedRaw.recent == raw.recent)
+        let persisted = try ModelContext(container).fetch(FetchDescriptor<ListeningEvent>())
+        #expect(Dictionary(uniqueKeysWithValues: persisted.map { ($0.trackId, $0.artist) })
+                == Dictionary(uniqueKeysWithValues: storedCredits))
+        #expect(library.track(by: ownerTrack.id)?.artist == "Playlist owner")
+        #expect(library.track(by: editedTrack.id)?.artist == "Today's edit")
+    }
+
     @Test("dashboard keeps timeline inside the selected calendar range")
     func dashboardScopesRecentActivityToSelectedRange() throws {
         let container = try makeContainer()

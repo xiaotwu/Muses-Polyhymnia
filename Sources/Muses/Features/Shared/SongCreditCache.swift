@@ -46,6 +46,17 @@ final class SongCreditCache {
 
     func entry(videoID: String) -> YTDlpBridge.YTDlpPlaylistEntry? { metadata[videoID] }
 
+    /// Resolve missing or exact owner-derived display credits without rewriting
+    /// immutable historical events or replacing legitimate historical credits.
+    func historicalArtist(videoID: String, storedArtist: String) -> String {
+        guard SongDisplayInformation.isMissingCredit(storedArtist)
+                || isCollectionOwner(storedArtist, videoID: videoID) else { return storedArtist }
+        let entry = metadata[videoID]
+        if let artist = nonMissing(entry?.artist) { return artist }
+        if let publisher = nonMissing(entry?.uploader) { return publisher }
+        return tr("Artist unavailable", "艺人信息暂缺")
+    }
+
     func artist(snapshot: TrackSnapshot, owner: String? = nil) -> String {
         let entry = metadata[snapshot.youTubeId]
         let original = snapshot.artist

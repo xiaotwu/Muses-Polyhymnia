@@ -185,14 +185,24 @@ final class HistoryService {
     /// Loads the full History presentation from one successful fetch. Unlike
     /// the legacy convenience queries, this API intentionally propagates store
     /// failures so the screen can render an error state instead of "no plays".
-    func dashboard(range: RecapRange, now: Date = .init(), recentLimit: Int = 80) throws
+    func dashboard(range: RecapRange, now: Date = .init(), recentLimit: Int = 80,
+                   artistResolver: (@MainActor (UUID, String) -> String)? = nil) throws
         -> ListeningHistoryDashboard {
         let context = ModelContext(modelContainer)
         let descriptor = FetchDescriptor<ListeningEvent>(
             sortBy: [SortDescriptor(\.startedAt, order: .reverse)]
         )
         let all = try context.fetch(descriptor)
-        let timeline = all.map(Self.timelineSnapshot)
+        let timeline = all.map { event in
+            let stored = Self.timelineSnapshot(event)
+            guard let artistResolver else { return stored }
+            return ListeningTimelineEvent(
+                id: stored.id, trackId: stored.trackId, title: stored.title,
+                artist: artistResolver(stored.trackId, stored.artist),
+                startedAt: stored.startedAt, endedAt: stored.endedAt,
+                listenedMs: stored.listenedMs, outcome: stored.outcome
+            )
+        }
         let earliest = timeline.map(\.startedAt).min()
         let displayInterval = range.displayInterval(from: now, calendar: .current,
                                                     earliest: earliest)
@@ -267,9 +277,13 @@ final class HistoryService {
             var tt = trackPlays[ev.trackId] ?? (ev.title, ev.artist, 0, 0)
             tt.plays += 1; tt.ms += ev.listenedMs
             trackPlays[ev.trackId] = tt
-            var at = artistPlays[ev.artist] ?? (0, 0)
-            at.plays += 1; at.ms += ev.listenedMs
-            artistPlays[ev.artist] = at
+            // Unavailable display credits are not an artist identity. Keep their
+            // plays and time in track totals without inventing a ranked artist.
+            if !SongDisplayInformation.isMissingCredit(ev.artist) {
+                var at = artistPlays[ev.artist] ?? (0, 0)
+                at.plays += 1; at.ms += ev.listenedMs
+                artistPlays[ev.artist] = at
+            }
         }
         let trackTallies: [ListeningRecap.TrackTally] = trackPlays.map { entry in
             ListeningRecap.TrackTally(id: entry.key, title: entry.value.title,
