@@ -43,18 +43,38 @@ struct PlayerBar: View {
             style: .continuous
         )
         MusesGlassGroup {
-            HStack(spacing: 12) {
-                PlaybackTransport()
-                    .disabled(!hasTrack)
-                    .opacity(hasTrack ? 1 : 0.45)
-                Group {
-                    if hasTrack { playingIdentity } else { idleIdentity }
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) {
+                    PlaybackTransport()
+                        .disabled(!hasTrack)
+                        .opacity(hasTrack ? 1 : 0.45)
+                    Group {
+                        if hasTrack { playingIdentity } else { idleIdentity }
+                    }
+                    .frame(maxWidth: .infinity)
+                    trailing
                 }
-                .frame(maxWidth: .infinity)
-                trailing
+                .padding(.horizontal, 14)
 
+                // Retain every action when a trailing pane leaves a narrow dock.
+                // The artwork keeps full song information through help and VoiceOver.
+                HStack(spacing: 4) {
+                    PlaybackTransport()
+                        .disabled(!hasTrack)
+                        .opacity(hasTrack ? 1 : 0.45)
+                    if hasTrack {
+                        artworkButton(size: 28)
+                            .help((songInformation?.title ?? "") + "\n" + (songInformation?.artist ?? ""))
+                            .accessibilityValue((songInformation?.artist ?? "") + ", " + format(playback.state.position))
+                    } else {
+                        idleTile(size: 28)
+                            .accessibilityHidden(false)
+                            .accessibilityLabel(tr("Not Playing", "未在播放"))
+                    }
+                    trailing
+                }
+                .padding(.horizontal, 4)
             }
-            .padding(.horizontal, 14)
             .frame(maxWidth: AppleMusicTokens.capsuleWidth)
             .frame(height: PlayerDockMetrics.height)
             .background(BrandColors.surface, in: shape)
@@ -109,14 +129,7 @@ struct PlayerBar: View {
 
     private var idleIdentity: some View {
         HStack(spacing: 10) {
-            Image(nsImage: TrayIcon.menuBarImage)
-                .resizable()
-                .scaledToFit()
-                .foregroundStyle(.primary)
-                .padding(8)
-                .frame(width: PlayerDockMetrics.art, height: PlayerDockMetrics.art)
-                .background(BrandColors.textPrimary.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
-                .accessibilityHidden(true)
+            idleTile(size: PlayerDockMetrics.art)
             VStack(alignment: .leading, spacing: 1) {
                 Text(tr("Not Playing", "未在播放"))
                     .font(MusesTypography.song(size: 13, emphasized: true))
@@ -135,27 +148,7 @@ struct PlayerBar: View {
 
     private var playingIdentity: some View {
         HStack(spacing: 10) {
-            Button(action: onArtworkTap) {
-                ArtworkView(source: ArtworkSource.resolve(for: playback.state.track),
-                            cornerRadius: 6, glyphSize: 14,
-                            targetSize: PlayerDockMetrics.art)
-                    .scaleEffect(playback.state.isPlaying && !reduceMotion ? 1.04 : 1.0)
-                    .shadow(color: .black.opacity(playback.state.isPlaying ? 0.35 : 0),
-                            radius: playback.state.isPlaying ? 8 : 0)
-                    .frame(width: PlayerDockMetrics.art, height: PlayerDockMetrics.art)
-                    .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-            }
-            .buttonStyle(.fullAreaPlain)
-            .focused($artworkFocused)
-            .help(tr("Open Now Playing", "打开正在播放"))
-            .accessibilityLabel(tr(
-                "Open Now Playing for \(playback.state.track?.title ?? "")",
-                "打开 \(playback.state.track?.title ?? "") 的正在播放页面", zhHant: "打開 \(playback.state.track?.title ?? "") 的正在播放頁面"
-            ))
-            .accessibilityHint(tr(
-                "Shows the full Now Playing view",
-                "显示完整的正在播放页面"
-            ))
+            artworkButton(size: PlayerDockMetrics.art)
 
             VStack(alignment: .leading, spacing: 1) {
                 Text(songInformation?.title ?? "")
@@ -181,6 +174,42 @@ struct PlayerBar: View {
                 .opacity(0.78)
                 .fixedSize()
         }
+    }
+
+    private func idleTile(size: CGFloat) -> some View {
+        Image(nsImage: TrayIcon.menuBarImage)
+            .resizable()
+            .scaledToFit()
+            .foregroundStyle(.primary)
+            .padding(size == PlayerDockMetrics.art ? 8 : 6)
+            .frame(width: size, height: size)
+            .background(BrandColors.textPrimary.opacity(0.07), in: RoundedRectangle(cornerRadius: 8))
+            .accessibilityHidden(true)
+    }
+
+    private func artworkButton(size: CGFloat) -> some View {
+        Button(action: onArtworkTap) {
+            ArtworkView(source: ArtworkSource.resolve(for: playback.state.track),
+                        cornerRadius: 6, glyphSize: 14,
+                        targetSize: PlayerDockMetrics.art)
+                .scaleEffect(size / PlayerDockMetrics.art)
+                .frame(width: size, height: size)
+                .scaleEffect(playback.state.isPlaying && !reduceMotion ? 1.04 : 1.0)
+                .shadow(color: .black.opacity(playback.state.isPlaying ? 0.35 : 0),
+                        radius: playback.state.isPlaying ? 8 : 0)
+                .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+        }
+        .buttonStyle(.fullAreaPlain)
+        .focused($artworkFocused)
+        .help(tr("Open Now Playing", "打开正在播放"))
+        .accessibilityLabel(tr(
+            "Open Now Playing for \(playback.state.track?.title ?? "")",
+            "打开 \(playback.state.track?.title ?? "") 的正在播放页面", zhHant: "打開 \(playback.state.track?.title ?? "") 的正在播放頁面"
+        ))
+        .accessibilityHint(tr(
+            "Shows the full Now Playing view",
+            "显示完整的正在播放页面"
+        ))
     }
 
     private var trailing: some View {
