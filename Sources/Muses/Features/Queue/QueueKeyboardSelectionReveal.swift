@@ -30,12 +30,10 @@ struct QueueKeyboardSelectionReveal: NSViewRepresentable {
                     MainActor.assumeIsolated { self?.scheduleReveal() }
                 })
             }
-            inputMonitor = NSEvent.addLocalMonitorForEvents(matching: [.scrollWheel, .leftMouseDown, .rightMouseDown, .keyDown]) { [weak self] event in
+            inputMonitor = NSEvent.addLocalMonitorForEvents(matching: [.scrollWheel, .leftMouseDown, .rightMouseDown]) { [weak self] event in
                 MainActor.assumeIsolated {
                     if let self, let window = self.table?.window, event.window === window {
-                        if event.type != .keyDown || ![115, 119, 125, 126].contains(event.keyCode) {
-                            self.endKeyboardOwnership()
-                        }
+                        self.endKeyboardOwnership()
                     }
                 }
                 return event
