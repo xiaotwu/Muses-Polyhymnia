@@ -191,67 +191,84 @@ struct CatalogReleasesView: View {
     }
 
     private var filterBar: some View {
-        HStack(spacing: 12) {
-            // Search field
-            HStack(spacing: 6) {
-                Image(systemName: "magnifyingglass")
-                    .font(MusesTypography.system(size: 12))
-                    .foregroundStyle(BrandColors.textSecondary)
-                TextField(tr("Filter albums…", "过滤专辑…"), text: $searchQuery)
-                    .textFieldStyle(.plain)
-                    .font(MusesTypography.system(size: 13))
-                if !searchQuery.isEmpty {
-                    Button {
-                        searchQuery = ""
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(MusesTypography.system(size: 12))
-                            .foregroundStyle(BrandColors.textSecondary)
-                    }
-                    .buttonStyle(.fullAreaPlain)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                filterSearchField.frame(maxWidth: 240)
+                releaseFilterButtons
+                Spacer()
+                releaseSortMenu
+            }
+            VStack(alignment: .leading, spacing: 12) {
+                filterSearchField
+                HStack(spacing: 12) {
+                    ScrollView(.horizontal) { releaseFilterButtons }
+                        .scrollIndicators(.hidden)
+                    releaseSortMenu
                 }
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .frame(maxWidth: 240)
-            .background(BrandColors.surface, in: Capsule())
-            .overlay(
-                Capsule()
-                    .stroke(BrandColors.hairline, lineWidth: 1)
-            )
+        }
+    }
 
-            HStack(spacing: 6) {
-                ForEach(ReleaseFilter.allCases) { item in
-                    Button { filter = item } label: {
-                        Text(item.localizedTitle)
-                            .font(MusesTypography.caption)
-                            .padding(.horizontal, 12)
-                            .frame(minHeight: 32)
-                    }
-                    .buttonStyle(.musesCompact(selected: filter == item))
-                    .accessibilityAddTraits(filter == item ? .isSelected : [])
+    private var filterSearchField: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .font(MusesTypography.system(size: 12))
+                .foregroundStyle(BrandColors.textSecondary)
+            TextField(tr("Filter albums…", "过滤专辑…"), text: $searchQuery)
+                .textFieldStyle(.plain)
+                .font(MusesTypography.system(size: 13))
+            if !searchQuery.isEmpty {
+                Button {
+                    searchQuery = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(MusesTypography.system(size: 12))
+                        .foregroundStyle(BrandColors.textSecondary)
                 }
+                .buttonStyle(.fullAreaPlain)
             }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(BrandColors.surface, in: Capsule())
+        .overlay(
+            Capsule()
+                .stroke(BrandColors.hairline, lineWidth: 1)
+        )
+    }
 
-            Spacer()
+    private var releaseFilterButtons: some View {
+        HStack(spacing: 6) {
+            ForEach(ReleaseFilter.allCases) { item in
+                Button { filter = item } label: {
+                    Text(item.localizedTitle)
+                        .font(MusesTypography.caption)
+                        .padding(.horizontal, 12)
+                        .frame(minHeight: 32)
+                        .fixedSize(horizontal: true, vertical: false)
+                }
+                .buttonStyle(.musesCompact(selected: filter == item))
+                .accessibilityAddTraits(filter == item ? .isSelected : [])
+            }
+        }
+    }
 
-            // Sort Menu
-            ChromeIconMenu(systemName: "arrow.up.arrow.down", title: tr("Sort", "排序")) {
-                ForEach(ReleaseSort.allCases) { s in
-                    Button {
-                        sort = s
-                    } label: {
-                        HStack {
-                            Text(s.localizedTitle)
-                            if sort == s {
-                                Image(systemName: "checkmark")
-                            }
+    private var releaseSortMenu: some View {
+        ChromeIconMenu(systemName: "arrow.up.arrow.down", title: tr("Sort", "排序")) {
+            ForEach(ReleaseSort.allCases) { s in
+                Button {
+                    sort = s
+                } label: {
+                    HStack {
+                        Text(s.localizedTitle)
+                        if sort == s {
+                            Image(systemName: "checkmark")
                         }
                     }
                 }
             }
-            .help(sort.localizedTitle)
         }
+        .help(sort.localizedTitle)
     }
 
     private func load() {
@@ -356,100 +373,110 @@ struct CatalogReleaseDetailView: View {
     }
 
     private var heroBanner: some View {
-        HStack(alignment: .top, spacing: 28) {
-            // Artwork
-            ArtworkView(
-                source: ArtworkSource.resolve(
-                    remoteURL: currentRelease.artworkURL,
-                    youTubeId: currentRelease.tracks.first?.youTubeId
-                ),
-                cornerRadius: 14,
-                glyphSize: 64,
-                targetSize: 220,
-                targetHeight: 220
-            )
-            .frame(width: 220, height: 220)
-            .shadow(color: Color.black.opacity(0.35), radius: 16, y: 8)
-
-            // Metadata & Controls
-            VStack(alignment: .leading, spacing: 10) {
-                Text(currentRelease.kind == .single ? tr("SINGLE", "单曲") : (currentRelease.kind == .ep ? tr("EP", "EP") : tr("ALBUM", "专辑")))
-                    .font(MusesTypography.system(size: 10, weight: .bold))
-                    .foregroundStyle(BrandColors.accent)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(BrandColors.accent.opacity(0.12), in: Capsule())
-
-                Text(currentRelease.title)
-                    .font(MusesTypography.system(size: 26, weight: .bold))
-                    .foregroundStyle(BrandColors.textPrimary)
-                    .lineLimit(2)
-
-                Button {
-                    NotificationCenter.default.post(
-                        name: .musesNavigateToArtist,
-                        object: currentRelease.artistStableID ?? currentRelease.artistName
-                    )
-                } label: {
-                    HStack(spacing: 4) {
-                        Text(currentRelease.artistName)
-                            .font(MusesTypography.system(size: 16, weight: .semibold))
-                            .foregroundStyle(BrandColors.accent)
-                        Image(systemName: "chevron.right")
-                            .font(MusesTypography.system(size: 11, weight: .bold))
-                            .foregroundStyle(BrandColors.accent.opacity(0.8))
-                    }
-                }
-                .buttonStyle(.fullAreaPlain)
-                .disabled(currentRelease.artistStableID == nil)
-
-                HStack(spacing: 6) {
-                    if let year = currentRelease.year {
-                        Text("\(year)")
-                        Text("•")
-                    }
-                    Text(tr("\(currentRelease.tracks.count) songs", "\(currentRelease.tracks.count) 首歌曲", zhHant: "\(currentRelease.tracks.count) 首歌曲"))
-                    if totalDurationSeconds > 0 {
-                        Text("•")
-                        Text(formattedDuration)
-                    }
-                }
-                .font(MusesTypography.system(size: 12))
-                .foregroundStyle(BrandColors.textSecondary)
-
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: 28) {
+                heroArtwork
+                heroInformation.frame(height: 220)
                 Spacer()
+            }
+            VStack(alignment: .leading, spacing: 16) {
+                heroArtwork
+                heroInformation
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
 
-                // Actions row
-                HStack(spacing: 12) {
-                    ChromeIconButton(systemName: "play.fill", help: tr("Play All", "播放全部"),
-                                     accessibility: tr("Play All", "播放全部"), action: playAll)
-                        .disabled(currentRelease.tracks.isEmpty)
-                    ChromeIconButton(systemName: "shuffle", help: tr("Shuffle", "随机播放"),
-                                     accessibility: tr("Shuffle", "随机播放"), action: shuffle)
-                        .disabled(currentRelease.tracks.isEmpty)
-                    ChromeIconButton(systemName: "cloud", help: tr("Online Tracklist", "在线曲目"),
-                                     accessibility: tr("Online Tracklist", "在线曲目"), action: checkOnlineTracklist)
-                        .disabled(isLoadingOnlineTracks)
-                    if isLoadingOnlineTracks { ProgressView().controlSize(.small) }
+    private var heroArtwork: some View {
+        ArtworkView(
+            source: ArtworkSource.resolve(
+                remoteURL: currentRelease.artworkURL,
+                youTubeId: currentRelease.tracks.first?.youTubeId
+            ),
+            cornerRadius: 14,
+            glyphSize: 64,
+            targetSize: 220,
+            targetHeight: 220
+        )
+        .frame(width: 220, height: 220)
+        .shadow(color: Color.black.opacity(0.35), radius: 16, y: 8)
+    }
 
-                    if YouTubeCatalogLink.releaseURL(stableID: currentRelease.stableID) != nil {
-                        Button {
-                            if let first = currentRelease.tracks.first { PlaybackPresentation.video(first, context: currentRelease.tracks, source: .album, playback: playback) }
-                            else { checkOnlineTracklist() }
-                        } label: {
-                            YouTubeMark(size: 14)
-                                .padding(8)
-                                .background(BrandColors.surface, in: Circle())
-                                .overlay(Circle().stroke(BrandColors.hairline, lineWidth: 1))
-                        }
-                        .buttonStyle(.fullAreaPlain)
-                        .help(tr("Floating video", "悬浮视频"))
-                    }
+    private var heroInformation: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(currentRelease.kind == .single ? tr("SINGLE", "单曲") : (currentRelease.kind == .ep ? tr("EP", "EP") : tr("ALBUM", "专辑")))
+                .font(MusesTypography.system(size: 10, weight: .bold))
+                .foregroundStyle(BrandColors.accent)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(BrandColors.accent.opacity(0.12), in: Capsule())
+
+            Text(currentRelease.title)
+                .font(MusesTypography.system(size: 26, weight: .bold))
+                .foregroundStyle(BrandColors.textPrimary)
+                .lineLimit(2)
+
+            Button {
+                NotificationCenter.default.post(
+                    name: .musesNavigateToArtist,
+                    object: currentRelease.artistStableID ?? currentRelease.artistName
+                )
+            } label: {
+                HStack(spacing: 4) {
+                    Text(currentRelease.artistName)
+                        .font(MusesTypography.system(size: 16, weight: .semibold))
+                        .foregroundStyle(BrandColors.accent)
+                    Image(systemName: "chevron.right")
+                        .font(MusesTypography.system(size: 11, weight: .bold))
+                        .foregroundStyle(BrandColors.accent.opacity(0.8))
                 }
             }
-            .frame(height: 220)
+            .buttonStyle(.fullAreaPlain)
+            .disabled(currentRelease.artistStableID == nil)
+
+            HStack(spacing: 6) {
+                if let year = currentRelease.year {
+                    Text("\(year)")
+                    Text("•")
+                }
+                Text(tr("\(currentRelease.tracks.count) songs", "\(currentRelease.tracks.count) 首歌曲", zhHant: "\(currentRelease.tracks.count) 首歌曲"))
+                if totalDurationSeconds > 0 {
+                    Text("•")
+                    Text(formattedDuration)
+                }
+            }
+            .font(MusesTypography.system(size: 12))
+            .foregroundStyle(BrandColors.textSecondary)
 
             Spacer()
+
+            // Actions row
+            HStack(spacing: 12) {
+                ChromeIconButton(systemName: "play.fill", help: tr("Play All", "播放全部"),
+                                 accessibility: tr("Play All", "播放全部"), action: playAll)
+                    .disabled(currentRelease.tracks.isEmpty)
+                ChromeIconButton(systemName: "shuffle", help: tr("Shuffle", "随机播放"),
+                                 accessibility: tr("Shuffle", "随机播放"), action: shuffle)
+                    .disabled(currentRelease.tracks.isEmpty)
+                ChromeIconButton(systemName: "cloud", help: tr("Online Tracklist", "在线曲目"),
+                                 accessibility: tr("Online Tracklist", "在线曲目"), action: checkOnlineTracklist)
+                    .disabled(isLoadingOnlineTracks)
+                if isLoadingOnlineTracks { ProgressView().controlSize(.small) }
+
+                if YouTubeCatalogLink.releaseURL(stableID: currentRelease.stableID) != nil {
+                    Button {
+                        if let first = currentRelease.tracks.first { PlaybackPresentation.video(first, context: currentRelease.tracks, source: .album, playback: playback) }
+                        else { checkOnlineTracklist() }
+                    } label: {
+                        YouTubeMark(size: 14)
+                            .padding(8)
+                            .background(BrandColors.surface, in: Circle())
+                            .overlay(Circle().stroke(BrandColors.hairline, lineWidth: 1))
+                    }
+                    .buttonStyle(.fullAreaPlain)
+                    .help(tr("Floating video", "悬浮视频"))
+                }
+            }
         }
     }
 
@@ -1018,67 +1045,79 @@ struct CatalogArtistDetailView: View {
     }
 
     private var heroBanner: some View {
-        HStack(spacing: 24) {
-            // Circular avatar
-            ArtworkView(
-                source: ArtworkSource.resolve(
-                    remoteURL: currentArtist.artworkURL,
-                    youTubeId: currentArtist.tracks.first?.youTubeId
-                ),
-                cornerRadius: 70,
-                glyphSize: 50,
-                targetSize: 140,
-                targetHeight: 140
-            )
-            .frame(width: 140, height: 140)
-            .clipShape(Circle())
-            .shadow(color: Color.black.opacity(0.35), radius: 12, y: 6)
-
-            VStack(alignment: .leading, spacing: 8) {
-                Text(currentArtist.name)
-                    .font(MusesTypography.system(size: 30, weight: .bold))
-                    .foregroundStyle(BrandColors.textPrimary)
-
-                HStack(spacing: 8) {
-                    Text(tr("\(currentArtist.tracks.count) songs in library", "\(currentArtist.tracks.count) 首歌曲在资料库", zhHant: "\(currentArtist.tracks.count) 首歌曲在資料庫"))
-                    if !currentArtist.releases.isEmpty {
-                        Text("•")
-                        Text(tr("\(currentArtist.releases.count) albums", "\(currentArtist.releases.count) 张专辑", zhHant: "\(currentArtist.releases.count) 張專輯"))
-                    }
-                }
-                .font(MusesTypography.system(size: 13))
-                .foregroundStyle(BrandColors.textSecondary)
-
-                HStack(spacing: 12) {
-                    ChromeIconButton(systemName: "play.fill", help: tr("Play All", "播放全部"),
-                                     accessibility: tr("Play All", "播放全部"), action: playAll)
-                        .disabled(currentArtist.tracks.isEmpty)
-                    ChromeIconButton(systemName: "shuffle", help: tr("Shuffle", "随机播放"),
-                                     accessibility: tr("Shuffle", "随机播放"), action: shuffle)
-                        .disabled(currentArtist.tracks.isEmpty)
-                    ChromeIconButton(systemName: "cloud", help: tr("Explore Online", "在线曲目"),
-                                     accessibility: tr("Explore Online", "在线曲目"), action: toggleOnlineDiscovery)
-                        .disabled(isLoadingOnline)
-                    if isLoadingOnline { ProgressView().controlSize(.small) }
-
-                    if YouTubeCatalogLink.artistURL(stableID: currentArtist.stableID) != nil {
-                        Button {
-                            if let first = orderedTracks.first { PlaybackPresentation.video(first, context: orderedTracks, source: .artist, playback: playback) }
-                            else { toggleOnlineDiscovery() }
-                        } label: {
-                            YouTubeMark(size: 14)
-                                .padding(8)
-                                .background(BrandColors.surface, in: Circle())
-                                .overlay(Circle().stroke(BrandColors.hairline, lineWidth: 1))
-                        }
-                        .buttonStyle(.fullAreaPlain)
-                        .help(tr("Floating video", "悬浮视频"))
-                    }
-                }
-                .padding(.top, 4)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 24) {
+                heroArtwork
+                heroInformation
+                Spacer()
             }
+            VStack(alignment: .leading, spacing: 16) {
+                heroArtwork
+                heroInformation
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
 
-            Spacer()
+    private var heroArtwork: some View {
+        ArtworkView(
+            source: ArtworkSource.resolve(
+                remoteURL: currentArtist.artworkURL,
+                youTubeId: currentArtist.tracks.first?.youTubeId
+            ),
+            cornerRadius: 70,
+            glyphSize: 50,
+            targetSize: 140,
+            targetHeight: 140
+        )
+        .frame(width: 140, height: 140)
+        .clipShape(Circle())
+        .shadow(color: Color.black.opacity(0.35), radius: 12, y: 6)
+    }
+
+    private var heroInformation: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(currentArtist.name)
+                .font(MusesTypography.system(size: 30, weight: .bold))
+                .foregroundStyle(BrandColors.textPrimary)
+
+            HStack(spacing: 8) {
+                Text(tr("\(currentArtist.tracks.count) songs in library", "\(currentArtist.tracks.count) 首歌曲在资料库", zhHant: "\(currentArtist.tracks.count) 首歌曲在資料庫"))
+                if !currentArtist.releases.isEmpty {
+                    Text("•")
+                    Text(tr("\(currentArtist.releases.count) albums", "\(currentArtist.releases.count) 张专辑", zhHant: "\(currentArtist.releases.count) 張專輯"))
+                }
+            }
+            .font(MusesTypography.system(size: 13))
+            .foregroundStyle(BrandColors.textSecondary)
+
+            HStack(spacing: 12) {
+                ChromeIconButton(systemName: "play.fill", help: tr("Play All", "播放全部"),
+                                 accessibility: tr("Play All", "播放全部"), action: playAll)
+                    .disabled(currentArtist.tracks.isEmpty)
+                ChromeIconButton(systemName: "shuffle", help: tr("Shuffle", "随机播放"),
+                                 accessibility: tr("Shuffle", "随机播放"), action: shuffle)
+                    .disabled(currentArtist.tracks.isEmpty)
+                ChromeIconButton(systemName: "cloud", help: tr("Explore Online", "在线曲目"),
+                                 accessibility: tr("Explore Online", "在线曲目"), action: toggleOnlineDiscovery)
+                    .disabled(isLoadingOnline)
+                if isLoadingOnline { ProgressView().controlSize(.small) }
+
+                if YouTubeCatalogLink.artistURL(stableID: currentArtist.stableID) != nil {
+                    Button {
+                        if let first = orderedTracks.first { PlaybackPresentation.video(first, context: orderedTracks, source: .artist, playback: playback) }
+                        else { toggleOnlineDiscovery() }
+                    } label: {
+                        YouTubeMark(size: 14)
+                            .padding(8)
+                            .background(BrandColors.surface, in: Circle())
+                            .overlay(Circle().stroke(BrandColors.hairline, lineWidth: 1))
+                    }
+                    .buttonStyle(.fullAreaPlain)
+                    .help(tr("Floating video", "悬浮视频"))
+                }
+            }
+            .padding(.top, 4)
         }
     }
 
