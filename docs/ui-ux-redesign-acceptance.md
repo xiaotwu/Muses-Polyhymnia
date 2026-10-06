@@ -657,3 +657,28 @@ The adapter now listens to NSOutlineView.selectionDidChangeNotification as well 
 Seven focused tests passed0.032s after the expected old-source failure; full858tests/113suites passed25.546s. Probe-free Release passed72.42s and the isolated Developer ID strict/deep signature passed. With the actual main window explicitly raised, Large regular Home→End selected the correct first/current and canonical last occurrences. Exhaustive AX traversal exceeded the tool's20s budget this round, so no completed full-traversal cell is inferred. Background key routing is additionally refused by the driver when same-process capture windows make its target ambiguous. A real-keyboard comparison was requested to distinguish that tool limitation from application behavior; an unanswered request is not a pass.
 
 Temporary key-event and selection/focus probes have been removed. Their diagnostic results did not establish a cause for the intermittent selection loss. Native Move Down on the preceding probe-free candidate actually swapped the intended adjacent collection rows while preserving current playback and count; pointer drag remained unverifiable. All27tables/full preferences were restored and compared before this candidate, integrityOK, and the four OS settings remain restored off. XW-49 and the broader ordered acceptance remain In Progress.
+
+
+## Human Queue boundary comparison and restoration — 2026-10-06
+
+The user confirmed genuine Home/End selected and displayed first/last after clicking a Queue occurrence in the signed 42c9eb5 isolated guest. This accepts the real-keyboard comparison without proving the cause of every synthetic input failure. Bounded native frame inspection reached all662 rows and retained selected659 inside the regular and compact viewport. Full child accessibility traversal still exceeded the driver's20s budget and is not recorded as complete. The guest exited; original27tables/fullpreferences were compared restored and database integrity passed. All four temporary OS flags remain restored off.
+
+XW-54's first explicit NSColor foreground candidate was rejected: Light inactive gray selection retained white text, and native More tint did not follow the content. Its tests/build are compilation evidence only. That candidate and the inferred SwiftUI focus/window emphasis state have been withdrawn. The next candidate reuses the already accepted CollectionTableForegroundStyle semantic background-prominence resolution; rendered acceptance is pending. No broad stage is closed.
+
+
+## Queue semantic-foreground candidate — 2026-10-06
+
+The new candidate is eight insertions/seven deletions in QueueDrawerView: reuse CollectionTableForegroundStyle for title, artist, lock, group disclosure/name/count and More, including matching native menu tint. It does not add selection, focus or window state and leaves occurrence identity, native background, row geometry and menu operations unchanged. Light gray nonactive current/collection rows now retain readable reading colors and matching More glyphs in rendered captures. Blue active selection confirmation was requested; Dark and auxiliary accessibility appearances are still pending.
+
+Exact candidate Release passed68.49s and isolated strict/deep Developer ID verification passed. Full858tests/113suites passed24.339s. These checks do not replace pending rendered cells. After fresh process/UID/type/timestamp/content checks,213 source-attributed test roots from six exact completed test-log windows were removed; the private manifest is retained. The guest remains active only for this validation; final restoration/cleanup is still required.
+
+
+The semantic candidate additionally rendered Dark canonical tail with selection visible after Tab/Shift-Tab input (Keyboard Navigation off; complete focus traversal is not claimed). Light current selection, lock and More remain readable under separately enabled Increase Contrast and Reduce Transparency. The contrast capture initially retained a small preceding scroll offset and clipped the title under its sticky section header; explicit upward wheel scrolling returned the full row. This is not recorded as a first-key boundary pass. Both temporary display flags were read back off, Color Filters remained off/intensity1, and task-created System Settings exited. Blue active selection confirmation still remains pending.
+
+
+## Minimum Diagnostics configuration-preview cancellation — 2026-10-06
+
+Independent Diagnostics was verified at520×512 outer (520×480 content) through native exact-window frame readback. The Muses configuration disclosure opened through its actual triangle; the None→Chrome draft enabled Preview. The rendered sheet displayed current None/new Chrome, its scope explanation and both Cancel/Apply completely. Cancel dismissed; reopening Preview still reported current None, and Escape independently dismissed it. No Apply or browser-cookie request was made. Closing/reopening Diagnostics reset the draft toNone and disabledPreview. The independent window was closed afterward; main Home, paused20s/80% and the Light current Queue selection were restored. This accepts the minimum configuration-preview cancellation cell, not the remaining auxiliary/focus/catalog/macOS26 matrix.
+
+
+XW-49 is now scopedDone after retained boundary/far-selection/section/wheel/focus-handoff evidence, native MoveDown and genuine userHome/End confirmation on42c9eb5. Its repair round was stopped/restored before the guest was reused for XW-54. Full child AX20s tool limit and pointer-drag acceptance remain explicit limitations; no drag implementation changed, and broader26/31 retains that interaction cell. Closing49 does not close25/26/31/19/27 or the externalmacOS26 runtime cell.
