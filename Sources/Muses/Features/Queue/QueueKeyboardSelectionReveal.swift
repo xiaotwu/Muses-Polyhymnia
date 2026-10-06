@@ -23,7 +23,8 @@ struct QueueKeyboardSelectionReveal: NSViewRepresentable {
             table = candidate
             previousPostsFrameChanges = candidate.postsFrameChangedNotifications
             candidate.postsFrameChangedNotifications = true
-            for name in [NSView.frameDidChangeNotification, NSTableView.selectionDidChangeNotification] {
+            for name in [NSView.frameDidChangeNotification, NSTableView.selectionDidChangeNotification,
+                         NSOutlineView.selectionDidChangeNotification] {
                 observers.append(NotificationCenter.default.addObserver(
                     forName: name, object: candidate, queue: .main
                 ) { [weak self] _ in

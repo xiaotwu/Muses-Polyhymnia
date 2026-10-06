@@ -97,6 +97,28 @@ struct QueueKeyboardSelectionRevealTests {
         #expect(table.revealed == [659])
     }
 
+    @Test func outlineSelectionChangeRevealsWithoutDocumentGrowth() async {
+        let table = Table()
+        let coordinator = QueueKeyboardSelectionReveal.Coordinator()
+        coordinator.attach(table)
+        defer { coordinator.detach() }
+        coordinator.receive(revision: 1)
+        await withCheckedContinuation { continuation in
+            DispatchQueue.main.async { continuation.resume() }
+        }
+        #expect(table.revealed.isEmpty)
+        table.selection = 650
+        table.selectedRect.origin.y = 29_000
+        // macOS Lists may use NSOutlineView, which publishes its own selection notification.
+        // No frame change or new keyboard revision accompanies this native handoff.
+        NotificationCenter.default.post(name: NSOutlineView.selectionDidChangeNotification, object: table)
+        await withCheckedContinuation { continuation in
+            DispatchQueue.main.async { continuation.resume() }
+        }
+        #expect(table.revealed == [650])
+        #expect(table.selection == 650)
+    }
+
     @Test func oversizedRowDoesNotOscillateWhenItsLeadingEdgeIsVisible() {
         let table = Table()
         table.selectedRect = NSRect(x: 0, y: 100, width: 360, height: 200)
