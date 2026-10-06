@@ -31,6 +31,7 @@ struct QueueDrawerView: View {
     @State private var historyExpanded = false
     @State private var groupsExpanded = false
     @State private var selectedRow: QueueListSelection?
+    @State private var keyboardRevealRevision = 0
     @State private var showsSmartShuffleInfo = false
     @State private var smartShuffleFocusTask: Task<Void, Never>?
     @FocusState private var smartShuffleInfoFocused: Bool
@@ -250,6 +251,7 @@ struct QueueDrawerView: View {
                 groupsSection
                 historySection
             }
+            .background(QueueKeyboardSelectionReveal(revision: keyboardRevealRevision))
             .listStyle(.plain)
             .listRowSeparator(.visible)
             .scrollContentBackground(.hidden)
@@ -653,6 +655,7 @@ struct QueueDrawerView: View {
         guard renameTarget == nil, pendingRemoval == nil, !showsSmartShuffleInfo,
               let selection, visibleRowSelections.contains(selection) else { return .ignored }
         selectedRow = selection
+        keyboardRevealRevision += 1
         focusedTarget = .list
         proxy.scrollTo(selection)
         return .handled
