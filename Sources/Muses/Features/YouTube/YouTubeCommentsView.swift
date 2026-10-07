@@ -5,15 +5,7 @@ struct YouTubeCommentsView: View {
     let videoID: String
     let onClose: () -> Void
     @Environment(YouTubeAccountService.self) private var account
-    @State private var threads: [YouTubeCommentThread] = []
-    @State private var nextToken: String?
-    @State private var loading = false
-    @State private var errorMessage: String?
-    @State private var selectedThread: YouTubeCommentThread?
-    @State private var replies: [YouTubeComment] = []
-    @State private var nextReplyToken: String?
-    @State private var task: Task<Void, Never>?
-    @State private var requestID = UUID()
+    @State private var browser = YouTubeCommentBrowser()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -43,77 +35,60 @@ struct YouTubeCommentsView: View {
                                                  "连接账号后即可在这里阅读评论。",
                                                  zhHant: "連接帳號後即可在這裡閱讀留言。")))
                     } else {
-                        if let errorMessage {
+                        if let errorMessage = browser.errorMessage {
                             HStack {
                                 Text(errorMessage).font(MusesTypography.callout)
                                 Button(tr("Retry", "重试", zhHant: "重試")) {
-                                    if selectedThread == nil { loadThreads(reset: threads.isEmpty) }
-                                    else { loadReplies(reset: replies.isEmpty) }
+                                    browser.retry()
                                 }
                             }
                         }
-                        if let selectedThread {
+                        if let selectedThread = browser.selectedThread {
                             Button(tr("Close replies", "收起回复", zhHant: "收起回覆")) {
-                                task?.cancel()
-                                requestID = UUID()
-                                loading = false
-                                self.selectedThread = nil
-                                replies = []
-                                nextReplyToken = nil
-                                errorMessage = nil
+                                browser.closeReplies()
                             }
                             Text(selectedThread.topLevelComment.text).font(MusesTypography.body)
                             Divider()
-                            ForEach(replies) { reply in commentRow(reply) }
-                            if nextReplyToken != nil {
+                            ForEach(browser.replies) { reply in commentRow(reply) }
+                            if browser.nextReplyToken != nil {
                                 Button(tr("Load more replies", "加载更多回复", zhHant: "載入更多回覆")) {
-                                    loadReplies(reset: false)
-                                }.disabled(loading)
+                                    browser.loadMoreReplies()
+                                }.disabled(browser.loading)
                             }
                         } else {
-                            ForEach(threads) { thread in
+                            ForEach(browser.threads) { thread in
                                 VStack(alignment: .leading, spacing: 5) {
                                     commentRow(thread.topLevelComment)
                                     if thread.totalReplyCount > 0 {
                                         Button(tr("View replies", "查看回复", zhHant: "查看回覆")
                                                + " (\(thread.totalReplyCount))") {
-                                            self.selectedThread = thread
-                                            replies = []
-                                            nextReplyToken = nil
-                                            loadReplies(reset: true)
+                                            browser.selectReplies(thread)
                                         }.font(MusesTypography.caption)
                                     }
                                 }
                                 Divider()
                             }
-                            if nextToken != nil {
+                            if browser.nextToken != nil {
                                 Button(tr("Load more comments", "加载更多评论", zhHant: "載入更多留言")) {
-                                    loadThreads(reset: false)
-                                }.disabled(loading)
+                                    browser.loadMoreThreads()
+                                }.disabled(browser.loading)
                             }
-                            if threads.isEmpty && !loading && errorMessage == nil {
+                            if browser.threads.isEmpty && !browser.loading && browser.errorMessage == nil {
                                 Text(tr("No comments available.", "暂无可用评论。", zhHant: "暫無可用留言。"))
                                     .foregroundStyle(.secondary)
                             }
                         }
-                        if loading { ProgressView().controlSize(.small) }
+                        if browser.loading { ProgressView().controlSize(.small) }
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(20)
             }
         }
-        .task(id: videoID + "|" + (account.activeChannelID ?? "")) {
-            task?.cancel()
-            requestID = UUID()
-            loading = false
-            threads = []
-            nextToken = nil
-            selectedThread = nil
-            replies = []
-            if account.isConnected { loadThreads(reset: true) }
+        .task(id: videoID + "|" + (account.activeChannelID ?? "") + "|\(account.isConnected)") {
+            browser.reset(videoID: videoID, client: account.dataAPIClient())
         }
-        .onDisappear { task?.cancel(); requestID = UUID() }
+        .onDisappear { browser.cancel() }
     }
 
     private func commentRow(_ comment: YouTubeComment) -> some View {
@@ -126,58 +101,5 @@ struct YouTubeCommentsView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func loadThreads(reset: Bool) {
-        guard let client = account.dataAPIClient(), !loading else { return }
-        task?.cancel()
-        requestID = UUID()
-        let expected = requestID
-        let token = reset ? nil : nextToken
-        loading = true
-        errorMessage = nil
-        task = Task {
-            do {
-                let page = try await client.commentThreads(videoID: videoID, pageToken: token)
-                guard !Task.isCancelled, requestID == expected else { return }
-                if reset { threads = page.items }
-                else {
-                    var seen = Set(threads.map(\.id))
-                    threads += page.items.filter { seen.insert($0.id).inserted }
-                }
-                nextToken = page.nextPageToken
-            } catch {
-                guard !Task.isCancelled, requestID == expected else { return }
-                errorMessage = error.localizedDescription
-            }
-            if requestID == expected { loading = false }
-        }
-    }
-
-    private func loadReplies(reset: Bool) {
-        guard let client = account.dataAPIClient(), let selectedThread, !loading else { return }
-        task?.cancel()
-        requestID = UUID()
-        let expected = requestID
-        let token = reset ? nil : nextReplyToken
-        loading = true
-        errorMessage = nil
-        task = Task {
-            do {
-                let page = try await client.commentReplies(parentID: selectedThread.topLevelComment.id,
-                                                           pageToken: token)
-                guard !Task.isCancelled, requestID == expected else { return }
-                if reset { replies = page.items }
-                else {
-                    var seen = Set(replies.map(\.id))
-                    replies += page.items.filter { seen.insert($0.id).inserted }
-                }
-                nextReplyToken = page.nextPageToken
-            } catch {
-                guard !Task.isCancelled, requestID == expected else { return }
-                errorMessage = error.localizedDescription
-            }
-            if requestID == expected { loading = false }
-        }
     }
 }
