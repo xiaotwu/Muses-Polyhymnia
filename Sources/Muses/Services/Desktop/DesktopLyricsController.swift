@@ -20,7 +20,7 @@ final class DesktopLyricsController {
         if enabled {
             if panel == nil {
                 let created = makePanel()
-                let host = NSHostingView(rootView:
+                let host = DesktopLyricsHostingView(rootView:
                     DesktopLyricsOverlayView()
                         .environment(playback)
                         .environment(library)
@@ -52,6 +52,20 @@ final class DesktopLyricsController {
         panel.setFrameAutosaveName("MusesDesktopLyrics")
         panel.hidesOnDeactivate = false
         return panel
+    }
+}
+
+/// The read-only lyrics surface delegates dragging to AppKit, including text hits.
+final class DesktopLyricsHostingView<Content: View>: NSHostingView<Content> {
+    // This nonactivating panel must accept a drag without a prior focus click.
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        super.hitTest(point) == nil ? nil : self
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        window?.performDrag(with: event)
     }
 }
 
