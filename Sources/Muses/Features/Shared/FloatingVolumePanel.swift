@@ -23,22 +23,26 @@ struct FloatingVolumePanel: View {
             default: return false
             }
         }) {
-            LiquidGlassVolumeBar(width: width, height: height,
-                                 showsOutput: showsOutput, focusesScaleOnAppear: true, scaleStyle: style)
-                .environment(playback)
-                .environment(audioDevices)
-                .preferredColorScheme(colorScheme)
-                .onExitCommand(perform: dismiss)
-                .onKeyPress(.escape) { dismiss(); return .handled }
-                .accessibilityElement(children: .contain)
-                .accessibilityLabel(tr("Volume", "音量"))
+            // Glass geometry belongs to the panel's own native window.
+            MusesGlassGroup {
+                LiquidGlassVolumeBar(width: width, height: height,
+                                     showsOutput: showsOutput, focusesScaleOnAppear: true, scaleStyle: style)
+                    .environment(playback)
+                    .environment(audioDevices)
+                    .preferredColorScheme(colorScheme)
+                    .onExitCommand(perform: dismiss)
+                    .onKeyPress(.escape) { dismiss(); return .handled }
+                    .accessibilityElement(children: .contain)
+                    .accessibilityLabel(tr("Volume", "音量"))
+            }
+            .frame(width: width, height: height)
         }
         .frame(width: anchorsToSpeaker ? 32 : width, height: anchorsToSpeaker ? 32 : height)
         .allowsHitTesting(false)
     }
 }
 
-private struct VolumePanelHost<Content: View>: NSViewRepresentable {
+struct VolumePanelHost<Content: View>: NSViewRepresentable {
     let width: CGFloat
     let height: CGFloat
     let anchorsToSpeaker: Bool
@@ -158,12 +162,17 @@ private struct VolumePanelHost<Content: View>: NSViewRepresentable {
                     rect.origin.y = max(screen.minY, min(rect.origin.y, screen.maxY - height))
                 }
             }
+            // Adding a child window can make it visible without making it key.
+            // Capture first presentation before AppKit changes its visibility.
+            let needsPresentation = !panel.isVisible
             panel.setFrame(rect, display: true)
             if panel.parent !== parent {
                 panel.parent?.removeChildWindow(panel)
                 parent.addChildWindow(panel, ordered: .above)
             }
-            if !panel.isVisible { panel.makeKeyAndOrderFront(nil) }
+            if needsPresentation {
+                panel.makeKeyAndOrderFront(nil)
+            }
         }
         func install() {
             monitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .leftMouseUp, .rightMouseUp, .keyDown]) { [weak self] event in
