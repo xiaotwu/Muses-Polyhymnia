@@ -391,7 +391,7 @@ struct QueueDrawerView: View {
                             } label: {
                                 Image(systemName: group.collapsed ? "chevron.right" : "chevron.down")
                                     .font(MusesTypography.caption2)
-                                    .foregroundStyle(BrandColors.textSecondary)
+                                    .foregroundStyle(CollectionTableForegroundStyle(BrandColors.textSecondary, secondary: true))
                                     .frame(width: 28, height: 28)
                             }
                             .buttonStyle(.fullAreaPlain)
@@ -400,10 +400,10 @@ struct QueueDrawerView: View {
                             .accessibilityLabel(group.collapsed
                                 ? tr("Expand \(group.name)", "展开 \(group.name)", zhHant: "展開 \(group.name)")
                                 : tr("Collapse \(group.name)", "折叠 \(group.name)", zhHant: "折疊 \(group.name)"))
-                            Text(group.name).foregroundStyle(BrandColors.textPrimary).lineLimit(1)
+                            Text(group.name).foregroundStyle(CollectionTableForegroundStyle(BrandColors.textPrimary)).lineLimit(1)
                             Spacer()
                             Text("\(itemsInGroup(group.id))")
-                                .font(MusesTypography.caption2).foregroundStyle(BrandColors.textSecondary)
+                                .font(MusesTypography.caption2).foregroundStyle(CollectionTableForegroundStyle(BrandColors.textSecondary, secondary: true))
                         }
                         .queueRowActions(title: group.name) { groupActions(group) }
                         .tag(QueueListSelection.group(group.id))
@@ -724,18 +724,18 @@ private struct QueueRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.track.title)
                     .font(MusesTypography.system(size: 13, weight: isCurrent ? .semibold : .regular))
-                    .foregroundStyle(isCurrent ? BrandColors.accent : BrandColors.textPrimary)
+                    .foregroundStyle(CollectionTableForegroundStyle(isCurrent ? BrandColors.accent : BrandColors.textPrimary))
                     .lineLimit(1)
                 Text(SongCreditCache.shared.artist(snapshot: item.track))
                     .font(MusesTypography.caption)
-                    .foregroundStyle(BrandColors.textSecondary)
+                    .foregroundStyle(CollectionTableForegroundStyle(BrandColors.textSecondary, secondary: true))
                     .lineLimit(1)
             }
             Spacer()
             if item.locked {
                 Image(systemName: "lock.fill")
                     .font(MusesTypography.caption2)
-                    .foregroundStyle(BrandColors.textSecondary)
+                    .foregroundStyle(CollectionTableForegroundStyle(BrandColors.textSecondary, secondary: true))
             }
         }
         .padding(.vertical, 4)
@@ -801,12 +801,13 @@ private extension View {
             Menu(content: actions) {
                 Image(systemName: "ellipsis")
                     .font(MusesTypography.system(size: 13, weight: .semibold))
-                    .foregroundStyle(BrandColors.textSecondary)
+                    .foregroundStyle(CollectionTableForegroundStyle(BrandColors.textSecondary, secondary: true))
                     .frame(width: 28, height: 28)
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel(tr("Options for \(title)", "\(title) 的选项"))
             }
             .menuStyle(.borderlessButton).menuIndicator(.hidden)
+            .tint(CollectionTableForegroundStyle(BrandColors.textSecondary))
             .frame(width: 28, height: 28)
             .help(tr("Options for \(title)", "\(title) 的选项"))
             .accessibilityLabel(tr("Options for \(title)", "\(title) 的选项"))
