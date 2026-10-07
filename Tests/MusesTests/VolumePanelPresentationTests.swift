@@ -23,8 +23,11 @@ struct VolumePanelPresentationTests {
             dismiss: {}, keyAction: { _ in false })
         coordinator.anchor = anchor
         coordinator.panel.alphaValue = 0
-        let host = NSHostingView(rootView: LiquidGlassVolumeBar(width: 230, height: 44,
-            drawsGlass: false, showsOutput: false, focusesScaleOnAppear: true).environment(playback))
+        let host = NSHostingView(rootView: MusesGlassGroup {
+            LiquidGlassVolumeBar(width: 230, height: 44, focusesScaleOnAppear: true)
+                .environment(playback)
+                .preferredColorScheme(.light)
+        }.frame(width: 230, height: 44))
         coordinator.panel.contentView = host
         let other = VolumePanelHost<EmptyView>.CapsulePanel(
             contentRect: NSRect(x: 0, y: 0, width: 40, height: 40),
