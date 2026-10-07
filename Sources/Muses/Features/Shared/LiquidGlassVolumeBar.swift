@@ -220,7 +220,18 @@ struct LiquidGlassVolumeBar: View {
 enum VolumeScaleMapping {
     static func volume(at x: CGFloat, width: CGFloat) -> Float {
         guard x.isFinite, width.isFinite, width > 0 else { return 0 }
-        return Float(min(1, max(0, x / width)))
+        let fraction = min(1, max(0, x / width))
+        // Give the visible ends a small hit band. Keep the middle half linear
+        // and interpolate continuously through the outer quarters.
+        let endpointFraction = min(6 / width, 0.08)
+        let quarter: CGFloat = 0.25
+        if fraction < quarter {
+            return Float(max(0, quarter * (fraction - endpointFraction) / (quarter - endpointFraction)))
+        }
+        if fraction > 1 - quarter {
+            return Float(min(1, 1 - quarter * (1 - fraction - endpointFraction) / (quarter - endpointFraction)))
+        }
+        return Float(fraction)
     }
 
     static func adjusted(_ volume: Float, delta: CGFloat) -> Float {
