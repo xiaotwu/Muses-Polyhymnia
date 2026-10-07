@@ -494,6 +494,7 @@ final class YouTubePlaylistSyncService {
         imported.lastSyncedAt = .init()
         try context.save()
         try pruneRevisions(importID: imported.id, context: context)
+        NotificationCenter.default.post(name: .musesPlaylistsChanged, object: nil)
     }
 
     // MARK: - Push journal

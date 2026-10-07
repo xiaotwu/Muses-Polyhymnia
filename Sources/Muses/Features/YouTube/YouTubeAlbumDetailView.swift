@@ -14,7 +14,7 @@ struct YouTubeAlbumDetailView: View {
     @State private var showDeleteConfirm = false
     @State private var showAddTrack = false
     @State private var writeError: String?
-    @State private var rows: [CollectionTrackRow] = []
+    @State private var collection: YouTubeImportCollectionSnapshot?
     @State private var pullPreview: YouTubePullPreview?
     @State private var pushPreview: YouTubePushPreview?
     @State private var deleteRemotePreview: YouTubePlaylistDeletePreview?
@@ -23,12 +23,7 @@ struct YouTubeAlbumDetailView: View {
         youTubeAccount.ownsPlaylist(youTubeImport.playlistId)
     }
 
-    private var items: [YouTubeImportItem] {
-        (youTubeImport.items ?? []).sorted {
-            if $0.order != $1.order { return $0.order < $1.order }
-            return $0.id.uuidString < $1.id.uuidString
-        }
-    }
+    private var rows: [CollectionTrackRow] { collection?.rows ?? [] }
 
     private func playbackSnaps() -> [TrackSnapshot] {
         rows.map(\.snapshot)
@@ -36,9 +31,9 @@ struct YouTubeAlbumDetailView: View {
 
     var body: some View {
         CollectionPage(
-            title: youTubeImport.title,
+            title: collection?.title ?? youTubeImport.title,
             subtitle: "\(metadataLine) • \(tr("Playlist Order", "歌单顺序"))",
-            youTubeURL: URL(string: youTubeImport.url),
+            youTubeURL: URL(string: collection?.url ?? youTubeImport.url),
             rows: rows,
             source: .import,
             defaultSort: .playlistOrder,
@@ -53,13 +48,15 @@ struct YouTubeAlbumDetailView: View {
                 playback.playTrack(row.snapshot, context: playbackSnaps(), from: .import)
             },
             onRemove: isOwned ? { row in
-                guard let item = items.first(where: { $0.id == row.id }) else { return }
-                removeItem(item)
+                removeItem(id: row.id)
             } : nil
         ) {
             controls
         }
-        .onAppear { reloadRows() }
+        .onChange(of: youTubeImport.id, initial: true) { _, _ in reloadRows() }
+        .onReceive(NotificationCenter.default.publisher(for: .musesPlaylistsChanged)) { _ in
+            reloadRows()
+        }
         .sheet(isPresented: $showAddTrack) {
             AddToYouTubePlaylistSheet(youTubeImport: youTubeImport)
         }
@@ -97,7 +94,7 @@ struct YouTubeAlbumDetailView: View {
                 title: tr("Delete this YouTube playlist import?", "删除此 YouTube 歌单导入？"),
                 explanation: tr("The local playlist moves to Recently Deleted for 30 days. YouTube is not changed.",
                                 "本地歌单会移入“最近删除”并保留 30 天；YouTube 不会被修改。"),
-                itemTitles: items.map { $0.track?.title ?? $0.title },
+                itemTitles: rows.map(\.snapshot.title),
                 onCancel: { showDeleteConfirm = false },
                 onDelete: {
                     showDeleteConfirm = false
@@ -171,10 +168,10 @@ struct YouTubeAlbumDetailView: View {
 
     /// Metadata: channel • track count • total duration.
     private var metadataLine: String {
-        let count = items.count
-        var parts: [String] = [youTubeImport.channel]
+        let count = rows.count
+        var parts: [String] = [collection?.channel ?? youTubeImport.channel]
         parts.append("\(count) \(count == 1 ? tr("song", "首") : tr("songs", "首"))")
-        let totalMs = items.reduce(0) { $0 + $1.durationMs }
+        let totalMs = collection?.totalDurationMs ?? 0
         if totalMs > 0 {
             let totalSec = totalMs / 1000
             parts.append(formatDuration(Double(totalSec)))
@@ -183,31 +180,14 @@ struct YouTubeAlbumDetailView: View {
     }
 
     private func reloadRows() {
-        rows = items.map { collectionRow(for: $0) }
+        collection = importService.collectionSnapshot(importID: youTubeImport.id)
     }
 
-    private func collectionRow(for item: YouTubeImportItem) -> CollectionTrackRow {
-        if let track = item.track {
-            return CollectionTrackRow(track: track, canonicalIndex: item.order,
-                                      collectionItemID: item.id,
-                                      collectionOwner: youTubeImport.channel,
-                                      collectionTitle: YouTubePlaylistID.isMusicAlbum(youTubeImport.playlistId) ? nil : youTubeImport.title)
-        }
-        return CollectionTrackRow(
-            snapshot: snapshot(for: item),
-            canonicalIndex: item.order,
-            addedAt: youTubeImport.importedAt,
-            collectionItemID: item.id,
-            collectionOwner: youTubeImport.channel,
-            collectionTitle: YouTubePlaylistID.isMusicAlbum(youTubeImport.playlistId) ? nil : youTubeImport.title
-        )
-    }
-
-    private func removeItem(_ item: YouTubeImportItem) {
+    private func removeItem(id itemID: UUID) {
         do {
             _ = try playlistSync.saveLocalRevision(importID: youTubeImport.id)
             guard importService.removeRemoteItem(
-                importId: youTubeImport.id, itemId: item.id) else {
+                importId: youTubeImport.id, itemId: itemID) else {
                 throw YouTubeImportError.notFound
             }
             writeError = nil
@@ -215,20 +195,6 @@ struct YouTubeAlbumDetailView: View {
         } catch {
             writeError = error.localizedDescription
         }
-    }
-
-    private func snapshot(for item: YouTubeImportItem) -> TrackSnapshot {
-        if let t = item.track { return TrackSnapshot(from: t) }
-        return TrackSnapshot(
-            id: item.id,
-            title: item.title,
-            artist: item.artist,
-            albumTitle: YouTubePlaylistID.isMusicAlbum(youTubeImport.playlistId) ? youTubeImport.title : nil,
-            durationSeconds: Double(item.durationMs) / 1000,
-            youTubeId: item.youTubeId,
-            artworkUrl: YouTubeThumbnail.urlString(videoId: item.youTubeId),
-            sampleRate: nil, bitDepth: nil, codec: nil, isLossless: false
-        )
     }
 
     private func playAll() {

@@ -6,6 +6,68 @@ import SwiftData
 @MainActor
 @Suite("YouTubeImportService", .serialized)
 struct YouTubeImportServiceTests {
+    @Test("Collection projection re-fetches committed membership, metadata and duplicate occurrences")
+    func committedCollectionProjection() throws {
+        let container = try makeModelContainer(inMemory: true)
+        let context = ModelContext(container)
+        let imported = YouTubeImport(playlistId: "PLprojection", url: "old", title: "Old", channel: "Owner")
+        let track = Track(title: "Edited title", artist: "Edited artist", youTubeId: "abcdefghijk", liked: true)
+        let first = YouTubeImportItem(youTubeId: track.youTubeId, title: "Remote title", artist: "Owner", durationMs: 1000, order: 1)
+        let second = YouTubeImportItem(youTubeId: track.youTubeId, title: "Remote title", artist: "Owner", durationMs: 1000, order: 0)
+        first.track = track; second.track = track
+        first.import_ = imported; second.import_ = imported
+        imported.items = [first, second]
+        context.insert(imported); context.insert(track)
+        try context.save()
+        let service = makeService(bridge: MockImportBridge(), container: container)
+        let before = try #require(service.collectionSnapshot(importID: imported.id))
+        #expect(before.rows.map(\.id) == [second.id, first.id])
+
+        let writer = ModelContext(container)
+        let id = imported.id
+        let stored = try #require(writer.fetch(FetchDescriptor<YouTubeImport>(predicate: #Predicate { $0.id == id })).first)
+        stored.title = "Committed title"; stored.channel = "Committed owner"; stored.url = "committed"
+        for item in stored.items ?? [] { item.order = item.id == first.id ? 0 : 1 }
+        let addition = YouTubeImportItem(youTubeId: "track_b0000", title: "New fallback", artist: "New artist", durationMs: 3000, order: 2)
+        addition.import_ = stored
+        stored.items = (stored.items ?? []) + [addition]
+        writer.insert(addition)
+        try writer.save()
+
+        let after = try #require(service.collectionSnapshot(importID: id))
+        #expect(before.rows.count == 2 && before.title == "Old")
+        #expect(after.title == "Committed title" && after.channel == "Committed owner" && after.url == "committed")
+        #expect(after.totalDurationMs == 5000)
+        #expect(after.rows.map(\.id) == [first.id, second.id, addition.id])
+        #expect(after.rows.map(\.canonicalIndex) == [0, 1, 2])
+        #expect(after.rows.map(\.snapshot.id) == [track.id, track.id, addition.id])
+        #expect(after.rows.map(\.snapshot.title) == ["Edited title", "Edited title", "New fallback"])
+        #expect(after.rows.allSatisfy { $0.collectionOwner == "Committed owner" && $0.collectionTitle == "Committed title" })
+        #expect(after.rows.last?.addedAt == stored.importedAt)
+        let savedTrack = try #require(ModelContext(container).fetch(FetchDescriptor<Track>()).first)
+        #expect(savedTrack.id == track.id && savedTrack.liked && savedTrack.artist == "Edited artist")
+    }
+
+    @Test("Collection projection excludes deleted or missing imports without reusing retained rows")
+    func unavailableCollectionProjection() throws {
+        let container = try makeModelContainer(inMemory: true)
+        let context = ModelContext(container)
+        let imported = YouTubeImport(playlistId: "PLdeleted", url: "", title: "Collection", channel: "Owner")
+        let item = YouTubeImportItem(youTubeId: "abcdefghijk", title: "Song", artist: "Artist", order: 0)
+        item.import_ = imported; imported.items = [item]
+        context.insert(imported)
+        try context.save()
+        let service = makeService(bridge: MockImportBridge(), container: container)
+        #expect(service.collectionSnapshot(importID: imported.id)?.rows.count == 1)
+        #expect(service.collectionSnapshot(importID: UUID()) == nil)
+        let fresh = ModelContext(container)
+        let id = imported.id
+        let stored = try #require(fresh.fetch(FetchDescriptor<YouTubeImport>(predicate: #Predicate { $0.id == id })).first)
+        stored.deletedAt = .init()
+        try fresh.save()
+        #expect(service.collectionSnapshot(importID: id) == nil)
+    }
+
     @Test("Local imported item edits roll back save failures and reject invalid reorder indices")
     func localItemEditFailures() throws {
         let container = try makeModelContainer(inMemory: true)

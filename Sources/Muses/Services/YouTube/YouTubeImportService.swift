@@ -41,6 +41,16 @@ struct YouTubePlaylistImportPreview: Sendable {
     let entries: [YTDlpBridge.YTDlpPlaylistEntry]
 }
 
+/// A committed collection projection; retained SwiftData relationships never
+/// supply the detail page's membership or playback context after a write.
+struct YouTubeImportCollectionSnapshot: Equatable, Sendable {
+    let title: String
+    let channel: String
+    let url: String
+    let rows: [CollectionTrackRow]
+    let totalDurationMs: Int
+}
+
 /// YouTube playlist import service.
 ///
 /// Mirrors the `MetadataEnricherService` pattern: `@MainActor`, a fresh
@@ -152,6 +162,40 @@ final class YouTubeImportService {
         return CollectionTrackRow(snapshot: snapshot, canonicalIndex: 0,
             collectionOwner: owner?.channel,
             collectionTitle: owner.flatMap { YouTubePlaylistID.isMusicAlbum($0.playlistId) ? nil : $0.title })
+    }
+
+    /// Re-fetch by owner UUID on the main actor and release all model objects
+    /// before returning values to the retained deck and table.
+    func collectionSnapshot(importID: UUID) -> YouTubeImportCollectionSnapshot? {
+        let context = ModelContext(modelContainer)
+        guard let imported = fetchImportById(importID, context: context),
+              imported.deletedAt == nil else { return nil }
+        let isAlbum = YouTubePlaylistID.isMusicAlbum(imported.playlistId)
+        let items = (imported.items ?? []).sorted {
+            if $0.order != $1.order { return $0.order < $1.order }
+            return $0.id.uuidString < $1.id.uuidString
+        }
+        let rows = items.map { item in
+            if let track = item.track {
+                return CollectionTrackRow(track: track, canonicalIndex: item.order,
+                    collectionItemID: item.id, collectionOwner: imported.channel,
+                    collectionTitle: isAlbum ? nil : imported.title)
+            }
+            let snapshot = TrackSnapshot(
+                id: item.id, title: item.title, artist: item.artist,
+                albumTitle: isAlbum ? imported.title : nil,
+                durationSeconds: Double(item.durationMs) / 1000,
+                youTubeId: item.youTubeId,
+                artworkUrl: YouTubeThumbnail.urlString(videoId: item.youTubeId),
+                sampleRate: nil, bitDepth: nil, codec: nil, isLossless: false
+            )
+            return CollectionTrackRow(snapshot: snapshot, canonicalIndex: item.order,
+                addedAt: imported.importedAt, collectionItemID: item.id,
+                collectionOwner: imported.channel,
+                collectionTitle: isAlbum ? nil : imported.title)
+        }
+        return YouTubeImportCollectionSnapshot(title: imported.title, channel: imported.channel,
+            url: imported.url, rows: rows, totalDurationMs: items.reduce(0) { $0 + $1.durationMs })
     }
 
     init(bridge: any YTDlpBridgeProtocol,

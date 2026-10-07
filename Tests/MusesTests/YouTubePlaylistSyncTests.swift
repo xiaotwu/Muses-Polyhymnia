@@ -609,7 +609,13 @@ struct YouTubePlaylistSyncRecoveryTests {
             base: remote, local: local, remote: remote,
             automaticResult: local, mergePlan: plan)
         let service = makeService(container)
+        nonisolated(unsafe) var changes = 0
+        let observer = NotificationCenter.default.addObserver(
+            forName: .musesPlaylistsChanged, object: nil, queue: .main
+        ) { _ in changes += 1 }
+        defer { NotificationCenter.default.removeObserver(observer) }
         try service.applyPull(preview)
+        #expect(changes == 1)
 
         let verify = ModelContext(container)
         let stored = try #require(
@@ -679,12 +685,18 @@ struct YouTubePlaylistSyncRecoveryTests {
         context.insert(added)
         try context.save()
 
+        nonisolated(unsafe) var changes = 0
+        let observer = NotificationCenter.default.addObserver(
+            forName: .musesPlaylistsChanged, object: nil, queue: .main
+        ) { _ in changes += 1 }
+        defer { NotificationCenter.default.removeObserver(observer) }
         do {
             try makeService(container).applyPull(preview)
             Issue.record("Expected stale Local preview rejection")
         } catch let error as YouTubePlaylistSyncError {
             #expect(error == .invalidSnapshot("Local changed; preview again"))
         }
+        #expect(changes == 0)
     }
 
     @Test("incomplete Remote Shadow cannot delete Local rows through Pull")
