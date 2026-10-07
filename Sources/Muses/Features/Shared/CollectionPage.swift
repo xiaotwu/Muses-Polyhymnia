@@ -19,6 +19,7 @@ struct CollectionPage<Controls: View>: View {
     var emptyAction: (() -> Void)? = nil
     let onPlay: (CollectionTrackRow) -> Void
     var onRemove: ((CollectionTrackRow) -> Void)? = nil
+    var onMove: ((CollectionTrackRow, Int) -> Void)? = nil
     private let controls: Controls
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -45,6 +46,7 @@ struct CollectionPage<Controls: View>: View {
         emptyAction: (() -> Void)? = nil,
         onPlay: @escaping (CollectionTrackRow) -> Void,
         onRemove: ((CollectionTrackRow) -> Void)? = nil,
+        onMove: ((CollectionTrackRow, Int) -> Void)? = nil,
         @ViewBuilder controls: () -> Controls
     ) {
         self.title = title
@@ -62,6 +64,7 @@ struct CollectionPage<Controls: View>: View {
         self.emptyAction = emptyAction
         self.onPlay = onPlay
         self.onRemove = onRemove
+        self.onMove = onMove
         self.controls = controls()
     }
 
@@ -142,7 +145,8 @@ struct CollectionPage<Controls: View>: View {
                                 currentTrack: currentTrack,
                                 playlists: playlists,
                                 onPlay: onPlay,
-                                onRemove: confirmedRemoval
+                                onRemove: confirmedRemoval,
+                                onMove: onMove
                             )
                             .opacity(mode == .list ? 1 : 0)
                             .offset(y: mode == .list ? 0 : 26)
@@ -314,6 +318,7 @@ private struct CollectionListPanel: View {
     let playlists: [Playlist]
     let onPlay: (CollectionTrackRow) -> Void
     let onRemove: ((CollectionTrackRow) -> Void)?
+    let onMove: ((CollectionTrackRow, Int) -> Void)?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -329,7 +334,8 @@ private struct CollectionListPanel: View {
                 currentTrack: currentTrack,
                 playlists: playlists,
                 onPlay: onPlay,
-                onRemove: onRemove
+                onRemove: onRemove,
+                onMove: onMove
             )
         }
         .background(BrandColors.background)
@@ -344,6 +350,7 @@ private struct CollectionTrackTable: View {
     let playlists: [Playlist]
     let onPlay: (CollectionTrackRow) -> Void
     let onRemove: ((CollectionTrackRow) -> Void)?
+    let onMove: ((CollectionTrackRow, Int) -> Void)?
 
     @Environment(YouTubeImportService.self) private var importService: YouTubeImportService?
     @Environment(LibraryService.self) private var library
@@ -373,7 +380,8 @@ private struct CollectionTrackTable: View {
         currentTrack: TrackSnapshot?,
         playlists: [Playlist],
         onPlay: @escaping (CollectionTrackRow) -> Void,
-        onRemove: ((CollectionTrackRow) -> Void)?
+        onRemove: ((CollectionTrackRow) -> Void)?,
+        onMove: ((CollectionTrackRow, Int) -> Void)?
     ) {
         self.rows = rows
         self.source = source
@@ -382,6 +390,7 @@ private struct CollectionTrackTable: View {
         self.playlists = playlists
         self.onPlay = onPlay
         self.onRemove = onRemove
+        self.onMove = onMove
         _sortOrder = State(initialValue: defaultSort.comparators)
     }
 
@@ -692,6 +701,17 @@ private struct CollectionTrackTable: View {
         }
 
         if let row = firstRow(in: selectedIDs) {
+            if selectedIDs.count == 1, let onMove {
+                Button(tr("Move earlier in playlist", "在歌单中前移"), systemImage: "arrow.up") {
+                    onMove(row, -1)
+                }
+                .disabled(row.id == rows.first?.id)
+                Button(tr("Move later in playlist", "在歌单中后移"), systemImage: "arrow.down") {
+                    onMove(row, 1)
+                }
+                .disabled(row.id == rows.last?.id)
+                Divider()
+            }
             TrackContextMenuItems(
                 snapshot: row.snapshot,
                 playlists: playlists,

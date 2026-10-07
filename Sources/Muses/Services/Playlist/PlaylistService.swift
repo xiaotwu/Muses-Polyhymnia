@@ -239,7 +239,7 @@ final class PlaylistService {
         return commit(ctx)
     }
 
-    /// Drag reordering: moves the entry at `from` to `to` and renumbers order.
+    /// Moves the entry at `from` to `to` and renumbers order.
     @discardableResult
     func moveItem(in playlist: Playlist, from: Int, to: Int) -> Bool {
         let ctx = editingContext()
@@ -252,6 +252,28 @@ final class PlaylistService {
         for (idx, item) in items.enumerated() {
             item.order = idx
         }
+        stored.items = items
+        return commit(ctx)
+    }
+
+    /// Resolves the selected occurrence against current membership before a
+    /// relative move; a sorted or stale presentation index is never authority.
+    @discardableResult
+    func moveItem(id itemID: UUID, in playlistID: UUID, by offset: Int) -> Bool {
+        let ctx = editingContext()
+        guard offset == -1 || offset == 1,
+              let stored = try? ctx.fetch(FetchDescriptor<Playlist>(
+                predicate: #Predicate { $0.id == playlistID }
+              )).first else { return failed() }
+        var items = (stored.items ?? []).sorted {
+            if $0.order != $1.order { return $0.order < $1.order }
+            return $0.id.uuidString < $1.id.uuidString
+        }
+        guard let from = items.firstIndex(where: { $0.id == itemID }),
+              items.indices.contains(from + offset) else { return failed() }
+        let item = items.remove(at: from)
+        items.insert(item, at: from + offset)
+        for (index, entry) in items.enumerated() { entry.order = index }
         stored.items = items
         return commit(ctx)
     }

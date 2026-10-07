@@ -175,6 +175,73 @@ struct PlaylistServiceTests {
         #expect(items.map { $0.order } == [0, 1, 2])
     }
 
+    @Test("Relative ordering targets current item identity despite sorted and stale rows")
+    func relativeOrderingUsesIdentity() throws {
+        let container = try makeContainer()
+        let service = PlaylistService(modelContainer: container)
+        let playlist = try #require(service.create(name: "Ordered"))
+        for title in ["Z", "A", "M"] {
+            #expect(service.addTrack(playlist, track: makeTrack(in: container, title: title)))
+        }
+        let original = service.fetchItems(in: playlist.id)
+        let ids = original.map(\.id)
+        let trackIDs = original.map(\.track?.id)
+        let rows = CollectionTrackRow.playlist(from: original)
+        let sorted = CollectionTrackSort.presentationRows(rows, using: [
+            KeyPathComparator(\.title, comparator: .localizedStandard)
+        ])
+        let selected = try #require(sorted.first)
+        #expect(selected.collectionItemID == ids[1])
+        #expect(service.moveItem(id: ids[1], in: playlist.id, by: 1))
+        #expect(service.fetchItems(in: playlist.id).map(\.id) == [ids[0], ids[2], ids[1]])
+        // Reuse the original presentation after a concurrent reorder. The
+        // occurrence moves from its current position, not its old index.
+        #expect(service.moveItem(id: ids[1], in: playlist.id, by: -1))
+        #expect(service.fetchItems(in: playlist.id).map(\.id) == ids)
+        #expect(service.fetchItems(in: playlist.id).map(\.track?.id) == trackIDs)
+        #expect(service.fetchItems(in: playlist.id).map(\.order) == [0, 1, 2])
+        let other = try #require(service.create(name: "Other"))
+        #expect(!service.moveItem(id: ids[1], in: other.id, by: -1))
+        #expect(!service.moveItem(id: ids[0], in: playlist.id, by: -1))
+        #expect(!service.moveItem(id: ids[2], in: playlist.id, by: 1))
+        #expect(!service.moveItem(id: ids[1], in: playlist.id, by: Int.max))
+        #expect(service.removeItem(id: ids[1]))
+        #expect(!service.moveItem(id: ids[1], in: playlist.id, by: -1))
+        #expect(service.fetchItems(in: playlist.id).map(\.id) == [ids[0], ids[2]])
+        #expect(service.fetchItems(in: other.id).isEmpty)
+    }
+
+    @Test("Failed relative movement retains canonical membership and can be retried")
+    func relativeOrderingRollsBack() throws {
+        let container = try makeContainer()
+        let service = PlaylistService(modelContainer: container)
+        let playlist = try #require(service.create(name: "Preserved"))
+        for title in ["A", "B", "C"] {
+            #expect(service.addTrack(playlist, track: makeTrack(in: container, title: title)))
+        }
+        #expect(service.togglePin(playlist))
+        let original = service.fetchItems(in: playlist.id)
+        let ids = original.map(\.id)
+        let tracks = original.map(\.track?.id)
+        enum Failure: Error { case diskFull }
+        var attempts = 0
+        let failing = PlaylistService(modelContainer: container, saveContext: { _ in
+            attempts += 1
+            throw Failure.diskFull
+        })
+        #expect(!failing.moveItem(id: ids[1], in: playlist.id, by: -1))
+        #expect(attempts == 1 && failing.lastError != nil)
+        #expect(service.fetchItems(in: playlist.id).map(\.id) == ids)
+        #expect(service.fetchItems(in: playlist.id).map(\.track?.id) == tracks)
+        #expect(service.fetchItems(in: playlist.id).map(\.order) == [0, 1, 2])
+        let persisted = try #require(ModelContext(container).fetch(FetchDescriptor<Playlist>()).first)
+        #expect(persisted.id == playlist.id && persisted.name == "Preserved" && persisted.pinned)
+        #expect(persisted.createdAt == playlist.createdAt)
+        #expect(service.moveItem(id: ids[1], in: playlist.id, by: -1))
+        #expect(service.fetchItems(in: playlist.id).map(\.id) == [ids[1], ids[0], ids[2]])
+        #expect(service.fetchItems(in: playlist.id).map(\.order) == [0, 1, 2])
+    }
+
     @Test("delete cascades playlist items")
     func deleteCascadesItems() throws {
         let container = try makeContainer()

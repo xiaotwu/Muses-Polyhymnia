@@ -40,6 +40,10 @@ struct PlaylistDetailView: View {
             onRemove: { row in
                 guard let itemID = row.collectionItemID else { return }
                 playlistService.removeItem(id: itemID)
+            },
+            onMove: { row, offset in
+                guard let itemID = row.collectionItemID else { return }
+                playlistService.moveItem(id: itemID, in: playlist.id, by: offset)
             }
         ) {
             HStack(spacing: 8) {
