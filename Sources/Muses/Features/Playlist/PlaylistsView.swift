@@ -14,6 +14,7 @@ struct PlaylistsView: View {
     private var gridLayout: Bool { overviewLayout == "grid" }
     @State private var playlists: [Playlist] = []
     @State private var showCreateSheet = false
+    @State private var renamingPlaylist: Playlist?
     @State private var showImportSheet = false
     @State private var showCreateYouTubeSheet = false
     @State private var createYouTubePreview: YouTubePlaylistCreatePreview?
@@ -173,6 +174,16 @@ struct PlaylistsView: View {
                 return true
             }
         }
+        .sheet(item: $renamingPlaylist) { playlist in
+            RenamePlaylistSheet(initialName: playlist.name) { name in
+                guard playlistService.rename(playlist, to: name) else {
+                    playlistService.clearError()
+                    return false
+                }
+                refresh()
+                return true
+            }
+        }
         .sheet(isPresented: $showCreateYouTubeSheet) {
             NewYouTubePlaylistSheet { title, description, privacy in
                 createYouTubePreview = try playlistSync.prepareCreatePlaylist(
@@ -245,6 +256,9 @@ struct PlaylistsView: View {
                     Button(tr("Play", "播放"), systemImage: "play.fill") {
                         playPlaylist(playlist)
                     }
+                }
+                Button(tr("Rename", "重命名"), systemImage: "pencil") {
+                    renamingPlaylist = playlist
                 }
                 Button(
                     playlist.pinned ? tr("Unpin", "取消钉选") : tr("Pin", "钉选"),
@@ -552,6 +566,54 @@ struct PlaylistsView: View {
                             in: Capsule())
             }
         }
+    }
+}
+
+/// Native editing surface for Muses playlist names; failed saves retain the draft.
+private struct RenamePlaylistSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var name: String
+    @State private var saveFailed = false
+    @FocusState private var nameFocused: Bool
+    let onRename: (String) -> Bool
+
+    init(initialName: String, onRename: @escaping (String) -> Bool) {
+        _name = State(initialValue: initialName)
+        self.onRename = onRename
+    }
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text(tr("Rename Playlist", "重命名歌单")).font(MusesTypography.headline)
+            TextField(tr("Playlist name", "歌单名称"), text: $name)
+                .textFieldStyle(.roundedBorder)
+                .focused($nameFocused)
+            if saveFailed {
+                Text(tr("The playlist could not be renamed. Your name is kept; try again.",
+                        "无法重命名歌单，名称已保留，请重试。"))
+                    .font(.callout).foregroundStyle(.red)
+            }
+            HStack {
+                Button(tr("Cancel", "取消")) { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                Button(tr("Rename", "重命名")) {
+                    let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !trimmed.isEmpty, onRename(trimmed) else {
+                        saveFailed = true
+                        return
+                    }
+                    dismiss()
+                }
+                .keyboardShortcut(.defaultAction)
+                .musesAction(prominent: true)
+                .tint(BrandColors.accent)
+                .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        .padding(24)
+        .frame(width: 320)
+        .musesFloatingChrome(cornerRadius: 16)
+        .onAppear { nameFocused = true }
     }
 }
 
