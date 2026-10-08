@@ -51,7 +51,9 @@ struct PlayerBar: View {
                     Group {
                         if hasTrack { playingIdentity } else { idleIdentity }
                     }
-                    .frame(maxWidth: .infinity)
+                    // Measure the readable identity region independently of title length.
+                    // ViewThatFits otherwise tests an untruncated title's ideal width.
+                    .frame(minWidth: 180, idealWidth: 240, maxWidth: .infinity)
                     trailing
                 }
                 .padding(.horizontal, 14)
