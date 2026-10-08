@@ -9,6 +9,7 @@
 | XW-71，父 XW-25 | 十类 Settings、普通入口/深链接/历史；字体搜索、键盘选择/取消、即时样本、语言/字号恢复；Help/Privacy 折叠与信息弹窗。记录具体紧凑/常规和语言状态 | 源码已有 `SettingsPage`、`SettingsFontPicker`、`SettingsDisclosureStyle`。本轮字体筛选与 Escape 仅为其中子集；不能等同完整 VoiceOver |
 | XW-72，父 XW-25 | MiniPlayer 开关/显式打开/关闭重开/Pin/键鼠焦点；桌面歌词有歌词或真实空态的显示、拖动、关闭释放；菜单栏与共享音量 | 开关开启 MiniPlayer 能力，不自动证明新窗口出现。保持同一 PlaybackService；工具焦点/捕获限制与应用故障分开记录 |
 | XW-73，父 XW-19 | Home/New/Albums/Artists 的初始加载、缓存/过期、空/不可用/重试、离开时取消及晚到响应 | 稳定 YouTube 身份、只读 Web Home、来源隔离和集合播放上下文；不制造真实 continuation token 或扩张认证 |
+| XW-75，父 XW-25，Backlog | 已有 App Intents 包装元数据与现有授权下的原生调用；播放使用 `test` 项目，歌词使用真实搜索 | `PlayYouTubeLinkIntent`、`SearchLyricsIntent` 已实现；元数据编译不代表 Siri 实测，不启用 OS 权限或设置 |
 
 每个任务记录实际源码、系统、窗口、数据来源、指针/键盘/菜单结果和残留边界。新发现的可复现缺陷单列子任务，维持小范围修复。已有 XW-17/15/8/18 等阶段任务保持 In Review，协调任务保持未完成，直到对应验收门槛满足。
 
@@ -26,5 +27,9 @@
 ## 已实现而不重复规划的功能
 
 当前合同保留独立 Albums/Artists、Track-backed Music Videos、主窗口 Search、原生导航与十类 Settings、浮动 PlayerBar、完整 Queue、封面/黑胶/歌词、按需视频、播客进度和 Sparkle 更新。项目改名、已发布版本及已修复菜单/署名不重新进入 Feature 待办。旧 macOS 14 说明、旧页面/菜单设计和已过时发布清单是历史证据，当前 macOS 26 与产品合同优先。
+
+补查早期方案后，以下差异已单独核对：`CatalogTrackReleaseMembership` 与目录投影已有稳定多发行关联，不重复创建旧 R002 的“缺失实现”；完整播客、Shorts 和只读回复已有实现，旧 R014/R015 的缺失说明不是当前状态。官方播放器字幕/画质与原生悬浮视频继续按既有边界运行，不增设无效分辨率或通用 DRM/WebKit 音频路径。当前语言是英语、简体中文、繁体中文及系统跟随；早期十七语言提案没有当作当前完成或新增实施授权。
+
+早期对话提出重启恢复最后浏览页面；`ef8730e` 后 `RootView.handleAppear` 明确从 Home 初始化，当前实际冷启证据也是 Home。保留这一冲突的历史来源与当前行为，不把旧方案直接恢复为功能任务。Settings 别名/深链接和窗口内 Back/Forward 的验证仍属于 XW-69/71。队列与播放位置的暂停恢复另属已实现播放合同；睡眠唤醒、真实设备断开等缺少条件的验收保留在 XW-26 的边界，不自动触发系统操作。
 
 Radio、本地扫描/音频文件导入/M3U/Add Local、长期迁移 capsule 继续退出产品。没有新的用户决定时不重建仓库、改写历史、安装/发布或提高账号权限。
