@@ -58,9 +58,15 @@ struct PodcastContinueShelf: View {
             let shows = podcasts.followedShows()
             showTitles = Dictionary(uniqueKeysWithValues: shows.map { ($0.catalogID, $0.title) })
             var seen = Set<String>()
-            episodes = Array(shows.flatMap { podcasts.episodes(showCatalogID: $0.catalogID) }
-                .filter { !$0.completed && $0.lastPositionMs > 0 && $0.availability == .available && seen.insert($0.videoID).inserted }
-                .prefix(12))
+            let allEpisodes: [PodcastEpisodeSnapshot] = shows.flatMap {
+                podcasts.episodes(showCatalogID: $0.catalogID)
+            }
+            let resumableEpisodes = allEpisodes.filter { episode in
+                guard !episode.completed, episode.lastPositionMs > 0,
+                      episode.availability == .available else { return false }
+                return seen.insert(episode.videoID).inserted
+            }
+            episodes = Array(resumableEpisodes.prefix(12))
         }
         .task(id: preparingVideoID) {
             guard let id = preparingVideoID else { return }
