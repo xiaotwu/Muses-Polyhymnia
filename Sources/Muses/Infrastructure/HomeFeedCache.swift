@@ -135,6 +135,12 @@ final class HomeFeedCache {
         }
     }
 
+    /// Completes already dispatched persistence before reopening a cold cache.
+    func flushPendingWrites() async {
+        let pending = Array(caches.values)
+        for cache in pending { await cache.flushPendingWrites() }
+    }
+
     func directoryURL(for scope: HomeFeedScope,
                       layer: Layer,
                       mode: HomeRecommendationMode = .muses,

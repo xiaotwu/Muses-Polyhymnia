@@ -84,9 +84,13 @@ struct HomeDiscoveryTrustTests {
             scope: .guest, sections: [section], fetchedAt: old,
             expiresAt: old.addingTimeInterval(900)),
             for: service.buildInput(), layer: .baseline, mode: .youtubeMusic))
+        await cache.flushPendingWrites()
         // A new cache instance proves disk restoration, not an in-memory hit.
+        let reopenedCache = HomeFeedCache(directory: root)
+        try #require(reopenedCache.get(
+            for: service.buildInput(), layer: .baseline, mode: .youtubeMusic)?.value.sections.first?.id == "saved-public")
         let reopened = HomeDiscoveryService(
-            provider: provider, cache: HomeFeedCache(directory: root), library: library,
+            provider: provider, cache: reopenedCache, library: library,
             enabledProvider: { true }, modeProvider: { .youtubeMusic })
         reopened.load()
         for _ in 0..<50 where reopened.isRefreshing {

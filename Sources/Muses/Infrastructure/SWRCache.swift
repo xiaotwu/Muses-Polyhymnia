@@ -1,5 +1,6 @@
 import Foundation
 import CryptoKit
+import Darwin
 
 /// Generic stale-while-revalidate cache: memory plus disk JSON, with a
 /// `fetchedAt` timestamp.
@@ -12,8 +13,8 @@ import CryptoKit
 ///
 /// `T` must be `Codable & Sendable`. Disk files live at `{dir}/{key-hex}.json`;
 /// keys are normalized with SHA-256 to avoid illegal characters. `@MainActor`
-/// matches `StreamURLCache`; disk I/O runs in a detached task so the main
-/// thread is never blocked.
+/// matches `StreamURLCache`; encoding and staging writes run off the main actor.
+/// Disk commits and invalidation share an identity-checked critical section.
 @MainActor
 final class SWRCache<T: Codable & Sendable> {
     struct Cached: Sendable {
@@ -22,16 +23,18 @@ final class SWRCache<T: Codable & Sendable> {
         var age: TimeInterval { Date().timeIntervalSince(fetchedAt) }
     }
 
-    private struct DiskEnvelope: Codable {
+    private struct DiskEnvelope: Codable, Sendable {
         let value: T
         let fetchedAt: Date
     }
 
     private let memory: NSCache<NSString, CacheBox>
     private let directory: URL
+    private let diskWrites = SWRDiskWrites()
     // NSCache may evict at any time. Retain new values until their detached
     // persistence completes so synchronous readers cannot fall into that gap.
     private var pendingWrites: [String: (id: UUID, cached: Cached)] = [:]
+    private var persistenceTasks: [UUID: Task<Void, Never>] = [:]
 
     /// Box for the in-memory value (NSCache stores reference types).
     final class CacheBox {
@@ -72,32 +75,41 @@ final class SWRCache<T: Codable & Sendable> {
         memory.setObject(CacheBox(cached), forKey: key as NSString)
         let envelope = DiskEnvelope(value: value, fetchedAt: fetchedAt)
         let url = fileURL(for: key)
-        Task.detached(priority: .utility) { [weak self] in
+        let diskWrites = diskWrites
+        diskWrites.begin(key, id: writeID)
+        persistenceTasks[writeID] = Task.detached(priority: .utility) { [weak self] in
             let encoder = JSONEncoder()
             if let data = try? encoder.encode(envelope) {
-                try? data.write(to: url, options: .atomic)
+                diskWrites.persist(data, key: key, id: writeID, url: url)
             }
+            diskWrites.finish(key, id: writeID)
             await MainActor.run {
+                self?.persistenceTasks.removeValue(forKey: writeID)
                 guard self?.pendingWrites[key]?.id == writeID else { return }
                 self?.pendingWrites.removeValue(forKey: key)
             }
         }
     }
 
+    /// Awaits writes dispatched before this call, including revoked writes.
+    /// Callers requiring a cold disk read must cross this asynchronous boundary.
+    func flushPendingWrites() async {
+        let tasks = Array(persistenceTasks.values)
+        for task in tasks { await task.value }
+    }
+
     /// Invalidates a key (memory + disk).
     func invalidate(_ key: String) {
         pendingWrites.removeValue(forKey: key)
         memory.removeObject(forKey: key as NSString)
-        try? FileManager.default.removeItem(at: fileURL(for: key))
+        diskWrites.invalidate(key, url: fileURL(for: key))
     }
 
     /// Clears everything (memory; disk files are removed as needed).
     func clearAll() {
         pendingWrites.removeAll()
         memory.removeAllObjects()
-        try? FileManager.default.removeItem(at: directory)
-        try? FileManager.default.createDirectory(at: directory,
-                                                  withIntermediateDirectories: true)
+        diskWrites.clear(directory: directory)
     }
 
     func isFresh(_ cached: Cached, freshWindow: TimeInterval) -> Bool {
@@ -107,6 +119,54 @@ final class SWRCache<T: Codable & Sendable> {
     private func fileURL(for key: String) -> URL {
         let hash = SHA256Hex(key)
         return directory.appendingPathComponent("\(hash).json")
+    }
+}
+
+/// Serializes only publication/deletion, never encoding or the bulk data write.
+/// Revoking a ticket and removing its file are atomic relative to publication.
+private final class SWRDiskWrites: @unchecked Sendable {
+    private let lock = NSLock()
+    private var current: [String: UUID] = [:]
+
+    func begin(_ key: String, id: UUID) {
+        lock.withLock { current[key] = id }
+    }
+
+    func persist(_ data: Data, key: String, id: UUID, url: URL) {
+        let staged = url.appendingPathExtension("\(id.uuidString).tmp")
+        defer { try? FileManager.default.removeItem(at: staged) }
+        guard (try? data.write(to: staged, options: .atomic)) != nil else { return }
+        lock.withLock {
+            guard current[key] == id else { return }
+            // Same-directory rename atomically replaces the old envelope.
+            staged.withUnsafeFileSystemRepresentation { source in
+                url.withUnsafeFileSystemRepresentation { destination in
+                    if let source, let destination { _ = rename(source, destination) }
+                }
+            }
+            current.removeValue(forKey: key)
+        }
+    }
+
+    func invalidate(_ key: String, url: URL) {
+        lock.withLock {
+            current.removeValue(forKey: key)
+            try? FileManager.default.removeItem(at: url)
+        }
+    }
+
+    func finish(_ key: String, id: UUID) {
+        lock.withLock {
+            if current[key] == id { current.removeValue(forKey: key) }
+        }
+    }
+
+    func clear(directory: URL) {
+        lock.withLock {
+            current.removeAll()
+            try? FileManager.default.removeItem(at: directory)
+            try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
     }
 }
 

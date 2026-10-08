@@ -88,18 +88,12 @@ struct PerfCacheTests {
     }
 
     @Test("SWRCache: disk persistence across instances simulates cold start")
-    func swrDiskPersistence() {
+    func swrDiskPersistence() async {
         let dir = tmpDir()
         let cache1 = SWRCache<[String]>(directory: dir)
         cache1.set("k", value: ["persisted"])
-        // Wait for the detached task to flush: poll until a .json file appears in dir (up to ~2s).
-        let deadline = Date().addingTimeInterval(2)
-        var files: [URL] = []
-        while Date() < deadline {
-            files = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
-            if files.contains(where: { $0.pathExtension == "json" }) { break }
-            Thread.sleep(forTimeInterval: 0.01)
-        }
+        await cache1.flushPendingWrites()
+        let files = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
         #expect(files.contains { $0.pathExtension == "json" })
 
         // A fresh instance (empty memory) backfills from disk.
@@ -116,6 +110,43 @@ struct PerfCacheTests {
         #expect(cache.get("k") != nil)
         cache.invalidate("k")
         #expect(cache.get("k") == nil)
+    }
+
+    @Test("obsolete delayed disk writes cannot undo invalidate, clear or replacement",
+          arguments: ["invalidate", "clear", "replace"])
+    func delayedDiskWriteIsRevoked(action: String) async throws {
+        let dir = tmpDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let gate = CacheEncodingGate()
+        defer { gate.release() }
+        let cache = SWRCache<GatedCacheValue>(directory: dir)
+        cache.set("k", value: GatedCacheValue(text: "old", gate: gate))
+        for _ in 0..<100 where !gate.started {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        try #require(gate.started)
+
+        if action == "replace" {
+            cache.set("k", value: GatedCacheValue(text: "new"))
+            // Force the new value to reach disk before the old encoder resumes.
+            let reader = SWRCache<GatedCacheValue>(directory: dir)
+            for _ in 0..<100 where reader.get("k")?.value.text != "new" {
+                try await Task.sleep(for: .milliseconds(10))
+            }
+            try #require(reader.get("k")?.value.text == "new")
+        } else if action == "clear" {
+            cache.clearAll()
+        } else {
+            cache.invalidate("k")
+        }
+        gate.release()
+        await cache.flushPendingWrites()
+
+        let reopened = SWRCache<GatedCacheValue>(directory: dir)
+        #expect(reopened.get("k")?.value.text == (action == "replace" ? "new" : nil))
+        #expect(cache.get("k")?.value.text == (action == "replace" ? "new" : nil))
+        let files = try FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)
+        #expect(files.allSatisfy { $0.pathExtension == "json" })
     }
 
     // MARK: - YTDlpSearchCache
@@ -203,5 +234,52 @@ struct PerfCacheTests {
         print("[D2-bench] cache hit per op: \(String(format: "%.2f", perOpUs)) µs over \(n) ops")
         #expect(perOpUs < 100)
         PerfTrace.clear()
+    }
+}
+
+private final class CacheEncodingGate: @unchecked Sendable {
+    private let condition = NSCondition()
+    private var blocked = true
+    private var encodingStarted = false
+
+    var started: Bool {
+        condition.lock()
+        defer { condition.unlock() }
+        return encodingStarted
+    }
+
+    func wait() {
+        condition.lock()
+        encodingStarted = true
+        condition.broadcast()
+        while blocked { condition.wait() }
+        condition.unlock()
+    }
+
+    func release() {
+        condition.lock()
+        blocked = false
+        condition.broadcast()
+        condition.unlock()
+    }
+}
+
+private struct GatedCacheValue: Codable, Sendable {
+    let text: String
+    var gate: CacheEncodingGate? = nil
+
+    init(text: String, gate: CacheEncodingGate? = nil) {
+        self.text = text
+        self.gate = gate
+    }
+
+    init(from decoder: Decoder) throws {
+        text = try decoder.singleValueContainer().decode(String.self)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        gate?.wait()
+        var container = encoder.singleValueContainer()
+        try container.encode(text)
     }
 }
