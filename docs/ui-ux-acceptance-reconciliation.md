@@ -11,7 +11,7 @@ Both retained choice documents contain the same 64 area selections. That establi
 - XW-66 system navigation and verified artist credits, XW-67 regular long-title PlayerBar and XW-68 shared all-mode lyric typography/artwork accents are accepted within their recorded native scopes. The user physically confirmed the system card's previous/next and artist credits.
 - The latest native round ended paused at app volume 80%, restored app appearance and lyric mode, quit cooperatively, and compared the original 27-table schema/rows, integrity and complete guest preferences. One temporary preference key was removed. No system settings, output device, Liked playlist or remote writes changed during these rounds.
 - Seventy-three attributed full-test fixture directories were cleaned with ownership, source-prefix, completed-run and unchanged-content guards. The isolated current build and active evidence remain necessary for the unfinished final session. The normal installed app and normal app build are preserved.
-- New final-source CPU/RSS, SwiftUI and animation-hitch measurements have not yet been recorded. Historical intermediate-build samples cannot establish current-source performance. The Mac relocked before the final native journey and measurements could start; the guest is stopped and its original data/preferences are restored.
+- The subsequent [final local session](ui-ux-final-local-session.md) completed the actual journey/cold queue comparison, final-source CPU/RSS samples and exported SwiftUI/Animation Hitches evidence. Verified native table actions returned normally after a distinct generic-outline tool timeout. The final trace records nonzero hitches with AX/instrumentation workload; it is not a smooth-scrolling, FPS or energy pass. Final original data/preferences restoration and owned bundle/cache/signing cleanup are complete.
 
 ## All 64 areas
 
@@ -20,7 +20,7 @@ Both retained choice documents contain the same 64 area selections. That establi
 | Area | Current contract and native evidence | Remaining evidence boundary |
 | --- | --- | --- |
 | 01 Window and navigation | Permanent 88pt-reserved islands; centered group and equal 16pt gaps were rendered; native history is implemented. | Complete window/focus matrix and macOS 26 runtime. |
-| 02 Toolbar and Back | Native traffic lights and independent Back; actual Command-[ / Command-] history and immersive exit; detail Escape returns were exercised. | Continuous final cold journey and all pointer-reveal/focus states. |
+| 02 Toolbar and Back | Native traffic lights and independent Back; actual history/immersive/detail exits and final Settings Back/cold journey exercised. | All pointer-reveal/focus states are not established. |
 | 03 Navigation selection | Home-first, separate Albums/Artists; navigation focus and selected destination were observed. | Full traversal without changing the user's OS keyboard settings. |
 | 04 Titles and typography | Shared hierarchy and F3 roles; actual long catalog/podcast titles and compact headers rendered; XW-67/68 accepted. | All font families/languages are not a complete rendered matrix. |
 | 05 Glass and color | Semantic glass roles; earlier opaque Home/Queue/Now Playing observations retained. | Further OS accessibility matrix deferred. |
@@ -31,8 +31,8 @@ Both retained choice documents contain the same 64 area selections. That establi
 | 10 New | Actual Light 1280/840 long title/credit, landscape artwork, corner More and horizontal rail rendered. | Every authenticated/provider/cancellation branch. |
 | 11 Shelf Open/Play/More | Separate semantic actions implemented; genuine artwork detail Open and Play were exercised. | Every shelf's hover and keyboard-focus state. |
 | 12 Songs default | H0/H2/H3 composition and bounded deck retained; prior native collection evidence. | Full compact/loading/unavailable state matrix. |
-| 13 Canonical focus strip | One canonical focus and reduced activation continuity implemented; native drag/keyboard evidence retained. | All input modes in one final session; measured scrolling. |
-| 14 Complete table/sorting | Genuine test table click/Down and native horizontal Scroll Left; canonical order repairs accepted. | Every column/sort/page and full VoiceOver traversal. |
+| 13 Canonical focus strip | One canonical focus and reduced activation continuity; native drag/keyboard and final adjustment 1 → 7 → 1 retained. | The generic horizontal-scroll attempt did not change focus; every input's equivalence is not inferred. |
+| 14 Complete table/sorting | Genuine test click/Down, native horizontal/vertical scroll ranges and current rendered leading columns; canonical order repairs accepted. | Generic-outline tool timeout remains distinct; every column/sort/page and full VoiceOver traversal unproved. |
 | 15 Cover wall/layout memory | Lazy wall and per-collection layout retained; native layout memory was exercised. | Complete compact/focus/appearance matrix. |
 | 16 Albums and Artists | Genuine 24-track stable catalog; Light/Dark compact/regular details, actions and Back; artist context played. | Every refresh/stale/unavailable branch; second selected track was not claimed audible. |
 | 17 Music videos | Genuine two-card Light compact/regular layouts without overlap; Track-backed context retained. | Complete Dark/empty/focus matrix. |
@@ -57,7 +57,7 @@ Both retained choice documents contain the same 64 area selections. That establi
 | 36 Progress/repeat/shuffle | Actual seek, repeat/one-item exhausted replay, shuffle/cold/canonical restoration and natural completions. | Canonical test tail unavailable; its natural completion is unverified. |
 | 37 Volume/output | App default 80%; endpoints and physical keyboard accepted; shared app-volume state; output menu displayed. | Actual output-device switching excluded; app volume never changes system volume. |
 | 38 Now Playing layout | Actual regular split and compact stacked Scroll Down reveal full lyrics above dock; no clipping defect after verification. | Every artwork/appearance/auxiliary focus state. |
-| 39 Vinyl/continuity | Existing circular cover, visible/reduced-visual gates and earlier reduced-motion native evidence. | Current-source playback/performance comparison. |
+| 39 Vinyl/continuity | Circular cover, native gates and earlier reduced-motion evidence; current actual vinyl/reduced-visual playback and CPU/RSS samples. | Samples are not a controlled energy comparison. |
 | 40 Lyrics/timing/modes | Genuine LRCLIB synced document and 35.39s line seek; XW-68 Light/Dark pure/current/split shared F3/accent accepted. | Every provider, translation and artwork contrast combination. |
 | 41 Lyric match/preview | Genuine LRCLIB candidates and actual matching-recording confirmation exercised. | Every failure, source and keyboard-cancellation state. |
 | 42 Main/floating video | Repeated real main/floating handoffs, pause/resume preference and audio return exercised. | WK video-frame capture remains limited; frames and slider seek are not inferred from AX playback values. |
@@ -82,13 +82,16 @@ Both retained choice documents contain the same 64 area selections. That establi
 | 61 About/update | Truthful status/result/retry and unsupported-build surface implemented. | Eligible download/verification/install not performed. |
 | 62 Loading/empty/stale/error | Actual empty/recovery, cached catalog/lyrics, stream-unavailable and comments 403 cases retained. | Full cross-feature state matrix is not complete. |
 | 63 Keyboard/focus/VoiceOver | Native focus/search/table/history controls and human volume/menu-bar/queue checks; previous system restoration correction recorded. | Full VoiceOver traversal unproved; additional OS matrix deferred. |
-| 64 Motion/scroll/performance | Existing visibility and reduced-motion gates; earlier scoped native checks retained. | Final-source CPU/RSS, SwiftUI/hitch traces and continuous journey remain unmeasured; no FPS/energy/leak claim. |
+| 64 Motion/scroll/performance | Existing gates and earlier native checks; final-source CPU/RSS, verified table scroll actions, SwiftUI/hitch exports and actual journey/cold restoration now recorded. | Nonzero traced hitches include full AX workload; pointer-only FPS/energy/leak conclusions remain unproved. |
 
 ## Remaining sequential route
 
-1. After manual Mac unlock, finish the continuous cold Home → Search → test/playback/Up Next → Now Playing/lyrics → video return → Settings/Back → cold-restoration journey on the exact signed current source. Keep all playlist operations on test, then restore the original isolated store and complete preferences.
-2. Measure only the owned isolated Release process. Record 20-second untraced CPU-time/RSS samples and 15-second SwiftUI/Animation Hitches traces where attachment/export succeeds. Report actual case conditions and exported schemas. CPU/RSS alone cannot prove frame rate, energy savings or absence of leaks.
-3. Reconcile the parent Linear issues against the specific accepted branches and retained gaps. Do not close XW-25/26/19/27 by treating external, excluded or unexercised cells as passes.
-4. Quit task-owned windows/processes, verify restoration and exact stopped paths, and remove the obsolete guest bundle/cache and temporary signing material only after their final validation use. Preserve the normal app/build, user data and private original/evidence snapshots.
+1. Local journey, representative owned-process samples/trace exports, cold semantic queue comparison and exact session cleanup are now complete; see the final local session for observed results and limitations.
+2. Reconcile the parent Linear issues against the specific accepted branches and retained gaps. Do not close XW-25/26/19/27 by treating external, excluded or unexercised cells as passes.
+3. Future work must target a specific remaining cell, use only test for playlist operations and rebuild a fresh isolated candidate when native work is needed. The previous guest/cache/signing material has been removed after its final use.
+
+## Implementation and coordinator states
+
+Linear readback on 2026-10-07: XW-7, XW-8, XW-9, XW-13, XW-14, XW-15, XW-16, XW-17 and XW-18 remain **In Review**, as do implementation coordinators XW-10 and XW-11. Their implemented area contracts and scoped native evidence are mapped above; retained stage/environment cells prevent blanket completion. XW-25, XW-26, XW-19, XW-27, acceptance coordinator XW-12 and overall XW-5 remain **In Progress**. XW-62's populated comment/reply acceptance remains limited by the genuine insufficientPermissions response. Scoped repaired defects XW-49/31 and XW-54–61/63–68 retain their individual accepted states. These task states are separate from the 64-choice decision count.
 
 Explicitly deferred/external: macOS 26 real runtime, populated subscriptions on an appropriately populated authorized channel, additional system accessibility/display traversal. Populated comments are a separate live permission limitation. Remote writes, permission expansion, Liked operations, output-device changes and release installation/publication are outside this acceptance authorization.
