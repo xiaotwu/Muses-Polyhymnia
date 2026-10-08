@@ -277,9 +277,11 @@ final class HomeDiscoveryService {
         globalContinuationError = nil
         morePage = 0
         isRefreshing = true
+        let operation = operationID
         refreshTask = Task { [weak self] in
-            guard let self else { return }
+            guard let self, !Task.isCancelled, operation == self.operationID else { return }
             let input = await self.buildInputAsync()
+            guard !Task.isCancelled, operation == self.operationID else { return }
             self.refresh(input: input)
         }
     }

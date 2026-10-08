@@ -335,10 +335,12 @@ final class YouTubeCatalogService {
 
     /// User-requested refresh retains cached collections on network failures.
     func refreshCatalog() async -> Int {
+        guard !Task.isCancelled else { return 0 }
         rebuildFromTrackMetadata()
         let releases = self.releases()
         let artists = self.artists()
         await structuredCatalog.reset()
+        guard !Task.isCancelled else { return 0 }
         albumTracksCache.removeAll()
         discographyCache.removeAll()
         var failures = 0
@@ -381,6 +383,7 @@ final class YouTubeCatalogService {
 
     private func completeBrowse(_ id: String, includeRelated: Bool = false) async throws -> MusicCatalogPage {
         var page = try await structuredCatalog.browse(id)
+        try Task.checkCancellation()
         let firstPage = page
         var result = page.items + (includeRelated ? page.relatedItems : [])
         var stale = page.isStale
@@ -389,6 +392,7 @@ final class YouTubeCatalogService {
         while let cursor = page.next, pageCount < 20, result.count < 5_000 {
             try Task.checkCancellation()
             page = try await structuredCatalog.next(cursor)
+            try Task.checkCancellation()
             stale = stale || page.isStale
             failed = failed || page.refreshFailed
             result += page.items

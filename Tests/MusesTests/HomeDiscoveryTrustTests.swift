@@ -378,6 +378,32 @@ struct HomeDiscoveryTrustTests {
         channelID = nil
     }
 
+    @Test("cancelled input preparation cannot restart Home fetching")
+    func cancelledReloadDoesNotFetch() async throws {
+        let provider = ScopeRecordingHomeProvider()
+        let root = FileManager.default.temporaryDirectory
+            .appending(path: "muses-home-cancel-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let service = HomeDiscoveryService(
+            provider: provider, cache: HomeFeedCache(directory: root),
+            library: LibraryService(modelContainer: try makeModelContainer(inMemory: true)),
+            enabledProvider: { true })
+
+        service.reload()
+        service.cancel()
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(provider.inputs.isEmpty)
+        #expect(service.sections.isEmpty)
+        #expect(!service.isRefreshing)
+
+        service.reload()
+        for _ in 0..<50 where service.isRefreshing {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(provider.inputs.count == 1)
+        #expect(!service.isRefreshing)
+    }
+
     @Test("logout and A-to-B switch discard a cancelled account result that arrives late")
     func scopeSwitchRejectsLateResult() async throws {
         let provider = ScopeRecordingHomeProvider(delayedScope: .account(channelID: "UC_A"))

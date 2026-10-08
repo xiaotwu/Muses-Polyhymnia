@@ -55,6 +55,7 @@ struct CatalogReleasesView: View {
     @State private var loading = true
     @State private var isRefreshing = false
     @State private var refreshFailures = 0
+    @State private var refreshTask: Task<Void, Never>?
     @State private var searchQuery = ""
     @State private var filter: ReleaseFilter = .all
     @State private var sort: ReleaseSort = .title
@@ -169,6 +170,12 @@ struct CatalogReleasesView: View {
         // The local projection is synchronous; populate it before the first frame
         // so returning to cached catalog pages does not briefly show skeletons.
         .onAppear(perform: load)
+        .onDisappear {
+            refreshTask?.cancel()
+            refreshTask = nil
+            isRefreshing = false
+            loading = false
+        }
         .onChange(of: catalog.revision) { _, _ in load() }
         .onReceive(NotificationCenter.default.publisher(for: ModelContext.didSave)) { _ in load() }
         .onReceive(NotificationCenter.default.publisher(for: .musesPlaylistsChanged)) { _ in load() }
@@ -282,10 +289,14 @@ struct CatalogReleasesView: View {
         isRefreshing = true
         loading = true
         refreshFailures = 0
-        Task {
-            refreshFailures = await catalog.refreshCatalog()
+        refreshTask = Task {
+            guard !Task.isCancelled else { return }
+            let failures = await catalog.refreshCatalog()
+            guard !Task.isCancelled else { return }
+            refreshFailures = failures
             load()
             isRefreshing = false
+            refreshTask = nil
         }
     }
 
@@ -780,6 +791,7 @@ struct CatalogArtistsView: View {
     @State private var loading = true
     @State private var isRefreshing = false
     @State private var refreshFailures = 0
+    @State private var refreshTask: Task<Void, Never>?
     @State private var searchQuery = ""
     @State private var sort: ArtistSort = .name
 
@@ -877,6 +889,12 @@ struct CatalogArtistsView: View {
         // The local projection is synchronous; populate it before the first frame
         // so returning to cached catalog pages does not briefly show skeletons.
         .onAppear(perform: load)
+        .onDisappear {
+            refreshTask?.cancel()
+            refreshTask = nil
+            isRefreshing = false
+            loading = false
+        }
         .onChange(of: catalog.revision) { _, _ in load() }
         .onReceive(NotificationCenter.default.publisher(for: ModelContext.didSave)) { _ in load() }
         .onReceive(NotificationCenter.default.publisher(for: .musesPlaylistsChanged)) { _ in load() }
@@ -958,10 +976,14 @@ struct CatalogArtistsView: View {
         isRefreshing = true
         loading = true
         refreshFailures = 0
-        Task {
-            refreshFailures = await catalog.refreshCatalog()
+        refreshTask = Task {
+            guard !Task.isCancelled else { return }
+            let failures = await catalog.refreshCatalog()
+            guard !Task.isCancelled else { return }
+            refreshFailures = failures
             load()
             isRefreshing = false
+            refreshTask = nil
         }
     }
 

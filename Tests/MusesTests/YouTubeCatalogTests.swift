@@ -196,6 +196,51 @@ struct YouTubeCatalogTests {
         #expect(service.artist(byName: "dua lipa")?.stableID == "channel:UC_dua")
     }
 
+    @Test("cancelled final browse pages cannot update metadata or populate the short-term cache",
+          arguments: [true, false], [true, false])
+    func cancelledBrowseDoesNotPopulateCaches(artist: Bool, finalPage: Bool) async throws {
+        let provider = SuspendedCatalogProvider(finalPage: finalPage)
+        let container = try makeModelContainer(inMemory: true)
+        let service = YouTubeCatalogService(modelContainer: container, structuredCatalog: provider)
+        service.upsertArtist(stableID: "channel:UC_artist", name: "Original Artist", refreshedAt: .distantPast)
+        service.upsertRelease(stableID: "browse:MPRE_album", title: "Original Album",
+                              artistName: "Original Artist", refreshedAt: .distantPast)
+        let artistValue = CatalogArtistProjection(stableID: "channel:UC_artist", name: "Original Artist",
+            artworkURL: nil, biography: nil, cacheState: .stale, releases: [], tracks: [])
+        let releaseValue = CatalogReleaseProjection(stableID: "browse:MPRE_album", title: "Original Album",
+            artistName: "Original Artist", artistStableID: "channel:UC_artist", artworkURL: nil,
+            year: nil, kind: .album, cacheState: .stale, tracks: [])
+        let pending = Task {
+            if artist { _ = try await service.fetchArtistOnlineDiscography(artist: artistValue) }
+            else { _ = try await service.fetchAlbumOnlineTracks(release: releaseValue) }
+        }
+        await provider.waitForSuspension()
+        pending.cancel()
+        await provider.release()
+        await #expect(throws: CancellationError.self) { try await pending.value }
+        let context = ModelContext(container)
+        #expect(try context.fetch(FetchDescriptor<CatalogArtist>()).first?.name == "Original Artist")
+        #expect(try context.fetch(FetchDescriptor<CatalogRelease>()).first?.title == "Original Album")
+
+        if artist { _ = try await service.fetchArtistOnlineDiscography(artist: artistValue) }
+        else { _ = try await service.fetchAlbumOnlineTracks(release: releaseValue) }
+        let browseCount = await provider.browseCount
+        #expect(browseCount == 2)
+    }
+
+    @Test("an already cancelled catalog refresh does not rebuild or reset its provider")
+    func cancelledRefreshDoesNotResetProvider() async throws {
+        let provider = MockStructuredCatalogProvider(items: [])
+        let service = YouTubeCatalogService(
+            modelContainer: try makeModelContainer(inMemory: true), structuredCatalog: provider)
+        let pending = Task { await service.refreshCatalog() }
+        pending.cancel()
+        _ = await pending.value
+        let resets = await provider.resetCount
+        #expect(resets == 0)
+        #expect(service.revision == 0)
+    }
+
     @Test("online catalog follows stable browse identity and supports refresh")
     func onlineDiscographyFetching() async throws {
         let catalog = MockStructuredCatalogProvider(items: [
@@ -485,6 +530,43 @@ struct YouTubeCatalogTests {
             == "q=taylor%20swift%201989")
         #expect(YouTubeCatalogLink.artistURL(stableID: "artist:coldplay")?.query
             == "q=coldplay")
+    }
+}
+
+private actor SuspendedCatalogProvider: MusicCatalogProviding {
+    let finalPage: Bool
+    private(set) var browseCount = 0
+    private var response: CheckedContinuation<Void, Never>?
+    private var waiter: CheckedContinuation<Void, Never>?
+    private let session = UUID()
+
+    init(finalPage: Bool) { self.finalPage = finalPage }
+    func waitForSuspension() async {
+        if response != nil { return }
+        await withCheckedContinuation { waiter = $0 }
+    }
+    func release() { response?.resume(); response = nil }
+    private func suspend() async {
+        await withCheckedContinuation { continuation in
+            response = continuation
+            waiter?.resume(); waiter = nil
+        }
+    }
+    func reset() {}
+    func search(_ query: String, kind: MusicCatalogKind?) async throws -> MusicCatalogPage { page(next: false) }
+    func browse(_ id: String) async throws -> MusicCatalogPage {
+        browseCount += 1
+        if browseCount == 1 && !finalPage { await suspend() }
+        return page(next: browseCount == 1 && finalPage)
+    }
+    func next(_ cursor: MusicCatalogCursor) async throws -> MusicCatalogPage {
+        await suspend()
+        return page(next: false)
+    }
+    private func page(next: Bool) -> MusicCatalogPage {
+        .init(items: [], filters: [],
+              next: next ? .init(session: session, endpoint: "browse", token: "fixture") : nil,
+              fetchedAt: Date(), region: "US", metadata: .init(title: "Verified", subtitle: "", artists: []))
     }
 }
 
