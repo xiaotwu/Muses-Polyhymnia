@@ -207,7 +207,7 @@ struct LyricsView: View {
             }
             else { placeholder }
         }
-        .environment(\.lyricPalette, layout == .fullscreen ? [BrandColors.accent] : prioritizeLegibility || artworkHues.isEmpty ? [BrandColors.textPrimary] : artworkHues.map {
+        .environment(\.lyricPalette, prioritizeLegibility || artworkHues.isEmpty ? [BrandColors.textPrimary] : artworkHues.map {
             Color(hue: $0[0], saturation: min($0[1], colorScheme == .dark ? 0.35 : 0.72),
                   brightness: colorScheme == .dark ? max(0.92, $0[2]) : min(0.34, $0[2]))
         })
@@ -456,8 +456,7 @@ struct LyricsView: View {
     private func lineFont(isCurrent: Bool, text: String) -> Font {
         let size: CGFloat = layout == .fullscreen ? (isCurrent ? 40 : 26)
             : (layout.isImmersive ? (isCurrent ? 34 : 26) : (isCurrent ? 22 : 17))
-        return layout == .fullscreen ? .system(size: size, weight: isCurrent ? .semibold : .regular)
-            : MusesTypography.lyric(size: size, current: isCurrent, text: text)
+        return MusesTypography.lyric(size: size, current: isCurrent, text: text)
     }
 
     /// Word-level row: renders the current line's `LyricWord` sequence as one
