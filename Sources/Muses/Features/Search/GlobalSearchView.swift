@@ -50,7 +50,7 @@ struct GlobalSearchView: View {
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
-                        if trimmedQuery.isEmpty {
+                        if trimmedQuery.isEmpty && search.musicCatalog.detail == nil {
                             searchLanding
                         } else {
                             if search.scope.searchesYouTube { StructuredCatalogSearchView() }
