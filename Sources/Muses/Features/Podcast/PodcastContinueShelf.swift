@@ -12,7 +12,8 @@ struct PodcastContinueShelf: View {
     @State private var failure: String?
 
     var body: some View {
-        Group {
+        // Keep the task owner mounted while the initial episode snapshot is empty.
+        VStack(alignment: .leading, spacing: 0) {
             if !episodes.isEmpty {
                 VStack(alignment: .leading, spacing: 12) {
                     SectionHeader(title: tr("Continue listening", "继续收听"),
