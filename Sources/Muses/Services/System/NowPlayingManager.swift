@@ -3,6 +3,12 @@ import MediaPlayer
 import AppKit
 import UserNotifications
 
+struct SystemMediaCommandAvailability: Equatable, Sendable {
+    let trackNavigation: Bool
+    let skipIntervals: Bool
+    let playbackRate: Bool
+}
+
 /// Manages MPNowPlayingInfoCenter (lock screen/Control Center metadata) and
 /// MPRemoteCommandCenter (media keys). Syncs PlaybackService.state → nowPlayingInfo
 /// over a single lifecycle; bound remote commands forward back into PlaybackService.
@@ -16,8 +22,9 @@ final class NowPlayingManager {
     /// commands are simply not bound (never fabricated).
     private let library: LibraryService?
     private let queue: QueueService?
-    private let bindsRemoteCommands: Bool
-    private var rateCommandEnabled = false
+    private let credits: SongCreditCache
+    private let publishCommandAvailability: (SystemMediaCommandAvailability) -> Void
+    private var commandAvailability: SystemMediaCommandAvailability?
     private var updateTask: Task<Void, Never>?
     private let publishInfo: ([String: Any]) -> Void
     private(set) var observationLifecycleStartCount = 0
@@ -34,6 +41,8 @@ final class NowPlayingManager {
          library: LibraryService? = nil,
          queue: QueueService? = nil,
          bindsRemoteCommands: Bool = true,
+         credits: SongCreditCache = .shared,
+         publishCommandAvailability: ((SystemMediaCommandAvailability) -> Void)? = nil,
          artworkLoader: @escaping (URL) async -> NSImage? = { await ImageLoader.shared.load($0).value },
          publishInfo: @escaping ([String: Any]) -> Void = {
              let center = MPNowPlayingInfoCenter.default()
@@ -44,7 +53,16 @@ final class NowPlayingManager {
         self.playback = playback
         self.library = library
         self.queue = queue
-        self.bindsRemoteCommands = bindsRemoteCommands
+        self.credits = credits
+        self.publishCommandAvailability = publishCommandAvailability ?? { availability in
+            guard bindsRemoteCommands else { return }
+            let center = MPRemoteCommandCenter.shared()
+            center.nextTrackCommand.isEnabled = availability.trackNavigation
+            center.previousTrackCommand.isEnabled = availability.trackNavigation
+            center.skipForwardCommand.isEnabled = availability.skipIntervals
+            center.skipBackwardCommand.isEnabled = availability.skipIntervals
+            center.changePlaybackRateCommand.isEnabled = availability.playbackRate
+        }
         self.artworkLoader = artworkLoader
         self.publishInfo = publishInfo
         if bindsRemoteCommands {
@@ -80,6 +98,15 @@ final class NowPlayingManager {
     // MARK: - nowPlayingInfo
 
     private func updateInfo() {
+        let state = playback.transportState
+        let hasNativeTrack = state.track != nil && playback.videoSession == nil
+        let isPodcast = hasNativeTrack && state.track?.mediaKind == .podcastEpisode
+        let availability = SystemMediaCommandAvailability(trackNavigation: hasNativeTrack,
+            skipIntervals: isPodcast, playbackRate: isPodcast)
+        if commandAvailability != availability {
+            publishCommandAvailability(availability)
+            commandAvailability = availability
+        }
         // The YouTube iframe supplies its own system media session. Publishing
         // the same video here would create a second Control Center card.
         if playback.videoSession != nil {
@@ -87,21 +114,12 @@ final class NowPlayingManager {
             return
         }
         var info: [String: Any] = [:]
-        let state = playback.transportState
-        if bindsRemoteCommands {
-            let isPodcast = state.track?.mediaKind == .podcastEpisode
-                && playback.videoSession == nil
-            if rateCommandEnabled != isPodcast {
-                MPRemoteCommandCenter.shared().changePlaybackRateCommand.isEnabled = isPodcast
-                rateCommandEnabled = isPodcast
-            }
-        }
         updateArtwork(for: state.track)
 
         if let track = state.track {
             info[MPMediaItemPropertyArtwork] = artwork ?? logoArtwork
             info[MPMediaItemPropertyTitle] = track.title
-            info[MPMediaItemPropertyArtist] = track.artist
+            info[MPMediaItemPropertyArtist] = credits.artist(snapshot: track)
             if let album = track.albumTitle {
                 info[MPMediaItemPropertyAlbumTitle] = album
             }
@@ -214,22 +232,23 @@ final class NowPlayingManager {
             return .success
         }
 
-        // Skip forward/backward ±15s
+        // Podcasts advertise 15-second intervals; music advertises track navigation.
         center.skipForwardCommand.preferredIntervals = [15]
-        center.skipForwardCommand.addTarget { [weak self] _ in
-            Task { @MainActor in
-                guard let self else { return }
-                self.playback.seek(to: min(self.playback.transportState.duration,
-                                           self.playback.transportState.position + 15))
+        center.skipForwardCommand.addTarget { [weak self] event in
+            guard let event = event as? MPSkipIntervalCommandEvent else {
+                return .commandFailed
             }
+            let interval = event.interval
+            Task { @MainActor in self?.handleRemoteSkip(by: interval) }
             return .success
         }
         center.skipBackwardCommand.preferredIntervals = [15]
-        center.skipBackwardCommand.addTarget { [weak self] _ in
-            Task { @MainActor in
-                guard let self else { return }
-                self.playback.seek(to: max(0, self.playback.transportState.position - 15))
+        center.skipBackwardCommand.addTarget { [weak self] event in
+            guard let event = event as? MPSkipIntervalCommandEvent else {
+                return .commandFailed
             }
+            let interval = event.interval
+            Task { @MainActor in self?.handleRemoteSkip(by: -interval) }
             return .success
         }
 
@@ -274,6 +293,11 @@ final class NowPlayingManager {
 
     func handleRemoteToggle() {
         playback.toggle()
+    }
+
+    func handleRemoteSkip(by interval: Double) {
+        guard playback.videoSession == nil else { return }
+        playback.skipPodcast(by: interval)
     }
 
     // MARK: - Remote command handling
