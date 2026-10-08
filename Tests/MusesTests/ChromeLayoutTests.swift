@@ -508,7 +508,7 @@ struct ChromeLayoutTests {
     func integratedSettingsCategories() {
         #expect(SettingsChromePolicy.presentsInMainWindow)
         #expect(SettingsCategory.audioQuality.destination == .playback)
-        #expect(SettingsCategory.desktop.destination == .appearance)
+        #expect(SettingsCategory.desktop.destination == .general)
         #expect(SettingsCategory.updates.destination == .about)
         #expect(Set(SettingsCategory.allCases.map(\.toolbarIcon)).count == SettingsCategory.allCases.count)
     }

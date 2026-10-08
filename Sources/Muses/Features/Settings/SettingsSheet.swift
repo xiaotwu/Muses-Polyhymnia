@@ -11,7 +11,7 @@ enum SettingsCategory: String, Hashable, CaseIterable, Identifiable {
     var destination: SettingsCategory {
         switch self {
         case .audioQuality: return .playback
-        case .desktop: return .appearance
+        case .desktop: return .general
         case .updates: return .about
         default: return self
         }

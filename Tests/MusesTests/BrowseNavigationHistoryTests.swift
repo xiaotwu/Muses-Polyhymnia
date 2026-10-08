@@ -82,4 +82,17 @@ struct BrowseNavigationHistoryTests {
         #expect(history.entries[history.index] == .section(.songs))
     }
 
+    @Test func legacyDesktopRouteRestoresItsCurrentOwnerAndHistory() throws {
+        let data = Data(#"{"version":1,"kind":"settings","value":"desktop","settingsPath":[]}"#.utf8)
+        let snapshot = try JSONDecoder().decode(BrowseRouteSnapshot.self, from: data)
+        let route = try #require(snapshot.route(activeChannelID: nil))
+        #expect(route == .settings("general", []))
+
+        var history = BrowseNavigationHistory(initial: route)
+        #expect(history.back() == .section(.home))
+        #expect(history.forward() == .settings("general", []))
+        history.visit(.settings("appearance", []))
+        #expect(history.back() == .settings("general", []))
+    }
+
 }

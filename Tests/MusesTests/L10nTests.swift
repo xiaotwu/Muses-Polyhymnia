@@ -48,7 +48,7 @@ struct L10nThemeTests {
     func settingsDestinations() {
         #expect(SettingsCategory.allCases.count == 10)
         #expect(SettingsCategory.audioQuality.destination == .playback)
-        #expect(SettingsCategory.desktop.destination == .appearance)
+        #expect(SettingsCategory.desktop.destination == .general)
         #expect(SettingsCategory.updates.destination == .about)
     }
 
