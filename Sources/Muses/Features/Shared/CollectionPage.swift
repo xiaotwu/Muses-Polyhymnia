@@ -417,6 +417,71 @@ private struct CollectionTrackTable: View {
                                           pageSize: accessiblePageSize)
     }
 
+    private var accessibleTable: some View {
+        ScrollView {
+            LazyVStack(spacing: 0) {
+                ForEach(tableRows) { row in
+                    accessibleSongRow(row)
+                    Divider()
+                }
+            }
+        }
+        .background(BrandColors.background)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            Color.clear.frame(height: OverlayChromeMetrics.scrollBottomInset)
+        }
+    }
+
+    private func accessibleSongRow(_ row: CollectionTrackRow) -> some View {
+        Button { onPlay(row) } label: {
+            accessibleSongLabel(row)
+        }
+        .buttonStyle(.fullAreaPlain)
+        .padding(.horizontal, 16)
+        .help(tr("Play \(row.title)", "播放 \(row.title)"))
+        .accessibilityLabel("\(row.title), \(row.displayArtist)")
+        .accessibilityValue(formatDuration(row.duration) + " · " + (likedIDs.contains(row.snapshot.id)
+            ? tr("Liked", "已收藏") : tr("Not liked", "未收藏")))
+        .accessibilityAction(named: Text(likedIDs.contains(row.snapshot.id)
+            ? tr("Unlike", "取消收藏") : tr("Like", "收藏"))) {
+            library.toggleLike(snapshot: row.snapshot)
+        }
+        .accessibilityActions {
+            if let onRemove {
+                Button(tr("Remove", "移除"), role: .destructive) { onRemove(row) }
+            }
+        }
+        .contextMenu { contextMenu(for: [row.id]) }
+        .task(id: row.snapshot.youTubeId) {
+            do { try await Task.sleep(for: .milliseconds(350)) } catch { return }
+            guard !Task.isCancelled, let importService else { return }
+            _ = await importService.songMetadata(videoID: row.snapshot.youTubeId)
+        }
+    }
+
+    private func accessibleSongLabel(_ row: CollectionTrackRow) -> some View {
+        HStack(spacing: 12) {
+            Text("\(row.canonicalIndex + 1)")
+                .monospacedDigit()
+                .foregroundStyle(BrandColors.textSecondary)
+                .frame(width: 40, alignment: .trailing)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(row.title).font(MusesTypography.song(size: 14, emphasized: true, text: row.title)).lineLimit(1)
+                Text(row.displayArtist).font(MusesTypography.song(size: 12, text: row.displayArtist))
+                    .foregroundStyle(BrandColors.textSecondary).lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            Text(formatDuration(row.duration))
+                .monospacedDigit().foregroundStyle(BrandColors.textSecondary)
+            Image(systemName: likedIDs.contains(row.snapshot.id) ? "heart.fill" : "heart")
+                .foregroundStyle(likedIDs.contains(row.snapshot.id) ? BrandColors.accent : BrandColors.textSecondary)
+                .frame(width: 28, height: 28)
+                .accessibilityHidden(true)
+        }
+        .frame(minHeight: 42)
+        .contentShape(Rectangle())
+    }
+
     var body: some View {
         VStack(spacing: 0) {
         if usesAccessiblePages {
@@ -472,60 +537,7 @@ private struct CollectionTrackTable: View {
             .padding(.vertical, 8)
         }
         if usesAccessiblePages {
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    ForEach(tableRows) { row in
-                        Button { onPlay(row) } label: {
-                            HStack(spacing: 12) {
-                                Text("\(row.canonicalIndex + 1)")
-                                    .monospacedDigit()
-                                    .foregroundStyle(BrandColors.textSecondary)
-                                    .frame(width: 40, alignment: .trailing)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(row.title).font(MusesTypography.song(size: 14, emphasized: true, text: row.title)).lineLimit(1)
-                                    Text(row.displayArtist).font(MusesTypography.song(size: 12, text: row.displayArtist))
-                                        .foregroundStyle(BrandColors.textSecondary).lineLimit(1)
-                                }
-                                Spacer(minLength: 8)
-                                Text(formatDuration(row.duration))
-                                    .monospacedDigit().foregroundStyle(BrandColors.textSecondary)
-                                Image(systemName: likedIDs.contains(row.snapshot.id) ? "heart.fill" : "heart")
-                                    .foregroundStyle(likedIDs.contains(row.snapshot.id) ? BrandColors.accent : BrandColors.textSecondary)
-                                    .frame(width: 28, height: 28)
-                                    .accessibilityHidden(true)
-                            }
-                            .frame(minHeight: 42)
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.fullAreaPlain)
-                        .padding(.horizontal, 16)
-                        .help(tr("Play \(row.title)", "播放 \(row.title)"))
-                        .accessibilityLabel("\(row.title), \(row.displayArtist)")
-                        .accessibilityValue(formatDuration(row.duration) + " · " + (likedIDs.contains(row.snapshot.id)
-                            ? tr("Liked", "已收藏") : tr("Not liked", "未收藏")))
-                        .accessibilityAction(named: Text(likedIDs.contains(row.snapshot.id)
-                            ? tr("Unlike", "取消收藏") : tr("Like", "收藏"))) {
-                            library.toggleLike(snapshot: row.snapshot)
-                        }
-                        .accessibilityActions {
-                            if let onRemove {
-                                Button(tr("Remove", "移除"), role: .destructive) { onRemove(row) }
-                            }
-                        }
-                        .contextMenu { contextMenu(for: [row.id]) }
-                        .task(id: row.snapshot.youTubeId) {
-                            do { try await Task.sleep(for: .milliseconds(350)) } catch { return }
-                            guard !Task.isCancelled, let importService else { return }
-                            _ = await importService.songMetadata(videoID: row.snapshot.youTubeId)
-                        }
-                        Divider()
-                    }
-                }
-            }
-            .background(BrandColors.background)
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                Color.clear.frame(height: OverlayChromeMetrics.scrollBottomInset)
-            }
+            accessibleTable
         } else {
             GeometryReader { viewport in
                 ScrollView(.horizontal) {
