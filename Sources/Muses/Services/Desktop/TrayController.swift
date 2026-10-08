@@ -194,16 +194,13 @@ final class TrayController: NSObject, NSPopoverDelegate {
 
     private func installDismissMonitors() {
         removeDismissMonitors()
-        localDismissMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
-            MainActor.assumeIsolated {
-                if let self, let popover = self.popover, popover.isShown,
-                   event.window !== popover.contentViewController?.view.window,
-                   event.window !== self.statusItem?.button?.window,
-                   event.window?.level != .popUpMenu {
-                    popover.performClose(nil)
-                }
+        localDismissMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .keyDown]) { [weak self] event in
+            let consume = MainActor.assumeIsolated {
+                guard let self, let popover = self.popover else { return false }
+                return Self.consumePopoverEvent(event, popover: popover,
+                    statusWindow: self.statusItem?.button?.window)
             }
-            return event
+            return consume ? nil : event
         }
         globalDismissMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
             MainActor.assumeIsolated { self?.popover?.performClose(nil) }
@@ -215,6 +212,26 @@ final class TrayController: NSObject, NSPopoverDelegate {
         if let globalDismissMonitor { NSEvent.removeMonitor(globalDismissMonitor) }
         localDismissMonitor = nil
         globalDismissMonitor = nil
+    }
+
+    /// Keeps native menu input separate from the compact player's window.
+    static func consumePopoverEvent(_ event: NSEvent, popover: NSPopover,
+                                    statusWindow: NSWindow?) -> Bool {
+        guard popover.isShown else { return false }
+        if event.type == .keyDown {
+            guard event.keyCode == 53,
+                  let window = popover.contentViewController?.view.window,
+                  event.window === window else { return false }
+            popover.performClose(nil)
+            return true
+        }
+        if event.type == .leftMouseDown || event.type == .rightMouseDown,
+           event.window !== popover.contentViewController?.view.window,
+           event.window !== statusWindow,
+           event.window?.level != .popUpMenu {
+            popover.performClose(nil)
+        }
+        return false
     }
 
     @objc private func menuAction(_ sender: NSMenuItem) {

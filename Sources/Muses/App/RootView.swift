@@ -333,11 +333,6 @@ struct RootView: View {
             }
             .dropDestination(for: URL.self, action: handleDroppedURLs)
             .onAppear(perform: handleAppear)
-            .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-                if NSApp.keyWindow == nil {
-                    MusesSingleInstance.orderFrontMainWindow()
-                }
-            }
             .onReceive(NotificationCenter.default.publisher(for: .musesToggleQueue)) { _ in
                 if showNowPlaying {
                     showNowPlaying = false
