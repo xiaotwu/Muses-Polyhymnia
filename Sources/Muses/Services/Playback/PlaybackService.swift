@@ -260,6 +260,14 @@ final class PlaybackService {
         guard nativePlaybackSuspensions.isEmpty else { return }
         guard !state.buffering else { return }
         guard !state.isPlaying else { return }
+        if lastCompletedTrackId == track.id {
+            // Replay owns a new load identity so an exhausted cycle's callback
+            // cannot consume its completion. Preserve an explicit seek before the end.
+            let resumeMs = state.position.isFinite && state.position < state.duration - 0.05
+                ? max(0, state.position) * 1000 : nil
+            scheduleLoad(track, resumeMs: resumeMs)
+            return
+        }
         engine.play()
         restoreCompletionEligibility(for: track)
         if startedTrackId == track.id {
@@ -786,6 +794,9 @@ final class PlaybackService {
         guard let track = state.track else { return }
         let listenedMs = listenedMilliseconds(for: track.id)
         pauseListening(track.id)
+        // Completion closes the listening interval even when the queue loops
+        // to the same track. The next load or prepared handoff starts a new one.
+        startedTrackId = nil
         let positionMs = max(0, track.durationSeconds, state.position) * 1000.0
         eventBus.post(.trackCompleted(track, listenedMs: listenedMs, positionMs: positionMs))
     }
