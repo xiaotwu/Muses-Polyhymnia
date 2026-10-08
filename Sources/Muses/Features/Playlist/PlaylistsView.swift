@@ -33,37 +33,55 @@ struct PlaylistsView: View {
         ytImports.filter { YouTubePlaylistSyncService.isWithinRecentlyDeletedRetention($0) }
     }
 
+    private var overviewTitle: some View {
+        Text(tr("All Playlists", "全部歌单"))
+            .font(MusesTypography.pageTitle)
+            .foregroundStyle(BrandColors.heading)
+    }
+
+    private var overviewControls: some View {
+        HStack(spacing: 16) {
+            Picker(tr("Playlist layout", "歌单布局"), selection: $overviewLayout) {
+                Label(tr("List", "列表"), systemImage: "list.bullet").tag("list")
+                Label(tr("Grid", "网格"), systemImage: "square.grid.2x2").tag("grid")
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(width: 150)
+            Menu {
+                Button(tr("New Muses Playlist", "新建 Muses 歌单"), systemImage: "plus.square.on.square") {
+                    showCreateSheet = true
+                }
+                Button(tr("Import YouTube Playlist", "导入 YouTube 歌单"), systemImage: "square.and.arrow.down") {
+                    showImportSheet = true
+                }
+                Button(tr("Create on YouTube", "在 YouTube 上创建"), systemImage: "play.rectangle.on.rectangle") {
+                    showCreateYouTubeSheet = true
+                }
+            } label: {
+                Image(systemName: "plus").frame(width: 28, height: 28)
+                    .accessibilityLabel(tr("Add Playlist", "添加歌单"))
+            }
+            .menuIndicator(.hidden)
+            .help(tr("Add Playlist", "添加歌单"))
+            .accessibilityLabel(tr("Add Playlist", "添加歌单"))
+        }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            HStack(alignment: .center, spacing: 16) {
-                Text(tr("All Playlists", "全部歌单"))
-                    .font(MusesTypography.pageTitle)
-                    .foregroundStyle(BrandColors.heading)
-                Spacer(minLength: 16)
-                Picker(tr("Playlist layout", "歌单布局"), selection: $overviewLayout) {
-                    Label(tr("List", "列表"), systemImage: "list.bullet").tag("list")
-                    Label(tr("Grid", "网格"), systemImage: "square.grid.2x2").tag("grid")
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .center, spacing: 16) {
+                    overviewTitle.fixedSize()
+                    Spacer(minLength: 16)
+                    overviewControls.fixedSize()
                 }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .frame(width: 150)
-                Menu {
-                    Button(tr("New Muses Playlist", "新建 Muses 歌单"), systemImage: "plus.square.on.square") {
-                        showCreateSheet = true
-                    }
-                    Button(tr("Import YouTube Playlist", "导入 YouTube 歌单"), systemImage: "square.and.arrow.down") {
-                        showImportSheet = true
-                    }
-                    Button(tr("Create on YouTube", "在 YouTube 上创建"), systemImage: "play.rectangle.on.rectangle") {
-                        showCreateYouTubeSheet = true
-                    }
-                } label: {
-                    Image(systemName: "plus").frame(width: 28, height: 28)
-                        .accessibilityLabel(tr("Add Playlist", "添加歌单"))
+                VStack(alignment: .leading, spacing: 12) {
+                    overviewTitle
+                        .fixedSize(horizontal: false, vertical: true)
+                    overviewControls
+                        .frame(maxWidth: .infinity, alignment: .trailing)
                 }
-                .menuIndicator(.hidden)
-                .help(tr("Add Playlist", "添加歌单"))
-                .accessibilityLabel(tr("Add Playlist", "添加歌单"))
             }
             .padding(.horizontal, AppleMusicTokens.contentPaddingX)
             .padding(.top, AppleMusicSpacing.browseTitleTop)

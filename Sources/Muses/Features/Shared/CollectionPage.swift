@@ -243,8 +243,8 @@ private struct CollectionEmptyPanel<Controls: View>: View {
 }
 
 /// One page-level title/action row shared by every collection presentation.
-/// Controls stay on the same visual line as the title while the row reserves a
-/// full native interaction height for pointer, keyboard, and accessibility use.
+/// Compact panes place controls below the title so both retain their native
+/// interaction height without compressing the collection identity away.
 struct CollectionPageHeader<Controls: View>: View {
     let title: String
     let youTubeURL: URL?
@@ -264,22 +264,32 @@ struct CollectionPageHeader<Controls: View>: View {
     }
 
     var body: some View {
-        HStack(alignment: .center, spacing: AppleMusicSpacing.related) {
-            HStack(alignment: .center, spacing: 10) {
-                Text(title)
-                    .font(MusesTypography.heading(title))
-                    .foregroundStyle(BrandColors.heading)
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .center, spacing: AppleMusicSpacing.related) {
+                heading.fixedSize()
+                Spacer(minLength: AppleMusicSpacing.related)
+                actions.fixedSize()
+            }
+            VStack(alignment: .leading, spacing: AppleMusicSpacing.related) {
+                heading
                     .lineLimit(2)
                     .fixedSize(horizontal: false, vertical: true)
-
-
+                actions.frame(maxWidth: .infinity, alignment: .trailing)
             }
-                .layoutPriority(1)
+        }
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+    }
 
-            Spacer(minLength: AppleMusicSpacing.related)
+    private var heading: some View {
+        Text(title)
+            .font(MusesTypography.heading(title))
+            .foregroundStyle(BrandColors.heading)
+    }
 
-            if showsActions {
-                MusesGlassGroup(spacing: 8) {
+    @ViewBuilder
+    private var actions: some View {
+        if showsActions {
+            MusesGlassGroup(spacing: 8) {
                 HStack(spacing: 16) {
                     controls
                     if youTubeURL != nil { Divider().frame(height: 20) }
@@ -303,10 +313,8 @@ struct CollectionPageHeader<Controls: View>: View {
                 .frame(minHeight: 44, alignment: .trailing)
                 .environment(\.groupedChromeActions, true)
                 .musesGlass(in: Capsule(), role: .compactControl)
-                }
             }
         }
-        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
     }
 }
 
