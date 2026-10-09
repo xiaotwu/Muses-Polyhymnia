@@ -48,3 +48,34 @@ All pilot/trial apps quit through targeted Command-Q; the driver acknowledgement
 The complete original own preference dictionary was restored and compared. Donor SQLite/WAL/SHM hashes and its complete preference dictionary matched; normal app Info.plist/executable hashes also matched. Only the unique owned registration, bundle, entitlements/staging and disposable data/cache were removed after bundle-ID, UID and no-symlink guards. Private source checkpoints, compact raw traces, summaries and owned-window screenshots remain under `~/.muses/acceptance/com.muses.acceptance.performance-oct08/evidence`. The current shared Release and ordinary apps/Keychain were preserved.
 
 Remaining XW-74 conditions: a complete-AX traversal that can coexist with a matched input cadence; a successfully finalized pointer frame trace with verified exposure; independent resolution of the A2 anchoring drift; and any separately requested physical trackpad/foreground/energy or long-duration memory study. Actual macOS 26 native runtime remains a separate family acceptance boundary. The runtime-complete marker means this executable phase was cleaned and released, not that these conditions or parent acceptance tasks passed.
+
+## Round 2: retained A2 evidence reconciliation — 2026-10-08
+
+This follow-up read the retained screenshots, input/read timestamps, response envelopes and table/credit implementation. It ran no new app, wheel workload, AX traversal, recorder, build or tests. The inspected collection files at reconciliation HEAD `676e53d` matched the measured `91cf337` source. First-round measurements and missing acceptance conditions remain intact.
+
+The earlier “row anchoring drift” describes a different return range; it does **not** establish a scroll-anchoring defect. The discrepancy localizes to one smaller captured movement around A2's seventh input. The eighth input moved the usual six rows and carried forward the four-row difference:
+
+| A2 input | Dispatch start/end, seconds from workload start | Whole visible range before → after | Captured movement |
+| --- | --- | --- | --- |
+| 6, up | 30.0002 → 31.5315 | 19–29 → 13–23 | Six rows |
+| 7, up | 35.0051 → 36.5598 | 13–23 → 11–21 | Two rows |
+| 8, up | 40.0004 → 41.6338 | 11–21 → 5–15 | Six rows |
+
+The seventh pre-read began at 32.5052 s and its post-read at 36.5599 s; the eighth pre-read began at 37.5017 s. A1's seventh dispatch was 35.0052 → 36.6168 s and moved 13–23 → 7–17. Both workloads met their programmed dispatch cadence. These durations include driver work; they do not measure when each notch reached AppKit or user-perceived response latency.
+
+Decoded pixel comparisons found identical whole-window images for A1 and A2 in each retained pair: sixth post → seventh pre, seventh post → eighth pre, eighth post → exit. In A2, divider spacing around the seventh input stayed approximately 60 screenshot pixels (ordinary one-pixel raster rounding), and overlapping rows retained their visible credits and consecutive order. This supports static *captured* intervals and uniform visible row pitch. The driver reports screenshot frame validity but `frame_freshness:unknown`, so image equality is not independent proof of an unchanged native scroll origin or all intervening frames.
+
+The already-retained later A2 pointer workload, in the same PID 45542/window 54983, began at 23:09:42.729815 UTC from 5–15. Its screenshots show 5–15 → 11–21 → 17–27 → 23–33 → 29–39 → 23–33 → 17–27 → 11–21 → 5–15, with all eight dispatches completed in 45.3162 s. It returned to its own starting range, without another two-row step. It was warm, started at a different range and ran alongside the recorder, so it is a diagnostic non-reproduction, not another controlled CPU replicate. The recorder still failed to finalize; these screenshots do not repair the missing frame evidence.
+
+### Source paths and attribution
+
+- `YouTubeAlbumDetailView` supplies playlist-order sorting. `YouTubeImportService.collectionSnapshot` supplies persisted occurrence IDs/order; `CollectionTrackRow.resolvingPresentationArtist` retains those values. Under the observed order-column sort, enriching an artist does not change the comparator key.
+- `CollectionTrackTitleCell` has a fixed 42-point frame; secondary text is single-line. `CollectionTableWidthObserver` disables native automatic row-height estimation while attached, restores the original policy on detach, and reports width only. The captures show no visible row-height expansion. Existing height-ownership and presentation-sort tests were read, not rerun.
+- Credit revision does republish the displayed row values. Per-visible-row enrichment waits 350 ms, coalesces video requests, then publishes fallback/detailed metadata; request completion can outlive the bounded direct-child wait. This remains a possible invalidation path, but the retained evidence has no credit-revision timestamps or native clip-origin trace to establish causation.
+- The table remains in its retained host. Its pointer-focus bridge handles mouse-down, not wheel events; the inspected table/host/width paths do not explicitly reset or scroll the vertical origin during credit updates. This does not rule out SwiftUI/AppKit adjustment during the input bracket.
+
+Every retained wheel response in both A runs reports `delivery.mode:background`, `route:synthetic_events`, `effect:unverifiable`. The driver's declared targeted-wheel contract defines amount 3 as three notches, but the responses contain no per-notch receipt/delta or application handling timestamps. A two-row movement is consistent with a smaller delivered/processed burst, yet it cannot prove dropped events. Background exposure, frame freshness and native anchoring remain unresolved confounds.
+
+The stronger next prerequisite is verified event receipt and native scroll-origin changes, with independently verified foreground/exposure, before attributing this to metadata or proposing a patch. Repeating the existing background script or the known 20-second full-AX timeout would add no useful discrimination. A future frame study also needs a short owned recording that successfully stops and exports before the actual workload. This round therefore closes the read-only reconciliation scope without a new native experiment or speculative source change. Complete AX comparison, valid pointer frame evidence and causal attribution remain open; no FPS, energy or leak claim is added.
+
+No new acceptance app, recorder, window, preference, library or disposable cache was created for this follow-up. Retained first-round evidence remains private and unchanged; only a compact reconciliation summary is added under its `evidence/round-2` directory. The second-round completion marker explicitly records `runtimeLaunched:false`; it is completion of this read-only follow-up, not a native acceptance pass or a replacement for predecessor markers.
