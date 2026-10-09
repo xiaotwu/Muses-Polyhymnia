@@ -90,9 +90,7 @@ struct HistoryView: View {
             if dashboard.recap.eventCount > 0 {
                 dashboardContent(dashboard)
             } else {
-                Picker(tr("History range", "历史时间范围"), selection: $range) {
-                    ForEach(RecapRange.allCases, id: \.self) { Text($0.label).tag($0) }
-                }.pickerStyle(.segmented).frame(maxWidth: 330)
+                rangePicker
                 rangeEmptyState
             }
         } else {
