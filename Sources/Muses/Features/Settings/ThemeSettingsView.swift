@@ -62,11 +62,14 @@ private struct SettingsFontPicker: View {
     @Bindable var typography: TypographyPreferences
     @State private var families: [String] = []
     @State private var query = ""
+    @State private var keyboardSelection = SettingsFontKeyboardSelection()
     @FocusState private var searching: Bool
 
     private var filtered: [String] {
         families.filter { query.isEmpty || $0.localizedStandardContains(query) }
     }
+
+    private var visibleFamilies: [String] { ["system", ""] + filtered }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -74,11 +77,34 @@ private struct SettingsFontPicker: View {
             TextField(tr("Search system fonts", "搜索系统字体"), text: $query)
                 .textFieldStyle(.roundedBorder)
                 .focused($searching)
-            ScrollView {
-                LazyVStack(spacing: 2) {
-                    fontRow("system", title: tr("System", "系统"))
-                    fontRow("", title: tr("Classic Muses", "Muses 经典"))
-                    ForEach(filtered, id: \.self) { family in fontRow(family, title: family) }
+                .help(tr("Use Up and Down to choose a font, Return to apply, and Escape to close.",
+                         "使用上下方向键选择字体，回车应用，Escape 关闭。",
+                         zhHant: "使用上下方向鍵選擇字體，Return 套用，Escape 關閉。"))
+                .onKeyPress(keys: [.downArrow], phases: [.down, .repeat]) { press in
+                    guard SettingsFontKeyboardSelection.acceptsModifiers(press.modifiers) else { return .ignored }
+                    keyboardSelection.move(by: 1, within: visibleFamilies)
+                    return .handled
+                }
+                .onKeyPress(keys: [.upArrow], phases: [.down, .repeat]) { press in
+                    guard SettingsFontKeyboardSelection.acceptsModifiers(press.modifiers) else { return .ignored }
+                    keyboardSelection.move(by: -1, within: visibleFamilies)
+                    return .handled
+                }
+                .onSubmit {
+                    if let family = keyboardSelection.confirmedFamily(within: visibleFamilies) {
+                        typography.family = family
+                    }
+                }
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(spacing: 2) {
+                        fontRow("system", title: tr("System", "系统"))
+                        fontRow("", title: tr("Classic Muses", "Muses 经典"))
+                        ForEach(filtered, id: \.self) { family in fontRow(family, title: family) }
+                    }
+                }
+                .onChange(of: keyboardSelection.candidate) { _, family in
+                    if let family { proxy.scrollTo(family, anchor: .center) }
                 }
             }
             TypographyLiveSamples(compact: true)
@@ -87,6 +113,7 @@ private struct SettingsFontPicker: View {
         .multilineTextAlignment(.leading)
         .frame(width: 380, height: 360)
         .onExitCommand { dismiss() }
+        .onChange(of: query) { _, _ in keyboardSelection.reset() }
         .task {
             families = NSFontManager.shared.availableFontFamilies.sorted { $0.localizedStandardCompare($1) == .orderedAscending }
             searching = true
@@ -94,7 +121,10 @@ private struct SettingsFontPicker: View {
     }
 
     private func fontRow(_ family: String, title: String) -> some View {
-        Button { typography.family = family } label: {
+        Button {
+            keyboardSelection.reset()
+            typography.family = family
+        } label: {
             HStack {
                 Text(title)
                 Spacer()
@@ -103,9 +133,18 @@ private struct SettingsFontPicker: View {
             .padding(.horizontal, 8)
             .frame(maxWidth: .infinity, minHeight: 30)
             .settingsSelection(typography.family == family)
+            .overlay {
+                if searching && keyboardSelection.candidate == family {
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(BrandColors.accent, lineWidth: 2)
+                }
+            }
             .contentShape(Rectangle())
         }
         .buttonStyle(.fullAreaPlain)
+        .id(family)
+        .accessibilityValue(keyboardSelection.candidate == family
+            ? tr("Ready to apply", "待确认", zhHant: "待確認") : "")
         .accessibilityAddTraits(typography.family == family ? .isSelected : [])
     }
 }

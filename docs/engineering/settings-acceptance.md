@@ -1,5 +1,7 @@
 # Settings and App Intents acceptance
 
+Round 2 supplements the remaining keyboard/focus cells in [Settings focus follow-up](settings-focus-followup.md); this first-round record retains its original source and observations.
+
 2026-10-08 execution of XW-71 and XW-75, under the [feature acceptance scope](feature-acceptance.md) and [execution coordination](execution-coordination.md). This records the completed local runtime phase, not completion of every external acceptance condition. XW-25 remains open.
 
 ## Candidate and evidence
