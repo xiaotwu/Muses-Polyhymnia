@@ -2,14 +2,14 @@
 
 更新时间：2026-10-08。当前工作入口是 Codex 对话「整理并执行Linear剩余任务」。近期列表之外，已补查旧项目路径的十四个较早对话；共二十二个历史对话的有效结论已归并，可恢复归档。归档不表示其中提及的所有验收都通过，也不删除历史证据。
 
-最新的具体结果、剩余条件与接续顺序见 [当前状态](current-status.md)。四组首轮运行均已完成并清理；XW-76/77/78 的新发现缺陷已修复，882 项测试的完整 CI 通过。XW-71/72/73/74 保持 In Review，下一轮只补剩余状态。
+最新结果和接续条件见 [当前状态](current-status.md)。已确认的 XW-69/70/76/77/78/80/81/82 均 Done，代码 `e44a058` 的完整 CI 通过 886 项测试/120 个套件。第二轮已恢复清理并释放资源，XW-71/72/73/74/79 保持 In Review，XW-75 保持 Backlog；本地尾曲验收等待手动解锁，完整产品验收未全部通过。
 
 本目录将仍有效的结论分为三类，并由 Linear 管理执行状态：
 
 | 分类 | 技术文档 | 执行任务 |
 | --- | --- | --- |
-| 已证实的缺陷与修复 | [修复任务](repairs.md)、[来源修复](source-state-acceptance.md)、[CI 回归](source-ci-regression.md) | XW-69、XW-70、XW-76、XW-77、XW-78；已完成修复保持原状态 |
-| 功能实现与补充验收 | [功能及验收](feature-acceptance.md) | XW-71、XW-72、XW-73、XW-75；沿用 XW-62 与既有阶段任务 |
+| 已证实的缺陷与修复 | [修复任务](repairs.md)、[来源修复](source-state-acceptance.md)、[CI 回归](source-ci-regression.md)、[缓存恢复](source-cache-recovery.md) | XW-69、XW-70、XW-76、XW-77、XW-78、XW-80、XW-81、XW-82 均完成 |
+| 功能实现与补充验收 | [功能及验收](feature-acceptance.md)、[草稿/历史跟进](playlist-flow-followup.md) | XW-71、XW-72、XW-73、XW-75、XW-79；沿用 XW-62 与既有阶段任务 |
 | 性能与优化调查 | [优化项](performance.md) | XW-74；无证据的排查候选不直接变成重构任务 |
 
 判断顺序：当前用户决定和批准规格 → 当前源码 → 实际运行 → 测试 → 历史记录。历史对话不能恢复已淘汰产品方向；测试通过不能替代原生界面验收。总体 UI 验收仍使用 [64 区域对照表](../ui-ux-acceptance-reconciliation.md)，具体操作使用 [验收记录](../ui-ux-redesign-acceptance.md)。
@@ -47,7 +47,7 @@
 
 ## 当前执行顺序
 
-用户已授权分对话执行；具体并行读取、互斥修改与顺序原生验收见 [执行协调](execution-coordination.md)。XW-69/70 已完成，以下顺序保留其依赖关系，后续从 XW-71/72 开始。
+用户已授权分对话执行；并行读取、互斥修改和原生顺序见 [执行协调](execution-coordination.md)。以下是已执行的依赖顺序；当前完成结果及唯一下一本地检查点以 [当前状态](current-status.md) 为准，不重新从 XW-71/72 开始整轮。
 
 1. XW-70：恢复原有 macos-26 / Swift 6.3.3 CI 编译、测试、App Intents 和包装检查；不通过升级 runner 或跳过测试掩盖问题。
 2. XW-69：旧 Desktop 分类重定向到实际拥有桌面控件的 General，完成序列化恢复/历史回归及原生所有权检查。

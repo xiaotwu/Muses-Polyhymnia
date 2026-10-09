@@ -1,35 +1,45 @@
-# 当前状态与剩余执行
+# 当前修复与验收状态
 
-2026-10-08 核对。源码与文档基线 `61c2a7b` 已推送，工作区干净；该提交的[完整 macOS CI](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/37861537949)通过。此前缓存修复 `91cf337` 的独立 CI 也通过：882 项测试、119 个套件，App Intents 元数据和预览包装均成功。macOS CI 不替代实际 macOS 26 图形验收。
+2026-10-08 最终核对。已确认的 XW-69/70/76/77/78/80/81/82 均 Done，Linear 的 Muses Bug 标签下没有开放项。最新代码 `e44a058` 的[完整 macOS CI](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/37874847384)成功：886 项测试、120 个套件（41.171s），发布配置、App Intents 元数据、预览包装与上传均通过。后续验收记录 `299efbd` 只修改文档；不据此重复已通过的代码测试，也不把 CI 当作完整原生验收。
 
-Linear 当前以 XW-5 及子任务组织工作，没有独立 Muses Project 对象。下一轮启动前共 24 项开放：17 In Review、6 In Progress、1 Backlog。阶段与协调父任务包含在其中，不代表 24 个独立缺陷。XW-69/70/76/77/78 的具体修复已完成；所有已提交改动均已推送，无待合并分支。
+Linear 以 XW-5 及子任务组织工作，没有独立 Muses Project 对象。仍有 25 项开放：18 In Review、6 In Progress、1 Backlog，包含阶段和协调父任务，不能当作 25 个尚未修复的缺陷。所有源码改动均已推送，无待合并源码。完整产品验收尚未全部通过。
 
-## 本轮已完成的具体范围
+## 已完成的修复
 
-| 类别 | 已完成 | 剩余条件 | 证据 |
-| --- | --- | --- | --- |
-| 修复 | 旧 Desktop 设置路由；Swift 6.3 编译推断；来源取消与晚到响应；Home 打开目录详情；旧缓存写入复活/覆盖竞态 | 保持各修复自己的验收边界 | [修复记录](repairs.md)、[来源报告](source-state-acceptance.md)、[CI 回归](source-ci-regression.md) |
-| Settings，XW-71 | 十类设置、普通入口与深链接、历史、后台播放、字体指针选择、即时样本、语言/字号恢复、帮助折叠与 Escape | 字体/帮助键盘路径及弹窗关闭后的焦点；完整辅助功能与实际 macOS 26 | [Settings 验收](settings-acceptance.md) |
-| 辅助窗口，XW-72 | MiniPlayer 生命周期/Pin、窗口命令、共享播放；桌面歌词真实空态/拖动/释放；菜单栏 Escape 与共享音量 | 控件焦点、更多应用内外观组合、真实同步歌词；系统 Dark 菜单栏与完整辅助功能 | [辅助窗口验收](auxiliary-acceptance.md) |
-| 来源状态，XW-73 | 匿名 Home 加载/缓存/过期恢复、真正目录详情与集合播放；New 图书馆上下文；Albums/Artists 真实未解析空态；取消回归 | 指针 Retry 失败恢复、非空图书馆目录、身份匹配个性化 Home 等尚未到达的状态 | [来源状态验收](source-state-acceptance.md) |
-| 性能，XW-74 | 两次真实指针滚动、独立进程 CPU/RSS、AX 超时诊断与框架布局热点记录 | 完整 AX 对照无效；第二次行锚点偏差未归因；指针帧录制未有效结束 | [滚动报告](scrolling-performance.md) |
-| App Intents，XW-75 | 两项 Intent 包装元数据与声明核对 | 没有已授权、能安全定向隔离实例的现成调用路径；保留 Backlog | [Settings / Intents 边界](settings-acceptance.md) |
+| 任务 | 具体问题与结果 | 证据 |
+| --- | --- | --- |
+| XW-69 | 旧 Desktop 设置分类指向实际拥有控件的 General；序列化/历史回归与原生归属通过 | [修复分析](repairs.md) |
+| XW-70 | 限定 Swift 6.3 表格/播客表达式推断，原有 CI 全阶段恢复 | [修复分析](repairs.md) |
+| XW-76 | Home 准备和目录响应保留取消/操作身份，禁止晚到结果更新缓存 | [来源验收](source-state-acceptance.md) |
+| XW-77 | 空 Search query 不再隐藏或清除 Home 打开的目录详情，实际集合上下文与历史通过 | [来源验收](source-state-acceptance.md) |
+| XW-78 | 旧异步写入不能重建已删除缓存或覆盖新值；冷读测试等待持久化完成 | [CI 回归](source-ci-regression.md) |
+| XW-80 | 字体搜索框 Up/Down、Return 和查询重置/取消路径可用；真实原生键事件验证通过 | [焦点跟进](settings-focus-followup.md) |
+| XW-81 | 清除已打开的账户 Web 缓存后可重新持久保存并冷读，其他分区保持隔离 | [缓存恢复](source-cache-recovery.md) |
+| XW-82 | 空历史范围复用既有横向隐藏视觉标签控件；常规 Light/Dark 和 840×804 真实复查通过 | [播放与草稿跟进](playlist-flow-followup.md) |
 
-四组隔离实例均退出；原始数据、完整偏好和普通应用校验一致，专用临时资源已清理，协调锁已释放。22 个历史对话的有效结论已归并并可恢复归档。保留当前协调对话及有未完任务的执行对话。
+此前 XW-53 等紧凑布局、Queue、播放器和歌词修复的具体通过项继续复用。XW-62 评论请求竞争代码已经修复，真实非空回复仍受现有 `insufficientPermissions` 限制，保持 In Review；不扩大认证或制造回复。
 
-## 下一轮顺序
+## 新增验收与保留边界
 
-源码和证据审查并行，源码修改/构建/测试与原生操作仍互斥；原生顺序如下。每个执行者先从既有报告中扣除通过项，只补具体缺口。
+| 范围 | 新增实际结果 | 尚未通过 |
+| --- | --- | --- |
+| XW-71 Settings | 十类设置、真实历史和后台播放；字体指针/键盘选择、即时样本、语言/字号恢复、Help 折叠及 Escape | 当前键盘模式 0 下按钮遍历/原按钮焦点返回、完整辅助功能和实际 macOS 26 |
+| XW-72 辅助窗口 | MiniPlayer 生命周期/Pin/快捷键共享播放；真实 LRCLIB 桌面歌词 Light/Dark 和 35.39s 行跳转；空态/拖动/释放；菜单栏 Escape 与共享音量 | 物理控件交接/完整焦点、真实未同步歌词、系统 Dark 菜单栏及外部矩阵 |
+| XW-73 来源 | 匿名 Home 加载/缓存/过期恢复、真实目录上下文；New 图书馆上下文及诚实未解析空态；取消与缓存修复 | 指针 Retry 失败恢复、非空图书馆目录、成功身份匹配个性化 Home等条件 |
+| XW-79 草稿/历史 | Dark group/history、非法整数保留草稿与 Cancel、真实 test 请求 pending/error Cancel；一个公开来源 108 项只读选择/Back/确认取消，无 Import；取消检查点 27 表一致 | 原 test 源当前返回 playlist does not exist；真实 canonical-tail 选择/可播放/自然 stop/wrap 未验 |
+| XW-74 性能 | 真正指针滚动、CPU/RSS与保留 trace；A2 偏差收窄到第七次输入，后续同进程序列未重现 | 完整 AX 对照无效，指针帧记录未完成；没有因果归因、FPS、能耗或泄漏改善结论 |
+| XW-75 App Intents | 两项已有能力的元数据与声明核对 | 安全隔离的真实系统调用条件尚不足，保持 Backlog |
 
-1. **Settings 键盘与焦点（XW-71）**：先区分当前 `AppleKeyboardUIMode=0` 的系统语义、驱动输入限制和应用缺陷。核对字体结果的方向键/确认/取消、帮助折叠、信息弹窗焦点返回；只有真实复现的缺陷触发窄修复。不改变 OS 键盘或辅助功能设置。
-2. **辅助控件焦点与真实歌词（XW-72）**：复用生命周期通过项，补 MiniPlayer 和桌面歌词控件的键鼠交接及应用内 Light/Dark；只有真实可取得的歌词文档能用于同步/非同步状态。系统菜单栏 Dark 仍受外部条件限制。
-3. **已授权编辑与播放分支（XW-79，父 XW-26）**：先将未验 group/history、导入/编辑草稿取消与失败分支精确对应源码及旧证据，再在独立副本补可执行路径。只允许 `test` 歌单操作；不清空历史、不执行 group 删除、远端 Push 或 Liked 操作。自然结束/尾部 wrap 仅在真实可播放条件下验收。
-4. **滚动跟进（XW-74）**：先分析已保留的行区间/信用信息变化与布局、输入日志，缩小第二次锚点偏差来源。只在有新假设与受控条件时重测，先解决前台暴露和录制完成条件；不重复相同的全 AX 超时，不据 CPU/RSS 声称 FPS、能耗或泄漏改善。
+详见 [Settings](settings-acceptance.md)、[辅助窗口](auxiliary-acceptance.md)、[辅助焦点/真实歌词](auxiliary-focus-followup.md)、[滚动报告](scrolling-performance.md)、[64 区域对照](../ui-ux-acceptance-reconciliation.md)。没有新增已批准但完全缺失的产品功能；剩余主要是具体原生/来源/系统验收条件。
 
-第二轮私有计划位于 `~/.muses/tmp/engineering-oct08/round-2/plan.json`，使用新的 `status` / `runtime-complete`；工作区和运行锁沿用全局锁。旧完成标记不能跳过第二轮顺序。当前阶段无法继续时，恢复/退出/清理后记录明确条件并释放该阶段，允许下一独立任务前进。
+## 恢复与继续
 
-## 外部或排除条件
+所有本轮拥有的应用和窗口均已退出，完整临时偏好已恢复，专用 data/cache 已清理，工作区/运行锁已释放。源 SQLite/WAL/SHM、完整源偏好及正常应用文件校验一致。副本会话更新时间和 JSON 编码顺序变化已独立审计；队列五项解码后的值与顺序相同，不是新增数据 Bug。恢复后的副本另行验证 27 表、schema 与完整性一致，不抹去此前真实运行差异。
 
-实际 macOS 26、完整 VoiceOver 与用户延期的 OS 显示/辅助功能矩阵；非空授权订阅；评论 `insufficientPermissions`；成功且身份匹配的 Personalized Home；安全真实 App Intents 调用，均保持未验。远端写入、权限扩张、输出设备/系统音量变化、发布安装及破坏性历史/group 操作不进入本轮。
+最后阶段 Mac 锁屏，AX/截图及正常原生退出不可用；在准确 UID、唯一 bundle、执行文件和启动时间核验后，仅对暂停的专用实例发送 SIGTERM，没有 force-kill。退出后恢复独立偏好与原始物理域缺席，保留私有证据、只读备份和不运行的签名候选作为后续材料。
 
-XW-5/12/25/26/19/27 继续跟踪对应剩余条件。阶段任务 In Review 表示已有实现与部分证据，不批量改成 Done；没有新的已批准但完全缺失的产品功能，本轮继续处理实际缺陷与验收缺口。
+**下一项本地验收是尾曲自然结束。** 等待用户手动解锁；优先使用已经存在的分页/列表等后台原生路径，必要前台输入须有明确授权。下一阶段使用新隔离 namespace/data seed，保留真实 canonical occurrence/集合上下文，不以显式 Next、单结果 Search 或合成时间替代自然 stop/wrap。已通过的编辑、公开预览和布局流程不重做。
+
+实际 macOS 26、完整 VoiceOver 与用户延期的 OS 矩阵、非空授权订阅、评论权限、身份匹配 Personalized Home及安全真实 App Intents条件仍保持未验。只允许 `test` 的已授权修改/Pull/恢复；不执行 Liked、破坏性历史/group操作、远端写入、权限或 OS/输出变化、发布安装。22 个历史对话已归并且可恢复归档，当前有未完验收的执行对话继续保留。
+
+第二轮记录位于 `~/.muses/tmp/engineering-oct08/round-2/`。完成标记表示当前可执行子集已清理并释放资源，不能代替人类解锁、前台授权或完整父任务通过。

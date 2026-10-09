@@ -2,6 +2,16 @@
 
 本页只把可复现行为或实际编译失败列为缺陷；未验收分支与测量候选分别见 [功能验收](feature-acceptance.md) 和 [优化调查](performance.md)。执行状态以对应 Linear 任务为准。
 
+2026-10-08 最终核对：XW-69/70/76/77/78/80/81/82 均 Done，没有开放的 Muses Bug 标签任务。代码 `e44a058` 的[完整 CI](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/37874847384)通过 886 项测试/120 个套件、元数据和预览包装；未验原生/系统/账号条件仍不算通过。
+
+| 后续修复 | 范围 | 分析与验证 |
+| --- | --- | --- |
+| XW-76/77 | 异步准备/目录取消，以及空 Search query 打开的真实目录详情 | [来源报告](source-state-acceptance.md) |
+| XW-78 | 旧异步磁盘写入撤销/替换顺序与冷读持久完成 | [CI 回归](source-ci-regression.md) |
+| XW-80 | 已聚焦字体搜索的方向键、Return、查询重置与取消 | [原生焦点跟进](settings-focus-followup.md) |
+| XW-81 | 隐私清除后撤销并淘汰旧分区对象，恢复新快照冷读，保持其他账户/层/语言隔离 | [缓存恢复](source-cache-recovery.md) |
+| XW-82 | 空历史范围复用已有横向 picker；常规与 840×804 真实渲染 | [草稿/历史报告](playlist-flow-followup.md) |
+
 ## XW-69：旧 Desktop 设置入口指向错误分类
 
 `SettingsPage` 的 General 分支拥有 `DesktopSettingsView`，提供 Menu bar、Mini player 和 Desktop lyrics。`SettingsCategory.desktop.destination` 仍指向 Appearance，因此旧保存值、类别请求及 `BrowseRouteSnapshot` 解码会指向没有这些控件的页面。
