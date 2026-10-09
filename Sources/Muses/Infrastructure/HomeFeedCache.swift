@@ -107,7 +107,12 @@ final class HomeFeedCache {
             (scope == nil || partition.scope == scope)
                 && (layer == nil || partition.layer == layer)
         }
-        for cache in targets.values { cache.clearAll() }
+        for (partition, cache) in targets {
+            cache.clearAll()
+            // Retire revoked handles before their directories are removed.
+            // A later access must initialize a writable partition again.
+            caches.removeValue(forKey: partition)
+        }
 
         // A privacy deletion must also remove dormant locale partitions that
         // were not opened during this process. Only the exact mode/scope/layer
@@ -135,7 +140,7 @@ final class HomeFeedCache {
         }
     }
 
-    /// Completes already dispatched persistence before reopening a cold cache.
+    /// Completes writes in currently opened partitions before a cold cache read.
     func flushPendingWrites() async {
         let pending = Array(caches.values)
         for cache in pending { await cache.flushPendingWrites() }

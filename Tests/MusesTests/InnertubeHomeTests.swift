@@ -150,6 +150,96 @@ struct InnertubeHomeTests {
         #expect(!FileManager.default.fileExists(atPath: legacyFile.path))
     }
 
+    @Test("cleared account Web partitions can persist fresh snapshots for a cold reader",
+          arguments: [false, true])
+    @MainActor
+    func webCacheRecoversAfterPrivacyDeletion(openBothLocales: Bool) async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("muses-home-recovery-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let selectedScope = HomeFeedScope.account(channelID: "UC1234567890123456789012")
+        let otherScope = HomeFeedScope.account(channelID: "UC9876543210987654321098")
+        func input(_ scope: HomeFeedScope, language: String = "en",
+                   region: String = "US") -> HomeDiscoveryInput {
+            HomeDiscoveryInput(
+                topArtistNames: [], recentlyPlayedArtistNames: [], likedArtistNames: [],
+                timeBand: .morning, hour: 9, scope: scope, language: language, region: region)
+        }
+        let english = input(selectedScope)
+        let traditional = input(selectedScope, language: "zh-Hant", region: "TW")
+        let other = input(otherScope)
+        let guest = input(.guest)
+        let now = Date()
+        func snapshot(_ input: HomeDiscoveryInput, id: String,
+                      source: HomeSource = .publicDiscovery) -> HomeSnapshot {
+            let channel: String?
+            if source == .signedInWeb, case .account(let id) = input.scope {
+                channel = id
+            } else { channel = nil }
+            let card = YouTubeDiscoveryCard(
+                id: "video:dQw4w9WgXc", title: "Normalized cache fixture", browseEndpoint: nil,
+                playEndpoint: HomeCardEndpoint(kind: .video, identifier: "dQw4w9WgXc"),
+                availability: .available)
+            return HomeSnapshot(
+                scope: input.scope,
+                sections: [HomeSection(id: id, title: "Fixture", kind: .quickPicks,
+                                       items: [.youTube(card)], source: source,
+                                       accountChannelID: channel)],
+                fetchedAt: now, expiresAt: now.addingTimeInterval(600))
+        }
+        let baseline: [(input: HomeDiscoveryInput, mode: HomeRecommendationMode, id: String)] = [
+            (english, .youtubeMusic, "baseline-en"),
+            (traditional, .youtubeMusic, "baseline-zh"),
+            (guest, .youtubeMusic, "guest-baseline"),
+            (english, .muses, "other-mode-baseline")
+        ]
+        let seed = HomeFeedCache(directory: root)
+        for entry in baseline {
+            try #require(seed.set(snapshot(entry.input, id: entry.id), for: entry.input,
+                                  layer: .baseline, mode: entry.mode))
+        }
+        for (value, id) in [(english, "old-en"), (traditional, "old-zh"), (other, "other-account")] {
+            try #require(seed.set(snapshot(value, id: id, source: .signedInWeb),
+                                  for: value, layer: .web, mode: .youtubeMusic))
+        }
+        await seed.flushPendingWrites()
+
+        let cache = HomeFeedCache(directory: root)
+        try #require(cache.get(for: english, layer: .web, mode: .youtubeMusic) != nil)
+        if openBothLocales {
+            try #require(cache.get(for: traditional, layer: .web, mode: .youtubeMusic) != nil)
+        }
+        let englishDirectory = cache.directoryURL(
+            for: selectedScope, layer: .web, mode: .youtubeMusic, language: "en", region: "US")
+        let traditionalDirectory = cache.directoryURL(
+            for: selectedScope, layer: .web, mode: .youtubeMusic, language: "zh-Hant", region: "TW")
+        let legacy = englishDirectory.deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent(HomeFeedCache.Layer.web.directoryName, isDirectory: true)
+        try FileManager.default.createDirectory(at: legacy, withIntermediateDirectories: true)
+        try JSONEncoder().encode(snapshot(english, id: "legacy", source: .signedInWeb))
+            .write(to: legacy.appendingPathComponent("legacy.json"))
+
+        cache.invalidate(scope: selectedScope, layer: .web, mode: .youtubeMusic)
+        #expect(!FileManager.default.fileExists(atPath: englishDirectory.path))
+        #expect(!FileManager.default.fileExists(atPath: traditionalDirectory.path))
+        #expect(!FileManager.default.fileExists(atPath: legacy.path))
+        // Do not cold-read the deleted target before set: that would recreate
+        // its directory and hide the opened handle's recovery failure.
+        for (value, id) in [(english, "fresh-en"), (traditional, "fresh-zh")] {
+            try #require(cache.set(snapshot(value, id: id, source: .signedInWeb),
+                                   for: value, layer: .web, mode: .youtubeMusic))
+            #expect(cache.get(for: value, layer: .web, mode: .youtubeMusic)?.value.sections.first?.id == id)
+        }
+        await cache.flushPendingWrites()
+        let cold = HomeFeedCache(directory: root)
+        #expect(cold.get(for: english, layer: .web, mode: .youtubeMusic)?.value.sections.first?.id == "fresh-en")
+        #expect(cold.get(for: traditional, layer: .web, mode: .youtubeMusic)?.value.sections.first?.id == "fresh-zh")
+        #expect(cold.get(for: other, layer: .web, mode: .youtubeMusic)?.value.sections.first?.id == "other-account")
+        for entry in baseline {
+            #expect(cold.get(for: entry.input, layer: .baseline, mode: entry.mode)?.value.sections.first?.id == entry.id)
+        }
+    }
+
     @Test("local ranking is deterministic and contains only supplied tracks")
     func localRankingIsDeterministic() {
         let now = Date(timeIntervalSince1970: 2_000_000_000)
