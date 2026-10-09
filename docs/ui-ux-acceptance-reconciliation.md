@@ -86,6 +86,19 @@ Both retained choice documents contain the same 64 area selections. That establi
 
 ## Remaining sequential route
 
+The 2026-10-08 follow-through adds scoped evidence from [Settings](engineering/settings-acceptance.md), [auxiliary windows](engineering/auxiliary-acceptance.md), [source states](engineering/source-state-acceptance.md), [cache CI regression](engineering/source-ci-regression.md) and [scrolling](engineering/scrolling-performance.md). Exact per-area additions and retained gaps:
+
+| Areas | Additional accepted subset | Still unaccepted |
+| --- | --- | --- |
+| 07, 10, 16, 28, 62 | Genuine anonymous Home loading/saved/expired recovery; Home-to-catalog details and collection playback; New with 655-song library copy; honest unresolved library catalog states. Source cancellation and detail-route defects XW-76/77 repaired. | Pointer Retry transport failure, nonempty library catalog overview and successful identity-matched Personalized Home; the public details do not substitute for library/account states. |
+| 46 | MiniPlayer enable/open/close/reopen/Pin and native window commands; shared playback; desktop lyrics true No lyrics/drag/release; tray Escape/main return/bidirectional volume. | Control focus traversal, real timed/untimed lyrics, remaining appearance combinations and system Dark tray. |
+| 49, 50, 53, 60 | All ten Settings categories, ordinary/reset and Account deep link, Back/Forward; real playback continues while PlayerBar is hidden; pointer font selection/live samples, language/size cold restoration, Help disclosures and Escape. | Keyboard font/help selection and information-popover focus return under unchanged OS keyboard mode; full VoiceOver and appearance matrix. |
+| 14, 64 | Two minimal-inspection real wheel runs and retained CPU/RSS; A1 row path returned 1–11, A2 had late range drift. Owned diagnostic traces identified framework layout churn after full AX inspection. | Both full-AX trials timed out before wheels, so no valid controlled ABBA; pointer frame recorder did not finalize; A2 drift is not attributed. No FPS, energy, leak or optimization claim. |
+
+XW-78 repaired obsolete asynchronous cache publication and made cold-cache fixtures await persistence. Source repair `91cf337` and final report `61c2a7b` passed full macOS CI, 882 tests / 119 suites plus metadata/preview packaging; this is not actual macOS 26 native acceptance. All four disposable sessions restored preferences, verified source preservation, exited and cleaned exact owned resources. These additions supplement the table rather than closing each area's entire matrix.
+
+The [current execution status](engineering/current-status.md) replaces historical next-step/count text below for scheduling. At reconciliation, 24 issues were open: 17 In Review, six In Progress and one Backlog, including parents/coordinators. XW-71/72/73/74 retain explicit remaining conditions; XW-75 is Backlog. XW-79 subsequently scopes still-unexercised authorized playlist/queue/history states under XW-26. Second-round native work uses fresh completion markers and global mutual exclusion, without repeating accepted paths.
+
 1. Local journey, representative owned-process samples/trace exports, cold semantic queue comparison and exact session cleanup are now complete; see the final local session for observed results and limitations.
 2. Reconcile the parent Linear issues against the specific accepted branches and retained gaps. Do not close XW-25/26/19/27 by treating external, excluded or unexercised cells as passes.
 3. Future work must target a specific remaining cell, use only test for playlist operations and rebuild a fresh isolated candidate when native work is needed. The previous guest/cache/signing material has been removed after its final use.
