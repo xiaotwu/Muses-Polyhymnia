@@ -260,6 +260,12 @@ final class PlaybackService {
         guard nativePlaybackSuspensions.isEmpty else { return }
         guard !state.buffering else { return }
         guard !state.isPlaying else { return }
+        if state.error != nil {
+            // A failed load has no resumable backend. Reuse this occurrence and
+            // only emit a start after a new load actually succeeds.
+            scheduleLoad(track)
+            return
+        }
         if lastCompletedTrackId == track.id {
             // Replay owns a new load identity so an exhausted cycle's callback
             // cannot consume its completion. Preserve an explicit seek before the end.

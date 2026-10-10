@@ -117,6 +117,57 @@ struct ExternalPlaybackRouterTests {
         playback.pause()
     }
 
+    @Test("failed current playback retries without replacing collection or Up Next", arguments: [false, true])
+    func failedCurrentTrackRetries(viaExternalLink: Bool) async throws {
+        let suite = "com.muses.test.external-retry-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let engine = RecordingEngine()
+        engine.loadError = .sourceUnavailable
+        let queue = QueueService()
+        let playback = PlaybackService(engine: engine, queue: queue, volumeDefaults: defaults)
+        defer { playback.pause() }
+        let first = makeTrack("first123456")
+        let second = makeTrack("second12345")
+        let upNext = makeTrack("upnext12345")
+        var starts = 0
+        let eventToken = playback.eventBus.subscribe { event in
+            if case .trackStarted = event { starts += 1 }
+        }
+        defer { playback.eventBus.unsubscribe(eventToken) }
+        playback.playTrack(first, context: [first, second], from: .songs)
+        queue.addToQueue(upNext)
+        for _ in 0..<200 where engine.loadCallCount == 0 { await Task.yield() }
+        #expect(playback.state.error == .sourceUnavailable)
+        #expect(!playback.state.isPlaying)
+        #expect(starts == 0)
+        let originalItemIDs = queue.items.map(\.id)
+        let originalUpNextIDs = queue.upNext.map(\.id)
+        let originalCurrentID = queue.current()?.id
+        let router = ExternalPlaybackRouter(playback: playback) { _ in first }
+        let url = try #require(URL(string: "muses://play?trackId=\(first.id.uuidString)"))
+
+        // A second failed resolution must remain a failure, never a false start.
+        if viaExternalLink { router.open(url) } else { playback.play() }
+        for _ in 0..<200 where engine.loadCallCount < 2 { await Task.yield() }
+        #expect(engine.loadCallCount == 2)
+        #expect(playback.state.error == .sourceUnavailable)
+        #expect(!playback.state.isPlaying)
+        #expect(starts == 0)
+
+        engine.loadError = nil
+        if viaExternalLink { router.open(url) } else { playback.play() }
+        for _ in 0..<200 where engine.loadCallCount < 3 { await Task.yield() }
+        #expect(engine.loadCallCount == 3)
+        #expect(playback.state.error == nil)
+        #expect(playback.state.isPlaying)
+        #expect(starts == 1)
+        #expect(queue.items.map(\.id) == originalItemIDs)
+        #expect(queue.upNext.map(\.id) == originalUpNextIDs)
+        #expect(queue.current()?.id == originalCurrentID)
+        #expect(queue.history.isEmpty)
+    }
+
     private func makeTrack(_ videoID: String) -> TrackSnapshot {
         TrackSnapshot(id: UUID(), title: videoID, artist: "Artist", albumTitle: nil,
                       durationSeconds: 120, youTubeId: videoID, artworkUrl: nil,

@@ -6,6 +6,7 @@ import Foundation
 final class RecordingEngine: PlayerEngine {
     let state = PlayerState()
     var loadCallCount = 0
+    var loadError: PlayerError?
     var lastLoadedTrack: TrackSnapshot?
     var playCallCount = 0
     var pauseCallCount = 0
@@ -28,6 +29,11 @@ final class RecordingEngine: PlayerEngine {
         loadCallCount += 1
         lastLoadedTrack = track
         state.track = track
+        state.error = loadError
+        if let loadError {
+            state.isPlaying = false
+            throw loadError
+        }
         state.duration = track.durationSeconds
         state.position = 0
         state.isPlaying = true
