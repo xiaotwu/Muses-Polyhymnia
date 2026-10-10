@@ -104,13 +104,14 @@ struct AddToYouTubePlaylistSheet: View {
 
 struct PlaylistPullPreviewSheet: View {
     let preview: YouTubePullPreview
-    let onApply: (YouTubePlaylistSnapshot?) -> Void
+    let onApply: (YouTubePlaylistSnapshot?) throws -> Void
     @Environment(\.dismiss) private var dismiss
+    @State private var applyError: String?
     @State private var resolvedItems: [YouTubePlaylistItemSnapshot]
     @State private var resolvedConflictIDs: Set<String> = []
 
     init(preview: YouTubePullPreview,
-         onApply: @escaping (YouTubePlaylistSnapshot?) -> Void) {
+         onApply: @escaping (YouTubePlaylistSnapshot?) throws -> Void) {
         self.preview = preview
         self.onApply = onApply
         _resolvedItems = State(initialValue: Self.initialItems(for: preview))
@@ -186,6 +187,10 @@ struct PlaylistPullPreviewSheet: View {
             }
             .listStyle(.inset)
 
+            if let applyError {
+                Text(applyError).font(.callout).foregroundStyle(.red).textSelection(.enabled)
+            }
+
             HStack {
                 Text(tr("Pull changes only Muses. YouTube is not modified.",
                         "拉取只会修改 Muses，不会修改 YouTube。"))
@@ -200,8 +205,12 @@ struct PlaylistPullPreviewSheet: View {
                         accountChannelID: preview.local.accountChannelID,
                         title: preview.local.title,
                         capturedAt: .init(), items: finalItems)
-                    onApply(resolved)
-                    dismiss()
+                    do {
+                        try onApply(resolved)
+                        dismiss()
+                    } catch {
+                        applyError = error.localizedDescription
+                    }
                 }
                 .musesAction(prominent: true)
                 .tint(BrandColors.accent)

@@ -203,6 +203,7 @@ final class YouTubePlaylistSyncService {
     private let pushExecutionPolicy: YouTubePushExecutionPolicy
     private let pushFaultInjector: (@MainActor (YouTubePushFaultPoint) throws -> Void)?
     private let pushReadbackRetryDelays: [Duration]
+    private let savePullContext: (ModelContext) throws -> Void
     private let log = AppLog.for("YouTubePlaylistSyncService")
 
     private(set) var activeOperations = 0
@@ -220,13 +221,14 @@ final class YouTubePlaylistSyncService {
          pushFaultInjector: (@MainActor (YouTubePushFaultPoint) throws -> Void)? = nil,
          pushReadbackRetryDelays: [Duration] = [
             .milliseconds(250), .milliseconds(750), .seconds(2)
-         ]) {
+         ], savePullContext: @escaping (ModelContext) throws -> Void = { try $0.save() }) {
         self.modelContainer = modelContainer
         self.accountImportPreferences = accountImportPreferences
         self.account = account
         self.pushExecutionPolicy = pushExecutionPolicy
         self.pushFaultInjector = pushFaultInjector
         self.pushReadbackRetryDelays = pushReadbackRetryDelays
+        self.savePullContext = savePullContext
     }
 
     // MARK: - Account library import
@@ -456,6 +458,7 @@ final class YouTubePlaylistSyncService {
                 preview.mergePlan.conflicts.count)
         }
         let context = ModelContext(modelContainer)
+        context.autosaveEnabled = false
         guard let imported = try fetchImport(preview.importID, context: context) else {
             throw YouTubePlaylistSyncError.importNotFound
         }
@@ -482,18 +485,23 @@ final class YouTubePlaylistSyncService {
             throw YouTubePlaylistSyncError.invalidSnapshot(
                 "Pull requires a complete Remote Shadow")
         }
-        _ = try insertRevision(importID: imported.id,
-                               accountChannelID: imported.accountChannelID,
-                               kind: .beforePull,
-                               snapshot: Self.localSnapshot(imported), context: context)
-        try apply(result, to: imported, context: context)
-        let baseRevision = try insertRevision(
-            importID: imported.id, accountChannelID: imported.accountChannelID,
-            kind: .base, snapshot: acceptedRemote, context: context)
-        imported.baseRevisionID = baseRevision.id
-        imported.lastSyncedAt = .init()
-        try context.save()
-        try pruneRevisions(importID: imported.id, context: context)
+        do {
+            _ = try insertRevision(importID: imported.id,
+                                   accountChannelID: imported.accountChannelID,
+                                   kind: .beforePull,
+                                   snapshot: Self.localSnapshot(imported), context: context)
+            try apply(result, to: imported, context: context)
+            let baseRevision = try insertRevision(
+                importID: imported.id, accountChannelID: imported.accountChannelID,
+                kind: .base, snapshot: acceptedRemote, context: context)
+            imported.baseRevisionID = baseRevision.id
+            imported.lastSyncedAt = .init()
+            try stageRevisionPruning(importID: imported.id, context: context)
+            try savePullContext(context)
+        } catch {
+            context.rollback()
+            throw error
+        }
         NotificationCenter.default.post(name: .musesPlaylistsChanged, object: nil)
     }
 
@@ -1982,6 +1990,13 @@ final class YouTubePlaylistSyncService {
 
     private func pruneRevisions(importID: UUID, now: Date = .init(),
                                 context: ModelContext) throws {
+        try stageRevisionPruning(importID: importID, now: now, context: context)
+        try context.save()
+    }
+
+    /// Stage housekeeping with the caller's mutation so Pull commits once.
+    private func stageRevisionPruning(importID: UUID, now: Date = .init(),
+                                      context: ModelContext) throws {
         let id = importID
         let descriptor = FetchDescriptor<YouTubePlaylistRevision>(
             predicate: #Predicate { $0.importID == id },
@@ -1994,7 +2009,6 @@ final class YouTubePlaylistSyncService {
             && revision.createdAt < cutoff {
             context.delete(revision)
         }
-        try context.save()
     }
 
     private func apply(_ snapshot: YouTubePlaylistSnapshot,

@@ -62,13 +62,9 @@ struct YouTubeAlbumDetailView: View {
         }
         .sheet(item: $pullPreview) { preview in
             PlaylistPullPreviewSheet(preview: preview) { resolved in
-                do {
-                    try playlistSync.applyPull(preview, resolvedSnapshot: resolved)
-                    writeError = nil
-                    reloadRows()
-                } catch {
-                    writeError = error.localizedDescription
-                }
+                try playlistSync.applyPull(preview, resolvedSnapshot: resolved)
+                writeError = nil
+                reloadRows()
             }
         }
         .sheet(item: $pushPreview) { preview in
