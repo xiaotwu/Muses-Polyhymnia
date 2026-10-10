@@ -113,6 +113,13 @@ final class GlobalSearchService {
         wasCancelled = true
     }
 
+    /// Re-project committed local edits without restarting remote search or navigation.
+    func refreshLibraryResults() {
+        let text = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard scope.searchesLibrary, !text.isEmpty else { return }
+        projectLibraryResults(query: text)
+    }
+
     func retrySearch() {
         if retryingMore { loadMore(); return }
         let text = query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -176,31 +183,7 @@ final class GlobalSearchService {
         retryingMore = extending
         let requestedScope = scope
         if requestedScope.searchesLibrary {
-            let playable = library.allTracks(search: trimmed).filter {
-                !$0.youTubeId.isEmpty
-            }
-            // Every playable YouTube row belongs to the single Songs result group,
-            // including Tracks marked as music videos.
-            trackResults = playable.map(TrackSnapshot.init(from:))
-
-            let releases = catalog?.releases() ?? []
-            releaseResults = releases.filter {
-                $0.title.localizedCaseInsensitiveContains(trimmed)
-                    || $0.artistName.localizedCaseInsensitiveContains(trimmed)
-            }
-            catalogArtistResults = (catalog?.artists() ?? []).filter {
-                $0.name.localizedCaseInsensitiveContains(trimmed)
-            }
-
-            if let notes {
-                noteResults = notes.searchNotes(query: trimmed).filter { hit in
-                    guard case .trackNote = hit.kind,
-                          let track = library.track(by: hit.ownerId) else { return false }
-                    return !track.youTubeId.isEmpty
-                }
-            } else {
-                noteResults = []
-            }
+            projectLibraryResults(query: trimmed)
         } else {
             clearLibraryResults()
         }
@@ -231,6 +214,34 @@ final class GlobalSearchService {
             guard !Task.isCancelled, requestID == expectedRequest, scope == requestedScope else { return }
             if !extending { youtubeResults = [] }
             youtubeError = tr("YouTube search failed. Please try again.", "YouTube 搜索失败，请重试。", zhHant: "YouTube 搜尋失敗，請再試一次。")
+        }
+    }
+
+    private func projectLibraryResults(query: String) {
+        let playable = library.allTracks(search: query).filter {
+            !$0.youTubeId.isEmpty
+        }
+        // Every playable YouTube row belongs to the single Songs result group,
+        // including Tracks marked as music videos.
+        trackResults = playable.map(TrackSnapshot.init(from:))
+
+        let releases = catalog?.releases() ?? []
+        releaseResults = releases.filter {
+            $0.title.localizedCaseInsensitiveContains(query)
+                || $0.artistName.localizedCaseInsensitiveContains(query)
+        }
+        catalogArtistResults = (catalog?.artists() ?? []).filter {
+            $0.name.localizedCaseInsensitiveContains(query)
+        }
+
+        if let notes {
+            noteResults = notes.searchNotes(query: query).filter { hit in
+                guard case .trackNote = hit.kind,
+                      let track = library.track(by: hit.ownerId) else { return false }
+                return !track.youTubeId.isEmpty
+            }
+        } else {
+            noteResults = []
         }
     }
 

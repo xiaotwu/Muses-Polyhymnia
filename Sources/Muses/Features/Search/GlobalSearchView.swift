@@ -18,6 +18,7 @@ struct GlobalSearchView: View {
     @Environment(GlobalSearchService.self) private var search
     @Environment(PlaybackService.self) private var playback
     @Environment(LibraryService.self) private var library
+    @Environment(NotesService.self) private var notes
     @FocusState private var searchFieldFocused: Bool
     @State private var expandedResultSections = Set<String>()
     @State private var savedYouTubeIDs = Set<String>()
@@ -80,6 +81,8 @@ struct GlobalSearchView: View {
             searchFieldFocused = true
         }
         .onChange(of: search.query) { _, _ in expandedResultSections.removeAll() }
+        .onChange(of: library.metadataRevision) { _, _ in search.refreshLibraryResults() }
+        .onChange(of: notes.revision) { _, _ in search.refreshLibraryResults() }
         .onChange(of: search.youtubeResults.map(\.id)) { _, ids in
             guard !ids.isEmpty else { return }
             refreshSavedYouTubeIDs()
@@ -90,6 +93,7 @@ struct GlobalSearchView: View {
         }
         .onDisappear { if search.isSearchingYouTube { search.cancelSearch() } }
         .onAppear {
+            search.refreshLibraryResults()
             if search.wasCancelled { search.retrySearch() }
             refreshSavedYouTubeIDs()
         }

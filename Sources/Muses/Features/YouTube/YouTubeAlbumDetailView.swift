@@ -4,6 +4,7 @@ import SwiftData
 /// Imported YouTube playlist detail using the shared collection composition.
 struct YouTubeAlbumDetailView: View {
     let youTubeImport: YouTubeImport
+    @Environment(LibraryService.self) private var library
     @Environment(PlaybackService.self) private var playback
     @Environment(YouTubeImportService.self) private var importService
     @Environment(YouTubeAccountService.self) private var youTubeAccount
@@ -54,6 +55,7 @@ struct YouTubeAlbumDetailView: View {
             controls
         }
         .onChange(of: youTubeImport.id, initial: true) { _, _ in reloadRows() }
+        .onChange(of: library.metadataRevision) { _, _ in reloadRows() }
         .onReceive(NotificationCenter.default.publisher(for: .musesPlaylistsChanged)) { _ in
             reloadRows()
         }

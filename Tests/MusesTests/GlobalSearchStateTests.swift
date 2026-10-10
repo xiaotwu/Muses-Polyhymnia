@@ -168,6 +168,62 @@ struct GlobalSearchStateTests {
         service.cancelSearch()
     }
 
+    @Test("Retained-query refresh reflects note and metadata edits without changing remote state")
+    func localEditsRefreshWithoutRemoteRestart() async throws {
+        let container = try makeModelContainer(inMemory: true)
+        let context = ModelContext(container)
+        let first = Track(title: "Needle original", artist: "Artist", youTubeId: "abcdefghijk")
+        let second = Track(title: "Other", artist: "Artist", youTubeId: "track_b0000")
+        context.insert(first); context.insert(second)
+        try context.save()
+        let library = LibraryService(modelContainer: container)
+        let notes = NotesService(modelContainer: container, enabledProvider: { true })
+        #expect(notes.setTrackNote(trackId: first.id, content: "Needle old note"))
+        var remoteCalls = 0
+        let browser = MusicCatalogBrowser(provider: SearchStatusCatalogFixture(stale: false))
+        let service = GlobalSearchService(library: library, notes: notes, debounceMs: 60_000,
+            musicCatalog: browser, remoteSearch: { _, limit in
+                remoteCalls += 1
+                return (0..<limit).map { .init(id: String(format: "remote%05d", $0), title: "Remote") }
+            })
+        defer { service.cancelSearch() }
+        service.query = "Needle"
+        await service.performSearch(query: service.query)
+        #expect(service.trackResults.map(\.id) == [first.id])
+        #expect(service.noteResults.map(\.ownerId) == [first.id])
+        let remote = service.youtubeResults
+        #expect(remote.count == 20)
+        let detail = MusicCatalogItem(id: "browse:retained", kind: .album, title: "Retained",
+            subtitle: "", artwork: nil, artists: [], releases: [], channels: [])
+        browser.open(detail)
+        #expect(service.canLoadMore)
+        #expect(library.updateTrack(id: first.id, title: "Removed match", artist: "Artist", albumTitle: nil,
+            albumArtist: nil, trackNo: nil, discNo: nil, year: nil, genre: nil, lyrics: nil))
+        #expect(library.updateTrack(id: second.id, title: "Needle added", artist: "Artist", albumTitle: nil,
+            albumArtist: nil, trackNo: nil, discNo: nil, year: nil, genre: nil, lyrics: nil))
+        #expect(notes.saveDraft(trackId: first.id, content: "", bookmarks: [],
+            originalContent: "Needle old note", originalBookmarks: []))
+        #expect(notes.saveDraft(trackId: second.id, content: "Needle fresh note", bookmarks: [],
+            originalContent: "", originalBookmarks: []))
+        service.refreshLibraryResults()
+        #expect(service.trackResults.map(\.id) == [second.id])
+        #expect(service.trackResults.first?.title == "Needle added")
+        #expect(service.noteResults.map(\.ownerId) == [second.id])
+        #expect(service.noteResults.first?.snippet == "Needle fresh note")
+        #expect(service.query == "Needle" && service.scope == .all)
+        #expect(remoteCalls == 1 && service.youtubeResults == remote)
+        #expect(service.canLoadMore && !service.isSearchingYouTube)
+        #expect(browser.detail == detail)
+        service.loadMore()
+        for _ in 0..<100 where service.isSearchingYouTube { await Task.yield() }
+        #expect(remoteCalls == 2 && service.youtubeResults.count == 40)
+        #expect(service.youtubeResults.prefix(20).map(\.id) == remote.map(\.id))
+        #expect(browser.detail == detail)
+        service.scope = .youtube
+        service.refreshLibraryResults()
+        #expect(service.trackResults.isEmpty && service.noteResults.isEmpty)
+    }
+
     @Test("Saving a transient search result emits the established save invalidation and preserves its identity")
     func savedResultProjectionInvalidates() async throws {
         let container = try makeModelContainer(inMemory: true)

@@ -7,6 +7,7 @@ struct PlaylistDetailView: View {
     let playlist: Playlist
     @Binding var selectedPlaylist: Playlist?
     @Environment(PlaylistService.self) private var playlistService
+    @Environment(LibraryService.self) private var library
     @Environment(PlaybackService.self) private var playback
     @Query(sort: \Playlist.name) private var allPlaylists: [Playlist]
     @State private var rows: [CollectionTrackRow] = []
@@ -64,6 +65,7 @@ struct PlaylistDetailView: View {
             }
         }
         .onAppear(perform: reloadRows)
+        .onChange(of: library.metadataRevision) { _, _ in reloadRows() }
         .onReceive(NotificationCenter.default.publisher(for: .musesPlaylistsChanged)) { _ in
             reloadRows()
         }

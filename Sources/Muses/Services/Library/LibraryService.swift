@@ -9,12 +9,15 @@ import SwiftData
 @Observable
 final class LibraryService {
     let modelContainer: ModelContainer
+    private let saveMetadataContext: (ModelContext) throws -> Void
     private(set) var likedRevision = 0
     private(set) var playRevision = 0
     private(set) var metadataRevision = 0
 
-    init(modelContainer: ModelContainer) {
+    init(modelContainer: ModelContainer,
+         saveMetadataContext: @escaping (ModelContext) throws -> Void = { try $0.save() }) {
         self.modelContainer = modelContainer
+        self.saveMetadataContext = saveMetadataContext
     }
 
     func allTracks(search: String? = nil) -> [Track] {
@@ -119,7 +122,7 @@ final class LibraryService {
         // Editing display metadata does not establish catalog identity.
 
         do {
-            try context.save()
+            try saveMetadataContext(context)
             metadataRevision &+= 1
             return true
         } catch {
