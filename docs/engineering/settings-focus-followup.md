@@ -39,3 +39,21 @@ Three focused tests passed: native arrow flags versus held modifiers, default/Cl
 Classic font was restored through the native control before returning to General and normal quit. Standard text, English and the preconfigured independent feature flags were retained. The complete original empty preference domain was restored after process exit. Source SQLite SHA-256 and the complete source preference dictionary matched their initial snapshots; `AppleKeyboardUIMode` remained 0. The exact owned process was gone before removing the disposable bundle registration, app, data and cache. Normal application/build, source data, Keychain and both rounds of private evidence were retained. `cleanup.json` records exact checks and paths.
 
 XW-80's repaired search-field keyboard path is accepted locally. XW-71 remains In Review for the Help/activation-control focus conditions and the existing macOS 26/VoiceOver/accessibility matrices. The round-2 runtime-complete marker releases the owned executable phase to `auxiliary-focus`, without asserting those external cells passed.
+
+## Dark compact visual follow-up — October 10
+
+The isolated `com.muses.acceptance.settings-darkcompact-20261010` candidate reused the source-equivalent `e44a058` Release. Its main window remained 840 × 804 pt, in application Dark appearance. No source, build, tests, authentication, output or OS permission changed. Three new visual cells passed:
+
+| Cell | Accepted rendered evidence |
+| --- | --- |
+| Standard font picker | The first Avenir candidate had a distinct pending outline while Classic retained its complete checkmark and selected marker. The search field was focused; Title, Track and Lyrics samples were complete. |
+| Large font picker | The same pending/current states and all three larger role samples remained readable without truncation or overlap. Navigation stayed available. |
+| Large Help | Account & browser access and Playback & cache expanded with complete text. Scrolling reached the end and all four Support rows; both explanations then collapsed, with navigation visible. No support link was opened. |
+
+`cell1-final`, `cell2-final`, `cell3-expanded-top`, `cell3-expanded-bottom` and `cell3-collapsed` retain native images and AX state. The root coordinator independently inspected the final Standard/Large and Help-bottom captures. Pending-state arrows only prepared the required visual state; Return was not used to apply a family, and no new functional keyboard or VoiceOver pass is claimed.
+
+An initial parent-window capture excluded the part of the native popover extending beyond that parent. The isolated window was reopened at the screen's right edge, keeping its size, and the complete popover became visible in the main-window capture. Large geometry was main x960/y39/840×804 pt and popup x1394/y72/406×386 pt, with the right edge at screen x1800. A separate popup-target capture returned `ax_window_unresolved` and inconsistent image/geometry; it remains tool evidence, not proof of application clipping. The final acceptance uses coherent main-window images and typed geometry. No foreground escalation was used.
+
+Standard text was restored through native UI and Classic was never changed. The app quit normally; the complete original empty preferences and physical-file absence were restored. All 309 protected source files, four normal-app entries and full donor preferences matched. The coordinator independently checked these hashes, donor preferences and removal of the exact app, data/cache and preference file. Owned registration and obsolete candidate material were removed; evidence, normal applications, source seeds and the current Release remain. Both locks were released in `settings-dark-compact-20261010`.
+
+Private evidence: `~/.muses/acceptance/com.muses.acceptance.settings-darkcompact-20261010/evidence/`. These three visual cells are complete. XW-71 and its parents retain activation-control/origin-focus, actual macOS 26, VoiceOver and the other explicitly deferred matrices.
