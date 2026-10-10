@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import AppKit
+import AppIntents
 
 @main
 struct MusesApp: App {
@@ -426,6 +427,9 @@ struct MusesApp: App {
                 await youTubeAccount?.refreshPersistedConnectionIfNeeded()
             }
         }
+        // Register the same app-lifetime router before any scene or intent runs.
+        let intentPlaybackRouter = externalPlaybackRouter
+        AppDependencyManager.shared.add(dependency: intentPlaybackRouter)
     }
 
     var body: some Scene {

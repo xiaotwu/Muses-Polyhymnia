@@ -12,12 +12,22 @@ struct SearchLyricsIntent: AppIntent {
     @Parameter(title: "Song title or keywords", default: "")
     var query: String
 
-    func perform() async throws -> some IntentResult & OpensIntent {
-        var components = URLComponents()
-        components.scheme = "muses"
-        components.host = "lyrics"
-        components.queryItems = [.init(name: "q", value: String(query.prefix(400)))]
-        return .result(opensIntent: OpenURLIntent(components.url!))
+    private var requestSearch: @MainActor @Sendable (String) -> Void = {
+        MusesSingleInstance.requestLyricsSearch($0)
+    }
+
+    init() {}
+
+    /// Tests bind a request receiver instead of presenting an AppKit window.
+    @MainActor
+    init(requestSearch: @escaping @MainActor @Sendable (String) -> Void) {
+        self.requestSearch = requestSearch
+    }
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        requestSearch(String(query.prefix(400)).trimmingCharacters(in: .whitespacesAndNewlines))
+        return .result()
     }
 }
 

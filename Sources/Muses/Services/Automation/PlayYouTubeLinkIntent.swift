@@ -1,7 +1,7 @@
 import AppIntents
 import Foundation
 
-/// System automation delegates to the same validated URL route as external links.
+/// System automation submits to the app's existing validated playback route.
 @available(macOS 15.0, *)
 struct PlayYouTubeLinkIntent: AppIntent {
     static let title: LocalizedStringResource = "Play YouTube Link"
@@ -11,23 +11,35 @@ struct PlayYouTubeLinkIntent: AppIntent {
     @Parameter(title: "YouTube Link")
     var link: URL
 
+    @Dependency private var playbackRouter: ExternalPlaybackRouter
+    private var presentMainWindow: @MainActor @Sendable () -> Void = {
+        MusesSingleInstance.orderFrontMainWindow()
+    }
+
+    init() {}
+
+    /// Explicit bindings let unit tests exercise the handoff without system activation.
+    @MainActor
+    init(playbackRouter: ExternalPlaybackRouter,
+         presentMainWindow: @escaping @MainActor @Sendable () -> Void) {
+        self.playbackRouter = playbackRouter
+        self.presentMainWindow = presentMainWindow
+    }
+
     static var parameterSummary: some ParameterSummary {
         Summary("Play \(\.$link) in Muses")
     }
 
-    func perform() async throws -> some IntentResult & OpensIntent {
-        guard let route = ExternalPlaybackRoute(url: link) else {
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        guard ExternalPlaybackRoute(url: link) != nil else {
             throw LinkIntentError.unsupported
         }
-        var url = URLComponents()
-        url.scheme = "muses"
-        url.host = "play"
-        switch route {
-        case .track(let id): url.queryItems = [.init(name: "trackId", value: id.uuidString)]
-        case .video(let id): url.queryItems = [.init(name: "v", value: id)]
+        presentMainWindow()
+        guard playbackRouter.open(link) else {
+            throw LinkIntentError.unsupported
         }
-        guard let destination = url.url else { throw LinkIntentError.unsupported }
-        return .result(opensIntent: OpenURLIntent(destination))
+        return .result()
     }
 }
 

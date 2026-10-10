@@ -2,6 +2,8 @@
 
 Round 2 supplements the remaining keyboard/focus cells in [Settings focus follow-up](settings-focus-followup.md); this first-round record retains its original source and observations.
 
+The 2026-10-10 [in-process App Intent handoff repair](app-intents-handoff.md) supersedes the source's custom-URL Intent dispatch described below. The original packaging and native invocation observations remain historical evidence; the repair does not close the outstanding system acceptance cells.
+
 2026-10-08 execution of XW-71 and XW-75, under the [feature acceptance scope](feature-acceptance.md) and [execution coordination](execution-coordination.md). This records the completed local runtime phase, not completion of every external acceptance condition. XW-25 remains open.
 
 ## Candidate and evidence

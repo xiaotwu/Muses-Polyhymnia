@@ -20,17 +20,6 @@ struct ExternalPlaybackRouterTests {
         #expect(ExternalPlaybackRoute(url: URL(string: "muses://play?trackId=\(id)")!) == .track(id))
     }
 
-    @Test("App automation uses the same external route contract")
-    func appIntentContract() throws {
-        let source = try String(contentsOfFile: #filePath
-            .replacingOccurrences(of: "Tests/MusesTests/ExternalPlaybackRouterTests.swift",
-                                  with: "Sources/Muses/Services/Automation/PlayYouTubeLinkIntent.swift"),
-            encoding: .utf8)
-        #expect(source.contains("static let openAppWhenRun = true"))
-        #expect(source.contains("ExternalPlaybackRoute(url: link)"))
-        #expect(source.contains("muses"))
-    }
-
     @Test func importLinksRejectForeignHostsAndMalformedVideoIDs() {
         for text in ["https://evilyoutube.com/watch?v=abcdefghijk", "https://example.com/playlist?list=PLtest",
                      "https://youtube.com/watch?v=short", "https://youtube.com/playlist?list=PLone&list=PLtwo"] {
