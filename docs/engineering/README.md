@@ -1,15 +1,15 @@
 # 技术工作索引与对话归并
 
-更新时间：2026-10-08。当前工作入口是 Codex 对话「整理并执行Linear剩余任务」。近期列表之外，已补查旧项目路径的十四个较早对话；共二十二个历史对话的有效结论已归并，可恢复归档。归档不表示其中提及的所有验收都通过，也不删除历史证据。
+更新时间：2026-10-10。当前工作入口是 Codex 对话「整理并执行Linear剩余任务」。近期列表之外，已补查旧项目路径的十四个较早对话；二十二个历史对话及一个已完成的执行对话均已归并，可恢复归档，共二十三个。归档不表示其中提及的所有验收都通过，也不删除历史证据。
 
-最新结果和接续条件见 [当前状态](current-status.md)。已确认的 XW-69/70/76/77/78/80/81/82 均 Done，代码 `e44a058` 的完整 CI 通过 886 项测试/120 个套件。第二轮已恢复清理并释放资源，XW-71/72/73/74/79 保持 In Review，XW-75 保持 Backlog；本地尾曲验收等待手动解锁，完整产品验收未全部通过。
+最新结果和接续条件见 [当前状态](current-status.md)。已确认的 XW-69/70/76/77/78/80/81/82 均 Done，源码等同 `e44a058` 的 `0f4f999` 完整 CI 通过 886 项测试/120 个套件。XW-79 已通过真实 506 项尾曲自然停止及循环回首曲验收，Done；新建实例已恢复清理。XW-71/72/73/74 保持 In Review，XW-75 保持 Backlog。无输入录制已正常保存，下一步滚动帧验收等待限定前台授权；完整产品验收未全部通过。
 
 本目录将仍有效的结论分为三类，并由 Linear 管理执行状态：
 
 | 分类 | 技术文档 | 执行任务 |
 | --- | --- | --- |
 | 已证实的缺陷与修复 | [修复任务](repairs.md)、[来源修复](source-state-acceptance.md)、[CI 回归](source-ci-regression.md)、[缓存恢复](source-cache-recovery.md) | XW-69、XW-70、XW-76、XW-77、XW-78、XW-80、XW-81、XW-82 均完成 |
-| 功能实现与补充验收 | [功能及验收](feature-acceptance.md)、[草稿/历史跟进](playlist-flow-followup.md) | XW-71、XW-72、XW-73、XW-75、XW-79；沿用 XW-62 与既有阶段任务 |
+| 功能实现与补充验收 | [功能及验收](feature-acceptance.md)、[草稿/历史跟进](playlist-flow-followup.md) | XW-79 已完成；XW-71、XW-72、XW-73、XW-75、XW-62 与既有阶段任务保留具体条件 |
 | 性能与优化调查 | [优化项](performance.md) | XW-74；无证据的排查候选不直接变成重构任务 |
 
 判断顺序：当前用户决定和批准规格 → 当前源码 → 实际运行 → 测试 → 历史记录。历史对话不能恢复已淘汰产品方向；测试通过不能替代原生界面验收。总体 UI 验收仍使用 [64 区域对照表](../ui-ux-acceptance-reconciliation.md)，具体操作使用 [验收记录](../ui-ux-redesign-acceptance.md)。
@@ -44,6 +44,8 @@
 | 清理低优先级能力项 | 早期窗口与 Retry 限定验收 | 660×520 独立 Settings、旧词标和独立 Search 被当前集成合同取代 |
 
 归档对话 ID 与精简核对清单保存在私有 `~/.muses/acceptance/com.muses.acceptance.settings-oct08/evidence/conversation-cleanup.json`。历史对话仍可恢复，截图、账号资料及库数据不进入仓库。
+
+2026-10-10 另行归档的「Muses · XW-79 歌单草稿与队列历史剩余验收」已把有效结果提交至 [草稿与尾曲报告](playlist-flow-followup.md)：真实 506 项上下文、自然停止/循环、完整恢复及清理。协调清单 `~/.muses/tmp/engineering-oct08/coordinator/continuation-20261009.json` 保留该次可恢复归档与证据位置。其父任务 XW-26 仍有独立验收条件。
 
 ## 当前执行顺序
 
