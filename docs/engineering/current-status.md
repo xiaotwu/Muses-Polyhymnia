@@ -31,7 +31,7 @@ XW-75 已有一次真实 AppIntentsTesting 交付通过：两 Intent 返回，�
 | 范围 | 下一步与实际前提 |
 | --- | --- |
 | XW-75 App Intents | 自动停止进程后的 Intent 冷启；原含关窗、Quick Search、framework 请求及关闭歌词后的完整串行路径；其余 import/gallery/video 模态边界；手动 Siri/Shortcuts、实际 macOS 26 及独立辅助功能/设备矩阵。独立 Cua Back/歌词面板对照通过不关闭这些条件。 |
-| XW-84、XW-26 | 原生 Pull 失败的错误/草稿保留，以及真实持久化 I/O 分支。当前 test 远端来源不可用；原子保存和受控失败回归继续有效。远端 Push/manage 与破坏性历史/group 保持原排除范围。 |
+| XW-84、XW-26 | 原生 Pull 失败的错误/草稿保留，以及真实持久化 I/O 分支。既有来源失败仅限匿名 yt-dlp 导入，不能证明已认证 Data API Pull 不可用；真实预览仍需连接只读账号、身份匹配和完整远端快照。原子保存和受控失败回归继续有效。远端 Push/manage 与破坏性历史/group 保持原排除范围。 |
 | XW-71 Settings | 十类设置/历史、字体指针/键盘、语言/字号恢复和 Dark 840×804 三项检查已接受。剩余 Help 的 Tab/Space 与原按钮焦点、完整 VoiceOver、实际 macOS 26。 |
 | XW-72 辅助窗口 | MiniPlayer 生命周期/Pin/共享播放、真实同步桌面歌词和菜单栏 Escape/音量已接受。剩余物理控件交接/完整焦点、真实未同步歌词、系统 Dark 菜单栏。 |
 | XW-73 来源、XW-62 评论 | 匿名 Home 加载/缓存/过期恢复、真实目录/集合上下文及缓存/取消修复已接受。剩余自然来源错误后的手动 Retry、非空目录、身份匹配且专门同意的 Web Home、非空评论回复；现有评论权限返回 insufficientPermissions。 |
