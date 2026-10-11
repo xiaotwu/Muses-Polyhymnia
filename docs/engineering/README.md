@@ -2,13 +2,13 @@
 
 更新时间：2026-10-11。当前工作入口是 Codex 对话「整理并执行Linear剩余任务」。近期列表之外，已补查旧项目路径的十四个较早对话；二十二个历史对话及一个已完成的执行对话均已归并，可恢复归档，共二十三个。归档不表示其中提及的所有验收都通过，也不删除历史证据。
 
-最新结果和接续条件见 [当前状态](current-status.md)。本轮新增 XW-83/84/85/86/87 五项修复；XW-83/85/86 已完成，XW-84 保留原生错误展示和真实 I/O 条件；XW-87：Done；实际歌曲/视频独立 AX 标签与 28pt 命中范围通过。执行源码 `03b8a1e` 的 [完整 macOS CI 38116679660](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38116679660) 全阶段通过：895 项测试、123 个套件（45.849 秒），8 项发布配置检查，以及 App Intents 元数据、预览打包和上传。 Linear 当前有 25 项开放：19 项 In Review、6 项 In Progress，包含父任务与协调项。XW-83/85/86/87 均 Done；唯一开放的 Bug 标签任务 XW-84 已完成代码修复，保留具体原生错误/I/O 条件。开放任务数不等于未修复缺陷数。 完整产品验收尚未全部通过。
+最新结果和接续条件见 [当前状态](current-status.md)。XW-83/85/86/87/88 已完成；XW-84 代码修复通过受控失败回归，保留原生错误/真实 I/O 条件。源码 `3b44632` 与文档提交 `f635d62` 的执行代码一致；后者的 [完整 macOS CI 38122069515](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38122069515) 全阶段通过：895 项测试、123 个套件（44.479 秒）、8 项发布配置检查、App Intents 元数据、预览打包和上传。 Linear 有 25 项开放（19 项 In Review、6 项 In Progress），包含父任务与协调项；唯一开放 Bug 标签任务为 XW-84。完整产品矩阵尚未全部通过。
 
 本目录将仍有效的结论分为三类，并由 Linear 管理执行状态：
 
 | 分类 | 技术文档 | 执行任务 |
 | --- | --- | --- |
-| 已证实的缺陷与修复 | [修复任务](repairs.md)、[来源修复](source-state-acceptance.md)、[CI 回归](source-ci-regression.md)、[缓存恢复](source-cache-recovery.md)、[重试/Pull/刷新/标签](remaining-review-fixes.md)、[App Intents](app-intents-handoff.md) | 新修复及证据以 [当前状态](current-status.md) 为准；XW-84 的原生错误条件保留 |
+| 已证实的缺陷与修复 | [修复任务](repairs.md)、[来源修复](source-state-acceptance.md)、[CI 回归](source-ci-regression.md)、[缓存恢复](source-cache-recovery.md)、[重试/Pull/刷新/标签](remaining-review-fixes.md)、[App Intents](app-intents-handoff.md)、[图库歌词](gallery-lyrics-acceptance.md)、[普通歌单](ordinary-playlist-metadata.md) | 新修复及证据以 [当前状态](current-status.md) 为准；XW-84 的原生错误条件保留 |
 | 功能实现与补充验收 | [功能及验收](feature-acceptance.md)、[草稿/历史跟进](playlist-flow-followup.md) | XW-79 已完成；XW-71、XW-72、XW-73、XW-75、XW-62 与既有阶段任务保留具体条件 |
 | 性能与优化调查 | [优化项](performance.md) | XW-74；无证据的排查候选不直接变成重构任务 |
 
@@ -62,6 +62,6 @@
 
 ## 授权与验收边界
 
-使用隔离的 `com.muses.acceptance.*` 实例；只允许 `test` 歌单的已授权操作。保留生产数据、Keychain、普通应用与正常构建。不操作 Liked，不执行远端写入、权限扩张、输出设备或 OS 辅助功能/显示设置变化、安装发布。完整 VoiceOver/显示矩阵、实际 macOS 26 原生运行、非空订阅账号与评论权限限制仍分别记录，不能由 macOS CI runner 或模拟数据代替。
+使用隔离的 `com.muses.acceptance.*` 实例；早期歌单操作限于 `test`，后续补验另行限定为自有可丢弃的普通 Playlist。阶段性测试配置不构成永久产品或用户限制，接续范围以当前用户授权和具体任务为准。保留生产数据、Keychain、普通应用与正常构建。不操作 Liked，不执行远端写入、权限扩张、输出设备或 OS 辅助功能/显示设置变化、安装发布。完整 VoiceOver/显示矩阵、实际 macOS 26 原生运行、非空订阅账号与评论权限限制仍分别记录，不能由 macOS CI runner 或模拟数据代替。
 
 每轮保存具体源码、系统、窗口、数据及操作条件；恢复临时偏好后正常退出，核对原始数据/偏好和精确进程所有权，再清理自建构建与缓存。版本发布需要独立的当前授权。

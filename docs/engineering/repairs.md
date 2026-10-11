@@ -2,7 +2,7 @@
 
 本页只把可复现行为或实际编译失败列为缺陷；未验收分支与测量候选分别见 [功能验收](feature-acceptance.md) 和 [优化调查](performance.md)。执行状态以对应 Linear 任务为准。
 
-2026-10-10 核对：此前 XW-69/70/76/77/78/80/81/82 与新增 XW-83/85/86 均 Done；XW-84 已修复并通过受控失败回归，原生错误展示和真实 I/O 待验。XW-87：Done；实际歌曲/视频独立 AX 标签与 28pt 命中范围通过。执行源码 `03b8a1e` 的 [完整 macOS CI 38116679660](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38116679660) 全阶段通过：895 项测试、123 个套件（45.849 秒），8 项发布配置检查，以及 App Intents 元数据、预览打包和上传。 完整验收边界见 [统一记录](current-status.md)。
+2026-10-11 核对：此前 XW-69/70/76/77/78/80/81/82 与新增 XW-83/85/86/87/88 均 Done。XW-84 已修复并通过受控失败回归，原生错误展示和真实 I/O 待验。源码 `3b44632` 与文档提交 `f635d62` 的执行代码一致；后者的 [完整 macOS CI 38122069515](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38122069515) 全阶段通过：895 项测试、123 个套件（44.479 秒）、8 项发布配置检查、App Intents 元数据、预览打包和上传。 当前原生证据见 [统一记录](current-status.md)。
 
 | 后续修复 | 范围 | 分析与验证 |
 | --- | --- | --- |
@@ -16,6 +16,7 @@
 | XW-85 | 保留歌单投影与当前 Search 随 metadata/Notes revision 刷新 | [修复报告](remaining-review-fixes.md)，真实保存/刷新/恢复通过，Done |
 | XW-86 | 复用进程内共享服务，移除 OpenURLIntent 自定义协议交接 | [App Intents](app-intents-handoff.md)，Done；系统矩阵归 XW-75 |
 | XW-87 | Search 的歌曲与独立视频按钮保留不同 AX 标签 | [修复报告](remaining-review-fixes.md)，Done；实际歌曲/视频独立 AX 标签与 28pt 命中范围通过 |
+| XW-88 | 图库背景隔离不再禁用原生歌词面板 | [图库歌词报告](gallery-lyrics-acceptance.md)，Done |
 
 ## XW-69：旧 Desktop 设置入口指向错误分类
 

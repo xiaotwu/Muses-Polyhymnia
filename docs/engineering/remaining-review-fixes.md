@@ -56,3 +56,13 @@ Edit Info 成功会增加 `LibraryService.metadataRevision`，但普通及导入
 修复只将歌曲标签和值应用到歌曲 Button，然后组合视频 overlay。视觉布局、命中区域、歌曲播放、队列和视频入口行为均保留。不添加仅比对 modifier 文本顺序的测试；以构建、现有回归和实际渲染的两个按钮标签核验为依据。
 
 `03b8a1e` 已推送，Debug、Release、26 项既有回归和完整 CI 通过。实际 Library 查询 `1000` 读到 1112×68pt 歌曲行“1000日間, noa - Topic”，时长值“—”；独立视频按钮为“Play in floating video window 1000日間”，值为空、28×28pt、enabled 且 hittable。协调方独立核对两者标签和值不再串用，未激活歌曲或视频。私有测试原先把 seed 上传者当作预期显示艺术家，导致断言失败；源码使用 SongCreditCache 的解析署名，这不是标签修复失败。整段测试与清理结果另行记录，不据此宣称完整 VoiceOver 通过。
+
+## XW-88：图库上方的歌词面板保持可操作
+
+XW-88 已完成。图库上方的歌词面板原先继承了背景禁用状态；`3b44632` 将禁用和辅助功能隐藏限于背景内容。修复后的真实 framework query、输入框可用及 Close、同一歌曲图库保留、背景 AX 隔离、Done 返回和正常 Command-Q 退出均通过；完整 XCTest Passed 1/0（15.09 秒）。协调方独立复核四张窗口图、停止后的 SQLite、八项保护哈希和精确清理。空链接 import overlay 的歌词交接也已接受，但该旧轮退出失败且没有重置前的 import 数据库检查点，保留这两个限制。详见 [图库歌词修复](gallery-lyrics-acceptance.md)。
+
+源码 `3b44632` 与文档提交 `f635d62` 的执行代码一致；后者的 [完整 macOS CI 38122069515](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38122069515) 全阶段通过：895 项测试、123 个套件（44.479 秒）、8 项发布配置检查、App Intents 元数据、预览打包和上传。
+
+## 普通 Playlist 的独立补验
+
+普通 Playlist 的独立小节已通过：新建并追加两首既有曲目、核对实际身份/顺序、在保留详情中保存标题并即时刷新、恢复原标题，以及按两项预览删除自有歌单。Cua 操作完成两次 Save；协调方独立核对七个 SQLite 检查点，655 首 Track、60 条播放事件及原有集合真值保留。前三次私有测试失败和其中一次实际播放副作用单独保留，本轮不借用 XCTest 通过结论。详见 [普通歌单验收](ordinary-playlist-metadata.md)。

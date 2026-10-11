@@ -42,10 +42,18 @@ Radio、本地扫描/音频文件导入/M3U/Add Local、长期迁移 capsule 继
 
 执行源码 `03b8a1e` 的 [完整 macOS CI 38116679660](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38116679660) 全阶段通过：895 项测试、123 个套件（45.849 秒），8 项发布配置检查，以及 App Intents 元数据、预览打包和上传。
 
-XW-83 的失败曲目重试、XW-85 的保留投影刷新和 XW-86 的 Intent API 修复已关闭。XW-85 在实际导入歌单和固定 Library query 中完成四次 Save、六个数据库检查点及原值恢复；最终业务 test case Passed，整体 xcresult 因后续 runner 取消为 Failed，具体证据见 [修复报告](remaining-review-fixes.md)。非空普通 Playlist 的完整矩阵仍属父任务。XW-84 保留真实 Pull 错误/草稿展示和持久化 I/O 条件；不以受控抛错替代这些分支。
+XW-83 的失败曲目重试、XW-85 的保留投影刷新和 XW-86 的 Intent API 修复已关闭。XW-85 在实际导入歌单和固定 Library query 中完成四次 Save、六个数据库检查点及原值恢复；最终业务 test case Passed，整体 xcresult 因后续 runner 取消为 Failed，具体证据见 [修复报告](remaining-review-fixes.md)。普通 Playlist 的保留详情补验见下；其余完整矩阵仍属父任务。XW-84 保留真实 Pull 错误/草稿展示和持久化 I/O 条件；不以受控抛错替代这些分支。
 
 `03b8a1e` 的新可写隔离副本已接受三个真实框架单元：最小化后同一窗口/PID 恢复、关窗后同一 PID 重建主窗口，以及 Quick Search 原草稿保留、关闭后首次歌词请求正确呈现。Now Playing 上的正确 query 与歌词面板关闭也已观察。后续正常启动的 Cua 对照确认基础 Command-[、真实 View→Back，以及从可见 Match Lyrics 入口关闭面板后的 Command-[ 均退出 Now Playing、恢复 PlayerBar，且仍暂停、音量 0%。该对照没有重放原先包含关窗、Quick Search 和 framework 请求的完整串行路径，因此保留 XCTest 超时，不称整轮通过。实例在前台离开后按精确 PID 合作退出；协调方独立核对 8 项保护哈希一致、原始 seed 仍为 0400、自有进程为零，且隔离产品、数据、偏好和 runner 容器均已移除。27 表审计保留 ORM/会话时戳变化及既有恢复路径填入的 9 个 historyRecordID，不声称所有持久化字节不变。
 
-自动停止进程后的 Intent 冷启；原含关窗、Quick Search、framework 请求及关闭歌词后的完整串行路径；其余 import/gallery/video 模态边界；手动 Siri/Shortcuts、实际 macOS 26 及独立辅助功能/设备矩阵。独立 Cua Back/歌词面板对照通过不关闭这些条件。
+自动停止进程后的 Intent 冷启；原含关窗、Quick Search、framework 请求及关闭歌词后的完整串行键盘路径；视频与其他未测呈现状态；手动 Siri/Shortcuts、实际 macOS 26 及完整 VoiceOver/设备矩阵。空链接 import 与图库歌词单元已按各自范围接受。
 
 XW-87：`03b8a1e` 已推送，Debug、Release、26 项既有回归和完整 CI 通过。实际 Library 查询 `1000` 读到 1112×68pt 歌曲行“1000日間, noa - Topic”，时长值“—”；独立视频按钮为“Play in floating video window 1000日間”，值为空、28×28pt、enabled 且 hittable。协调方独立核对两者标签和值不再串用，未激活歌曲或视频。私有测试原先把 seed 上传者当作预期显示艺术家，导致断言失败；源码使用 SongCreditCache 的解析署名，这不是标签修复失败。整段测试与清理结果另行记录，不据此宣称完整 VoiceOver 通过。
+
+## 2026-10-11 补充原生结果
+
+XW-88 已完成。图库上方的歌词面板原先继承了背景禁用状态；`3b44632` 将禁用和辅助功能隐藏限于背景内容。修复后的真实 framework query、输入框可用及 Close、同一歌曲图库保留、背景 AX 隔离、Done 返回和正常 Command-Q 退出均通过；完整 XCTest Passed 1/0（15.09 秒）。协调方独立复核四张窗口图、停止后的 SQLite、八项保护哈希和精确清理。空链接 import overlay 的歌词交接也已接受，但该旧轮退出失败且没有重置前的 import 数据库检查点，保留这两个限制。详见 [图库歌词修复](gallery-lyrics-acceptance.md)。
+
+普通 Playlist 的独立小节已通过：新建并追加两首既有曲目、核对实际身份/顺序、在保留详情中保存标题并即时刷新、恢复原标题，以及按两项预览删除自有歌单。Cua 操作完成两次 Save；协调方独立核对七个 SQLite 检查点，655 首 Track、60 条播放事件及原有集合真值保留。前三次私有测试失败和其中一次实际播放副作用单独保留，本轮不借用 XCTest 通过结论。详见 [普通歌单验收](ordinary-playlist-metadata.md)。
+
+源码 `3b44632` 与文档提交 `f635d62` 的执行代码一致；后者的 [完整 macOS CI 38122069515](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38122069515) 全阶段通过：895 项测试、123 个套件（44.479 秒）、8 项发布配置检查、App Intents 元数据、预览打包和上传。

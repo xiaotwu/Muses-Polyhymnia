@@ -42,8 +42,16 @@ After foreground left the candidate, the exact main process cooperatively termin
 
 Evidence is retained in `round-3/intent-window-route-20261010-d292b333`: per-attempt operation/result records, `coordinator-xw87-ax-readback.json`, `native-gui-comparison.json`, and the final cleanup/coordination records. The real normal-launch keyboard/menu comparison is separate from AppIntentsTesting delivery and from the failed whole XCTest runs.
 
+## Gallery isolation repair and native recheck
+
+XW-88 is Done on `3b44632`. Gallery isolation originally wrapped native sheet presentation, leaving the real lyrics query field and Close disabled. Restricting disabled/accessibilityHidden to background chrome preserves isolation while allowing native sheets. One public framework query, enabled/hittable field and Close, unchanged gallery title/artist/cover, background AX isolation, gallery Done and native Command-Q exit passed. The complete XCTest Passed 1/0, exit 0, in 15.09 seconds. Root independently reviewed four exact-window screenshots, the stopped 27-table database, eight protected hashes and exact cleanup. The 655 Tracks and 60 listening events remain; ORM/session timestamps and nine historyRecordID bindings filled by existing restoration are separately recorded. This accepts the exercised gallery state; provider success, automatic Intent cold launch and other modal states remain separate.
+
+[Complete macOS CI 38122069515](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38122069515) on source-equivalent `f635d62` passed 895 tests in 123 suites (44.479 seconds), eight release configuration checks, App Intents metadata, preview packaging and upload.
+
+See [gallery acceptance](gallery-lyrics-acceptance.md) for the earlier empty-import control comparison, failed original exits, missing pre-reset import checkpoint, and the independently verified successful new gallery run.
+
 ## Remaining acceptance
 
-Automatic Intent launch from a stopped process; the original compound closed-window, Quick Search, framework-query and post-lyrics keyboard sequence; remaining import/gallery/video presentation boundaries; manual Siri/Shortcuts, actual macOS 26 and separate accessibility/device matrices remain unaccepted. The independent Cua Back and visible-lyrics-sheet comparisons do not close these conditions.
+Automatic Intent launch from a stopped target; the original compound closed-window/Quick Search/framework/post-lyrics keyboard route; video and other unexamined presentation states; manual Siri/Shortcuts, actual macOS 26, full VoiceOver and device/focus conditions remain unaccepted. The empty import-link overlay and gallery lyrics cells are accepted in their specific recorded scopes. A truthful no-match result or a still-searching sheet does not establish provider-content success.
 
 XW-86 closes the source/API custom-scheme handoff mismatch. XW-75 remains In Review for the explicitly unaccepted cells. Framework delivery to a running application does not establish automatic stopped-target launch, manual Siri/Shortcuts UI or actual macOS 26 interaction. The acceptance automation did not change the normal library, installed application, Keychain, OS settings or system permissions. The human confirmed completing the earlier authentication prompt before continuation; its disappeared text and purpose were not inferred.

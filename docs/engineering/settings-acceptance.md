@@ -55,6 +55,8 @@ The current `shortcuts list` completed without a permission request: three exist
 
 The real `test` playback above verifies an executable Settings interaction only; it is **not** an App Intent playback result. A real provider lyric query, system invocation, modal boundary, playback pause/restoration and unavailable-state behavior reached through `SearchLyricsIntent` remain unexercised. A direct URL or fake lyrics would not satisfy those cells. XW-75 stays open until an already authorized native invocation can target an isolated candidate safely.
 
+Later source and acceptance supersede the earlier XW-75 packaging-only boundary above: XW-86 replaced OpenURLIntent handoff with shared in-process services, and real exact-bundle framework invocation, window/modal subsets and XW-88 gallery interaction now have native evidence. See [App Intents handoff](app-intents-handoff.md) and [gallery acceptance](gallery-lyrics-acceptance.md). The earlier candidate and its lack of a runnable shortcut remain historical observations, not a current claim that all Intent invocation is untested.
+
 ## Verification and cleanup
 
 The Release package build, metadata extraction, hardened-runtime yt-dlp startup checks and deep/strict signature verification succeeded. This session did not repeat the already passing full CI or run a redundant full test suite: no executable source or tests changed. Source inspection and compilation are not substituted for the native observations above.

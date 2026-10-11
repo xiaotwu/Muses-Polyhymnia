@@ -1,8 +1,8 @@
 # 当前修复与验收状态
 
-2026-10-10 至 11 日继续审阅后，五项确认的问题已修复并推送到 `main`。执行源码 `03b8a1e` 的 [完整 macOS CI 38116679660](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38116679660) 全阶段通过：895 项测试、123 个套件（45.849 秒），8 项发布配置检查，以及 App Intents 元数据、预览打包和上传。该 CI 对应执行源码，不代替后续文档提交的检查。
+2026-10-10 至 11 日继续审阅后，六项确认的问题已修复并推送到 `main`。源码 `3b44632` 与文档提交 `f635d62` 的执行代码一致；后者的 [完整 macOS CI 38122069515](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38122069515) 全阶段通过：895 项测试、123 个套件（44.479 秒）、8 项发布配置检查、App Intents 元数据、预览打包和上传。
 
-Linear 当前有 25 项开放：19 项 In Review、6 项 In Progress，包含父任务与协调项。XW-83/85/86/87 均 Done；唯一开放的 Bug 标签任务 XW-84 已完成代码修复，保留具体原生错误/I/O 条件。开放任务数不等于未修复缺陷数。
+Linear 当前有 25 项开放：19 项 In Review、6 项 In Progress，包含父任务与协调项。XW-83/85/86/87/88 均 Done；唯一开放的 Bug 标签任务 XW-84 已完成代码修复，保留具体原生错误/I/O 条件。开放任务数不等于未修复缺陷数。
 
 ## 已交付修复
 
@@ -13,8 +13,9 @@ Linear 当前有 25 项开放：19 项 In Review、6 项 In Progress，包含父
 | XW-85 | `c84d55c`：已打开的普通/导入歌单观察 metadata revision；Search 刷新当前查询的本地歌曲/笔记匹配，保留远端结果、分页和目录详情 | Done；真实导入歌单和固定 Library 查询的保存、刷新、恢复通过，保留完整 runner 收尾取消记录 |
 | XW-86 | `8475d31`：两个既有 App Intents 改用 MainActor 上的共享进程内入口，移除 OpenURLIntent 自定义协议交接 | Done；13 项定向测试、元数据和完整 CI 通过；原生矩阵归 XW-75 |
 | XW-87 | `03b8a1e`：歌曲 AX 标签绑定到歌曲 Button，保留独立视频按钮的用途/标题；Debug、Release 和 26 项现有回归通过 | Done；实际歌曲/视频独立 AX 标签与 28pt 命中范围通过 |
+| XW-88 | `3b44632`：图库的禁用与辅助功能隐藏只作用于背景，避免歌词面板继承 disabled | Done；真实 framework query、输入框可用及 Close、图库身份、背景隔离、退出及清理通过 |
 
-触发、修复和验证细节见 [播放/Pull/刷新修复](remaining-review-fixes.md) 与 [App Intents 交接](app-intents-handoff.md)。此前 XW-69/70/76/77/78/80/81/82 和 XW-79 均 Done，已接受范围继续复用，不重复运行。
+触发、修复和验证细节见 [播放/Pull/刷新修复](remaining-review-fixes.md) 与 [App Intents 交接](app-intents-handoff.md)、[图库歌词修复](gallery-lyrics-acceptance.md)。此前 XW-69/70/76/77/78/80/81/82 和 XW-79 均 Done，已接受范围继续复用，不重复运行。
 
 ## 最新原生结果
 
@@ -26,11 +27,15 @@ XW-75 已有一次真实 AppIntentsTesting 交付通过：两 Intent 返回，�
 
 `03b8a1e` 的新可写隔离副本已接受三个真实框架单元：最小化后同一窗口/PID 恢复、关窗后同一 PID 重建主窗口，以及 Quick Search 原草稿保留、关闭后首次歌词请求正确呈现。Now Playing 上的正确 query 与歌词面板关闭也已观察。后续正常启动的 Cua 对照确认基础 Command-[、真实 View→Back，以及从可见 Match Lyrics 入口关闭面板后的 Command-[ 均退出 Now Playing、恢复 PlayerBar，且仍暂停、音量 0%。该对照没有重放原先包含关窗、Quick Search 和 framework 请求的完整串行路径，因此保留 XCTest 超时，不称整轮通过。实例在前台离开后按精确 PID 合作退出；协调方独立核对 8 项保护哈希一致、原始 seed 仍为 0400、自有进程为零，且隔离产品、数据、偏好和 runner 容器均已移除。27 表审计保留 ORM/会话时戳变化及既有恢复路径填入的 9 个 historyRecordID，不声称所有持久化字节不变。
 
+XW-88 已完成。图库上方的歌词面板原先继承了背景禁用状态；`3b44632` 将禁用和辅助功能隐藏限于背景内容。修复后的真实 framework query、输入框可用及 Close、同一歌曲图库保留、背景 AX 隔离、Done 返回和正常 Command-Q 退出均通过；完整 XCTest Passed 1/0（15.09 秒）。协调方独立复核四张窗口图、停止后的 SQLite、八项保护哈希和精确清理。空链接 import overlay 的歌词交接也已接受，但该旧轮退出失败且没有重置前的 import 数据库检查点，保留这两个限制。详见 [图库歌词修复](gallery-lyrics-acceptance.md)。
+
+普通 Playlist 的独立小节已通过：新建并追加两首既有曲目、核对实际身份/顺序、在保留详情中保存标题并即时刷新、恢复原标题，以及按两项预览删除自有歌单。Cua 操作完成两次 Save；协调方独立核对七个 SQLite 检查点，655 首 Track、60 条播放事件及原有集合真值保留。前三次私有测试失败和其中一次实际播放副作用单独保留，本轮不借用 XCTest 通过结论。详见 [普通歌单验收](ordinary-playlist-metadata.md)。
+
 ## 剩余条件
 
 | 范围 | 下一步与实际前提 |
 | --- | --- |
-| XW-75 App Intents | 自动停止进程后的 Intent 冷启；原含关窗、Quick Search、framework 请求及关闭歌词后的完整串行路径；其余 import/gallery/video 模态边界；手动 Siri/Shortcuts、实际 macOS 26 及独立辅助功能/设备矩阵。独立 Cua Back/歌词面板对照通过不关闭这些条件。 |
+| XW-75 App Intents | 自动停止进程后的 Intent 冷启；原含关窗、Quick Search、framework 请求及关闭歌词后的完整串行键盘路径；视频与其他未测呈现状态；手动 Siri/Shortcuts、实际 macOS 26 及完整 VoiceOver/设备矩阵。空链接 import 与图库歌词单元已按各自范围接受。 |
 | XW-84、XW-26 | 原生 Pull 失败的错误/草稿保留，以及真实持久化 I/O 分支。既有来源失败仅限匿名 yt-dlp 导入，不能证明已认证 Data API Pull 不可用；真实预览仍需连接只读账号、身份匹配和完整远端快照。原子保存和受控失败回归继续有效。远端 Push/manage 与破坏性历史/group 保持原排除范围。 |
 | XW-71 Settings | 十类设置/历史、字体指针/键盘、语言/字号恢复和 Dark 840×804 三项检查已接受。剩余 Help 的 Tab/Space 与原按钮焦点、完整 VoiceOver、实际 macOS 26。 |
 | XW-72 辅助窗口 | MiniPlayer 生命周期/Pin/共享播放、真实同步桌面歌词和菜单栏 Escape/音量已接受。剩余物理控件交接/完整焦点、真实未同步歌词、系统 Dark 菜单栏。 |
@@ -38,6 +43,8 @@ XW-75 已有一次真实 AppIntentsTesting 交付通过：两 Intent 返回，�
 | XW-74 性能 | 获准八次真实位移和 24 次输入边界已通过；私有生命周期脚本的 29 项模拟检查通过。旧录制在末次输入后因覆盖中断提前停止，仍缺正常保存的帧记录、完整 AX 对照和事件/锚点归因；无 FPS、能耗或泄漏改善结论。 |
 
 最新 64 区域映射见 [验收对照](../ui-ux-acceptance-reconciliation.md)。没有新增已批准但完全缺失的产品功能。系统、账号、真实来源和测量前提由现有任务管理，不通过构造来源或扩大权限填补证据。
+
+2026-10-11 停点：普通 Playlist 的保留详情标题保存/恢复与自有删除小节已完成；按用户要求，在数据复核、清理、文档与 Linear 同步后暂停。恢复时从上表的具体剩余条件接续。
 
 ## 协作与证据
 
