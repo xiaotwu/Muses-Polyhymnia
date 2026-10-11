@@ -76,8 +76,6 @@ struct RootView: View {
 
     var body: some View {
         notificationWired
-            .disabled(galleryPresentation.preview != nil)
-            .accessibilityHidden(galleryPresentation.preview != nil)
             .overlay {
                 if let preview = galleryPresentation.preview {
                     GalleryMediaPreviewOverlay(preview: preview,
@@ -465,6 +463,9 @@ struct RootView: View {
 
     private var alertHost: some View {
         continuityChrome(splitView)
+            // Isolate the gallery background without disabling presented native sheets.
+            .disabled(galleryPresentation.preview != nil)
+            .accessibilityHidden(galleryPresentation.preview != nil)
             .alert(
                 tr("Library could not be opened", "无法打开资料库"),
                 isPresented: $showStoreFallbackAlert
