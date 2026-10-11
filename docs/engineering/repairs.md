@@ -2,7 +2,7 @@
 
 本页只把可复现行为或实际编译失败列为缺陷；未验收分支与测量候选分别见 [功能验收](feature-acceptance.md) 和 [优化调查](performance.md)。执行状态以对应 Linear 任务为准。
 
-2026-10-08 最终核对：XW-69/70/76/77/78/80/81/82 均 Done，没有开放的 Muses Bug 标签任务。代码 `e44a058` 的[完整 CI](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/37874847384)通过 886 项测试/120 个套件、元数据和预览包装；未验原生/系统/账号条件仍不算通过。
+2026-10-10 核对：此前 XW-69/70/76/77/78/80/81/82 与新增 XW-83/85/86 均 Done；XW-84 已修复并通过受控失败回归，原生错误展示和真实 I/O 待验。XW-87：Done；实际歌曲/视频独立 AX 标签与 28pt 命中范围通过。执行源码 `03b8a1e` 的 [完整 macOS CI 38116679660](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38116679660) 全阶段通过：895 项测试、123 个套件（45.849 秒），8 项发布配置检查，以及 App Intents 元数据、预览打包和上传。 完整验收边界见 [统一记录](current-status.md)。
 
 | 后续修复 | 范围 | 分析与验证 |
 | --- | --- | --- |
@@ -11,6 +11,11 @@
 | XW-80 | 已聚焦字体搜索的方向键、Return、查询重置与取消 | [原生焦点跟进](settings-focus-followup.md) |
 | XW-81 | 隐私清除后撤销并淘汰旧分区对象，恢复新快照冷读，保持其他账户/层/语言隔离 | [缓存恢复](source-cache-recovery.md) |
 | XW-82 | 空历史范围复用已有横向 picker；常规与 840×804 真实渲染 | [草稿/历史报告](playlist-flow-followup.md) |
+| XW-83 | 当前失败曲目的共享 Play / 外部链接重新加载，保留队列身份与历史 | [修复报告](remaining-review-fixes.md)，Done |
+| XW-84 | Pull 失败保留草稿；Local/Base/剪枝原子提交与回滚 | [修复报告](remaining-review-fixes.md)，原生错误展示待验 |
+| XW-85 | 保留歌单投影与当前 Search 随 metadata/Notes revision 刷新 | [修复报告](remaining-review-fixes.md)，真实保存/刷新/恢复通过，Done |
+| XW-86 | 复用进程内共享服务，移除 OpenURLIntent 自定义协议交接 | [App Intents](app-intents-handoff.md)，Done；系统矩阵归 XW-75 |
+| XW-87 | Search 的歌曲与独立视频按钮保留不同 AX 标签 | [修复报告](remaining-review-fixes.md)，Done；实际歌曲/视频独立 AX 标签与 28pt 命中范围通过 |
 
 ## XW-69：旧 Desktop 设置入口指向错误分类
 

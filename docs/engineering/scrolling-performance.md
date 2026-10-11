@@ -140,3 +140,9 @@ The exposure guard aborted recording at 49.533 seconds from recorder spawn, befo
 The app quit normally without force termination. Complete own preferences and original logical/physical domain absence were restored. All 309 source files, four protected normal-app entries and the donor's complete preferences matched. The coordinator independently checked source/normal hashes and exact owned process, bundle, data/cache and preference absence. The owned registration, obsolete signed candidate and invalid trace were removed; necessary screenshots, input/exposure journals and audit evidence remain. Both locks were released, with a separate `scrolling-pointer-20261010-55753acd-after-unlock-1` completion marker. Earlier interrupted evidence remains historical and is not overwritten.
 
 Private evidence and `handoff-result-summary.json` are under `~/.muses/acceptance/com.muses.acceptance.performance-pointer-20261010-55753acd/evidence/corrected-pointer-after-unlock-1/`. XW-74 remains In Review for a normally finalized pointer-frame record and the retained controlled-comparison/causal conditions; the eight painted moves and exact cleanup are complete.
+
+## 2026-10-10 私有测量脚本审阅
+
+原始脚本及证据保持不变，独立 successor 修正覆盖/存储中断误报 timeout、连接关闭误报焦点恢复，以及 setup/采样失败跳过清理的路径。动作在调用前记入日志；派发回执与原生事件送达分开。后台收尾以 monotonic deadline 和 100ms 检查观察迟到中断，焦点恢复只有精确 PID/window 证据才记为 confirmed。
+
+29 项纯模拟检查通过，15 项私有产物哈希及三个历史脚本的保留由协调方复核。没有 GUI、原生 reader、滚轮或 xctrace 录制，也没有应用源码优化。默认 CLI 为 dry-run，已消费的八次输入计划不能复用。实际原生适配、正常保存且覆盖工作负载的指针帧轨迹、完整 AX 对照与事件/锚点归因仍未通过；XW-74 保持 In Review。私有报告位于 round-3/performance-harness/review.md，不能以这些模拟检查宣称 FPS、能耗或泄漏改善。

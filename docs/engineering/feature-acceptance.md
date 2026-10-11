@@ -11,7 +11,7 @@
 | XW-71，父 XW-25 | Help/按钮遍历、信息弹窗原按钮焦点返回，以及完整 OS/VoiceOver 矩阵；十类分类/历史、字体指针与 Up/Down/Return/取消、样本及语言/字号恢复已经接受 | 当前系统键盘模式 0；不通过修改 OS 设置或全局焦点机制制造通过结果 |
 | XW-72，父 XW-25 | 物理控件交接/完整焦点、真实未同步歌词、系统 Dark 菜单栏及其余外部矩阵；生命周期/Pin/快捷键、共享音量及真实同步桌面歌词已经接受 | 保持同一 PlaybackService。两首既有 test 录音的有界只读查找未找到真实未同步文档，不剥除时间戳或扩大整库查询 |
 | XW-73，父 XW-19 | 自然出现的真实公开来源失败后指针 Retry 恢复、非空图书馆目录、当前候选成功身份匹配的 Web Home；加载/缓存/过期及取消修复的接受范围继续沿用 | 不制造网络错误，不把关闭来源的配置提示当作 Retry 网络恢复；稳定 YouTube 身份、来源隔离和只读 Web Home 边界保持 |
-| XW-75，父 XW-25，Backlog | 已有 App Intents 包装元数据与现有授权下的原生调用；播放使用 `test` 项目，歌词使用真实搜索 | `PlayYouTubeLinkIntent`、`SearchLyricsIntent` 已实现；元数据编译不代表 Siri 实测，不启用 OS 权限或设置 |
+| XW-75，父 XW-25，In Review | 已有 App Intents 包装元数据与现有授权下的原生调用；播放使用 `test` 项目，歌词使用真实搜索 | XW-86 已修复共享进程内交接；精确 bundle 的真实 AppIntentsTesting 证据见交接报告。自动冷启、手动 Siri 和其它系统矩阵分别记录 |
 
 每个任务记录实际源码、系统、窗口、数据来源、指针/键盘/菜单结果和残留边界。新发现的可复现缺陷单列子任务，维持小范围修复。已有 XW-17/15/8/18 等阶段任务保持 In Review，协调任务保持未完成，直到对应验收门槛满足。
 
@@ -37,3 +37,15 @@
 早期对话提出重启恢复最后浏览页面；`ef8730e` 后 `RootView.handleAppear` 明确从 Home 初始化，当前实际冷启证据也是 Home。保留这一冲突的历史来源与当前行为，不把旧方案直接恢复为功能任务。Settings 别名/深链接和窗口内 Back/Forward 的验证仍属于 XW-69/71。队列与播放位置的暂停恢复另属已实现播放合同；睡眠唤醒、真实设备断开等缺少条件的验收保留在 XW-26 的边界，不自动触发系统操作。
 
 Radio、本地扫描/音频文件导入/M3U/Add Local、长期迁移 capsule 继续退出产品。没有新的用户决定时不重建仓库、改写历史、安装/发布或提高账号权限。
+
+## 修复后的剩余验收
+
+执行源码 `03b8a1e` 的 [完整 macOS CI 38116679660](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38116679660) 全阶段通过：895 项测试、123 个套件（45.849 秒），8 项发布配置检查，以及 App Intents 元数据、预览打包和上传。
+
+XW-83 的失败曲目重试、XW-85 的保留投影刷新和 XW-86 的 Intent API 修复已关闭。XW-85 在实际导入歌单和固定 Library query 中完成四次 Save、六个数据库检查点及原值恢复；最终业务 test case Passed，整体 xcresult 因后续 runner 取消为 Failed，具体证据见 [修复报告](remaining-review-fixes.md)。非空普通 Playlist 的完整矩阵仍属父任务。XW-84 保留真实 Pull 错误/草稿展示和持久化 I/O 条件；不以受控抛错替代这些分支。
+
+`03b8a1e` 的新可写隔离副本已接受三个真实框架单元：最小化后同一窗口/PID 恢复、关窗后同一 PID 重建主窗口，以及 Quick Search 原草稿保留、关闭后首次歌词请求正确呈现。Now Playing 上的正确 query 与歌词面板关闭也已观察。后续正常启动的 Cua 对照确认基础 Command-[、真实 View→Back，以及从可见 Match Lyrics 入口关闭面板后的 Command-[ 均退出 Now Playing、恢复 PlayerBar，且仍暂停、音量 0%。该对照没有重放原先包含关窗、Quick Search 和 framework 请求的完整串行路径，因此保留 XCTest 超时，不称整轮通过。实例在前台离开后按精确 PID 合作退出；协调方独立核对 8 项保护哈希一致、原始 seed 仍为 0400、自有进程为零，且隔离产品、数据、偏好和 runner 容器均已移除。27 表审计保留 ORM/会话时戳变化及既有恢复路径填入的 9 个 historyRecordID，不声称所有持久化字节不变。
+
+自动停止进程后的 Intent 冷启；原含关窗、Quick Search、framework 请求及关闭歌词后的完整串行路径；其余 import/gallery/video 模态边界；手动 Siri/Shortcuts、实际 macOS 26 及独立辅助功能/设备矩阵。独立 Cua Back/歌词面板对照通过不关闭这些条件。
+
+XW-87：`03b8a1e` 已推送，Debug、Release、26 项既有回归和完整 CI 通过。实际 Library 查询 `1000` 读到 1112×68pt 歌曲行“1000日間, noa - Topic”，时长值“—”；独立视频按钮为“Play in floating video window 1000日間”，值为空、28×28pt、enabled 且 hittable。协调方独立核对两者标签和值不再串用，未激活歌曲或视频。私有测试原先把 seed 上传者当作预期显示艺术家，导致断言失败；源码使用 SongCreditCache 的解析署名，这不是标签修复失败。整段测试与清理结果另行记录，不据此宣称完整 VoiceOver 通过。
