@@ -72,6 +72,8 @@ struct GlobalSearchTrackRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.fullAreaPlain)
+        .accessibilityLabel("\(snapshot.title), \(SongCreditCache.shared.artist(snapshot: snapshot))")
+        .accessibilityValue(formatDuration(snapshot.durationSeconds))
         .overlay(alignment: .trailing) {
             YouTubeVideoButton(entry: .init(id: snapshot.youTubeId, title: snapshot.title, uploader: snapshot.artist, duration: snapshot.durationSeconds),
                                context: videoContext)
@@ -79,8 +81,6 @@ struct GlobalSearchTrackRow: View {
         .overlay(alignment: .bottom) {
             Rectangle().fill(BrandColors.hairline).frame(height: 1)
         }
-        .accessibilityLabel("\(snapshot.title), \(SongCreditCache.shared.artist(snapshot: snapshot))")
-        .accessibilityValue(formatDuration(snapshot.durationSeconds))
     }
 }
 
