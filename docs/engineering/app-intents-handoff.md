@@ -50,6 +50,18 @@ XW-88 is Done on `3b44632`. Gallery isolation originally wrapped native sheet pr
 
 See [gallery acceptance](gallery-lyrics-acceptance.md) for the earlier empty-import control comparison, failed original exits, missing pre-reset import checkpoint, and the independently verified successful new gallery run.
 
+## Stopped-target and Shortcuts identity investigation
+
+On 2026-10-11, the stopped-target AppIntentsTesting attempt ended at a new authentication surface before any business invocation. Its failed whole runner and zero Intent calls remain recorded. The human confirmed completing that authentication and later unlocking the desktop; neither observation turns the attempt into a cold-launch pass.
+
+A uniquely named same-team signed candidate, MusesLyrics-119ede29534b, reused source `3b44632` and matching metadata. Public LaunchServices registration returned exactly one candidate URL, with zero target processes before and after registration. The first bounded discovery check found neither a unique Apps category nor matching actions. A separately authorized muted setup launch then normally quit. After elapsed indexing time and a Shortcuts refresh, the full-name search displayed Search Lyrics and Play YouTube Link; this does not isolate setup as the cause or establish a general first-launch requirement.
+
+Apps still showed generic Muses. The native action Info window contained only the fixed action description, with no unique application-source name, bundle ID or path. A unique search query is not itself a displayed source identity. Neither identity method established the exact target, so no shortcut was created and no Intent was run. No application cold-launch defect is inferred.
+
+Four actual SQLite checkpoints and the 27-table audit preserve 655 Tracks, 60 listening events and existing user truth. Lifecycle/ORM changes and nine existing restoration bindings are recorded separately. Root independently verified the stopped data, 12 protected inputs including the candidate's eight inputs, seed 0400 and exact owned cleanup. The original three shortcuts remain. The setup candidate and task-started Shortcuts processes normally quit; a follow-up AX procNotFound diagnostic is separate from independently verified process exit. Candidate registration, bundle, data/cache and preferences were removed, then both locks released. Evidence: `round-3/xw75-shortcuts-cold-native-20261011-119ede29534b` and `round-4/root/xw75-shortcuts-independent-review.json`. Native observations are retained in the execution chat; root does not claim an independent image inspection of this unit.
+
+The next possible identity method is a legitimate export of one owned, unrun UI draft, inspected before Run. Apple's [File Export documentation](https://support.apple.com/en-gb/guide/shortcuts-mac/apdf01f8c054/mac) says Anyone sends the recipe to Apple for validation, while People Who Know Me includes contact information. Exact action identity readability and this host's account/export requirements remain unverified. The read-only investigation created no draft or export; do not treat the proposed route as accepted binding.
+
 ## Remaining acceptance
 
 Automatic Intent launch from a stopped target; the original compound closed-window/Quick Search/framework/post-lyrics keyboard route; video and other unexamined presentation states; manual Siri/Shortcuts, actual macOS 26, full VoiceOver and device/focus conditions remain unaccepted. The empty import-link overlay and gallery lyrics cells are accepted in their specific recorded scopes. A truthful no-match result or a still-searching sheet does not establish provider-content success.

@@ -2,6 +2,8 @@
 
 2026-10-08 execution of XW-73 under [feature acceptance](feature-acceptance.md) and [execution coordination](execution-coordination.md). Two confirmed defects were repaired as XW-76 and XW-77. The observations below complete the currently reachable native source-state scope; XW-73 remains In Review and XW-19 remains open for the explicitly unexecuted conditions.
 
+October 11 follow-up: [native library catalog acceptance](library-catalog-acceptance.md) now accepts one real 24-track import, nonempty Albums/detail/normal refresh/Back and Artists overview. The older empty-library observations and unexecuted conditions below retain their October 8 scope; the later report supplies the newly accepted nonempty cell without extending error-Retry, artist-detail, playback or platform coverage.
+
 ## Candidate and isolation
 
 - Baseline: auxiliary handoff `6fb75de`. Cancellation repair: `a325a36`. Home-to-catalog route repair and final executable source: `e74a638`.

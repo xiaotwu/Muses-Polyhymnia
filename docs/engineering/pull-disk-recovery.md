@@ -14,6 +14,8 @@
 
 本机 macOS 27.0.1（26A434）上，SwiftData 的真实保存返回 `NSSQLiteErrorDomain` / `778`（`SQLITE_IOERR_WRITE`），错误中的路径精确指向自有测试库。最终版本的独立用例通过，完整测试运行 0.041 秒。
 
+提交 `8a58f7b` 的 [完整 CI 38149867942](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38149867942) 也已通过。常规运行报告 896 项测试/123 个套件（53.867 秒），其中跳过此 opt-in 用例；独立进程随后真实得到错误 778 并完成恢复，1 项/1 套件通过（0.144 秒）。8 项发布检查、App Intents 元数据、预览打包和上传均成功。
+
 - 失败前后，通过独立只读 SQLite 连接比较 Import、Item、Revision、Track 四张表所有已提交行的列类型与读取值，结果一致；另用 fresh ModelContext 核对 Local 身份/顺序、Base/Remote 指针、lastSyncedAt、63 条完整修订、Track 与关系均保持原状，刷新通知为 0。
 - 解除限额后，同一服务、同一 preview 和同一 resolved snapshot 重试成功：新 Local/Base、一个 beforePull、一首新 Track、修订剪枝至 50 条，恰好一次刷新通知。
 - 释放第一组对象后，在同一测试进程中新建 ModelContainer 重开文件，持久化结果相同。这不是应用冷启动验收。

@@ -2,14 +2,14 @@
 
 更新时间：2026-10-11。当前工作入口是 Codex 对话「整理并执行Linear剩余任务」。近期列表之外，已补查旧项目路径的十四个较早对话；二十二个历史对话及一个已完成的执行对话均已归并，可恢复归档，共二十三个。归档不表示其中提及的所有验收都通过，也不删除历史证据。
 
-最新结果和接续条件见 [当前状态](current-status.md)。XW-83/85/86/87/88 已完成；XW-84 代码修复已通过受控失败及 [真实磁盘错误恢复](pull-disk-recovery.md) 回归，保留原生错误/草稿展示条件。本轮恢复时已确认文档提交 `c3f1983` 的 [完整 macOS CI 38125096299](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38125096299) 全阶段通过：895 项测试、123 个套件（40.689 秒）、8 项发布配置检查、App Intents 元数据、预览打包和上传；应用执行源码仍为 `3b44632`。 Linear 有 25 项开放（19 项 In Review、6 项 In Progress），包含父任务与协调项；唯一开放 Bug 标签任务为 XW-84。完整产品矩阵尚未全部通过。
+最新结果和接续条件见 [当前状态](current-status.md)。XW-83/85/86/87/88 已完成；XW-84 代码修复已通过受控失败及 [真实磁盘错误恢复](pull-disk-recovery.md) 回归，保留原生错误/草稿展示条件。测试与 CI 提交 `8a58f7b` 的 [完整 macOS CI 38149867942](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38149867942) 全阶段通过：常规运行报告 896 项测试、123 个套件（53.867 秒），独立磁盘用例在其中跳过后另以 1 项/1 套件通过（0.144 秒）；8 项发布配置检查、App Intents 元数据、预览打包和上传均通过。应用执行源码仍为 `3b44632`。 Linear 有 25 项开放（19 项 In Review、6 项 In Progress），包含父任务与协调项；唯一开放 Bug 标签任务为 XW-84。完整产品矩阵尚未全部通过。
 
 本目录将仍有效的结论分为三类，并由 Linear 管理执行状态：
 
 | 分类 | 技术文档 | 执行任务 |
 | --- | --- | --- |
 | 已证实的缺陷与修复 | [修复任务](repairs.md)、[来源修复](source-state-acceptance.md)、[CI 回归](source-ci-regression.md)、[缓存恢复](source-cache-recovery.md)、[重试/Pull/刷新/标签](remaining-review-fixes.md)、[App Intents](app-intents-handoff.md)、[图库歌词](gallery-lyrics-acceptance.md)、[普通歌单](ordinary-playlist-metadata.md)、[真实磁盘恢复](pull-disk-recovery.md) | 新修复及证据以 [当前状态](current-status.md) 为准；XW-84 的原生错误条件保留 |
-| 功能实现与补充验收 | [功能及验收](feature-acceptance.md)、[草稿/历史跟进](playlist-flow-followup.md) | XW-79 已完成；XW-71、XW-72、XW-73、XW-75、XW-62 与既有阶段任务保留具体条件 |
+| 功能实现与补充验收 | [功能及验收](feature-acceptance.md)、[草稿/历史跟进](playlist-flow-followup.md)、[非空目录验收](library-catalog-acceptance.md) | XW-79 已完成；XW-73 已补齐 24 首真实专辑的非空目录/正常刷新小节，XW-71、XW-72、XW-73、XW-75、XW-62 与既有阶段任务保留各自剩余条件 |
 | 性能与优化调查 | [优化项](performance.md) | XW-74；无证据的排查候选不直接变成重构任务 |
 
 判断顺序：当前用户决定和批准规格 → 当前源码 → 实际运行 → 测试 → 历史记录。历史对话不能恢复已淘汰产品方向；测试通过不能替代原生界面验收。总体 UI 验收仍使用 [64 区域对照表](../ui-ux-acceptance-reconciliation.md)，具体操作使用 [验收记录](../ui-ux-redesign-acceptance.md)。
