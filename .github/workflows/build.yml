@@ -17,6 +17,11 @@ jobs:
         run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s Tests/ReleaseTests
       - name: Tests
         run: swift test --no-parallel
+      - name: Pull disk failure recovery
+        timeout-minutes: 2
+        env:
+          MUSES_PULL_DISK_FAILURE_TEST: "1"
+        run: swift test --skip-build --no-parallel --filter PlaylistPullPersistenceTests/diskFailureThenRetry
       - name: Generate App Intents metadata
         run: |
           xcodebuild \

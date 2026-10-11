@@ -16,7 +16,7 @@
 
 使用真实内存 SwiftData 模型和仅限 Pull 保存的注入接口，先复现两项测试中的四个问题，再验证失败后的全部 truth/revision/新 Track、通知和同一预览重试。成功路径将 63 条修订裁剪为 50 条且只保存一次；失败不泄漏新数据，原预览能够恢复。15 项定向测试通过，并再次包含在最终 37 项、七套件的来源回归中。该测试是受控的保存抛错，不能代替真实磁盘 I/O 故障或原生错误展示。
 
-2026-10-11 只读复核进一步限定来源证据：[既有失败](playlist-flow-followup.md) 是 cookie-free yt-dlp 导入返回 “The playlist does not exist”，不能推广为已认证 Data API Pull 不可用。生产 Pull Preview 需要已连接且可读取的账号、匹配身份和完整远端快照；seed 虽保留各 506 项、11 页的 Base/RemoteShadow，生产 UI 没有直接用这些历史快照打开预览的入口。此前 Guest、空 OAuth client 和仅选 `test` 是隔离测试选择。当前没有真实 Apply 或底层磁盘保存错误；导入错误、表单校验和受控抛错分别保留原有范围，不代替这两项条件。
+2026-10-11 只读复核进一步限定来源证据：[既有失败](playlist-flow-followup.md) 是 cookie-free yt-dlp 导入返回 “The playlist does not exist”，不能推广为已认证 Data API Pull 不可用。生产 Pull Preview 需要已连接且可读取的账号、匹配身份和完整远端快照；seed 虽保留各 506 项、11 页的 Base/RemoteShadow，生产 UI 没有直接用这些历史快照打开预览的入口。此前 Guest、空 OAuth client 和仅选 `test` 是隔离测试选择。该次只读复核没有执行原生 Apply 或底层磁盘保存错误；导入错误、表单校验和受控抛错分别保留原有范围。随后完成的 [真实磁盘回归](pull-disk-recovery.md) 已通过实际 SwiftData 保存的 778 错误、四表原始行保持、同一服务/预览重试和新容器重开；原生错误文案与草稿展示仍待验。
 
 ## XW-85：已打开歌单与本地搜索即时刷新
 
@@ -61,7 +61,7 @@ Edit Info 成功会增加 `LibraryService.metadataRevision`，但普通及导入
 
 XW-88 已完成。图库上方的歌词面板原先继承了背景禁用状态；`3b44632` 将禁用和辅助功能隐藏限于背景内容。修复后的真实 framework query、输入框可用及 Close、同一歌曲图库保留、背景 AX 隔离、Done 返回和正常 Command-Q 退出均通过；完整 XCTest Passed 1/0（15.09 秒）。协调方独立复核四张窗口图、停止后的 SQLite、八项保护哈希和精确清理。空链接 import overlay 的歌词交接也已接受，但该旧轮退出失败且没有重置前的 import 数据库检查点，保留这两个限制。详见 [图库歌词修复](gallery-lyrics-acceptance.md)。
 
-源码 `3b44632` 与文档提交 `f635d62` 的执行代码一致；后者的 [完整 macOS CI 38122069515](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38122069515) 全阶段通过：895 项测试、123 个套件（44.479 秒）、8 项发布配置检查、App Intents 元数据、预览打包和上传。
+本轮恢复时已确认文档提交 `c3f1983` 的 [完整 macOS CI 38125096299](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38125096299) 全阶段通过：895 项测试、123 个套件（40.689 秒）、8 项发布配置检查、App Intents 元数据、预览打包和上传；应用执行源码仍为 `3b44632`。
 
 ## 普通 Playlist 的独立补验
 
