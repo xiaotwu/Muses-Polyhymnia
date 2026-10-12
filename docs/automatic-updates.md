@@ -76,7 +76,7 @@ environment, then run:
 ```sh
 export MUSES_NOTARY_PROFILE=muses
 make release MUSES_SIGN_IDENTITY='Developer ID Application: ...' \
-  MUSES_VERSION=0.6.0 MUSES_BUILD=20261001.1
+  MUSES_VERSION=0.6.0 MUSES_BUILD=20261012.1
 ```
 
 `make release` signs framework/helpers inside-out, notarizes/staples the app,

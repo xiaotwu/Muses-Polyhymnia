@@ -2,7 +2,7 @@
 
 更新时间：2026-10-12。当前工作入口是 Codex 对话「整理并执行Linear剩余任务」。近期列表之外，已补查旧项目路径的十四个较早对话；二十二个历史对话及一个已完成的执行对话均已归并，可恢复归档，共二十三个。归档不表示其中提及的所有验收都通过，也不删除历史证据。
 
-最新结果和接续条件见 [当前状态](current-status.md)。XW-83/84/85/86/87/88/89 已完成；XW-84 的 [原生错误、草稿及 Apply 重试](pull-native-recovery.md)，以及 XW-75 歌词冷启动和 XW-89 [播放位置保护](cold-start-recovery.md) 均已接受。最新执行源码为 `8877bee`。`8877bee` 的 [完整 macOS CI 38217251194](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38217251194) 全阶段通过：常规运行报告 901 项测试、123 个套件（51.299 秒，包含 opt-in 跳过项），独立磁盘恢复用例另以 1 项/1 套件通过（0.112 秒）；8 项发布配置检查、App Intents 元数据、预览打包和上传均通过。 Linear 有 24 项开放（18 项 In Review、6 项 In Progress），包含父任务与协调项；开放 Bug 标签任务为零。用户已授权将当前大更新打包发布为 0.6.0；剩余 24 项安排到发布后，优先 XW-75 原串行键盘路径及其余具体呈现状态。完整产品矩阵尚未全部通过。
+最新结果和接续条件见 [当前状态](current-status.md)。XW-83/84/85/86/87/88/89 已完成；XW-84 的 [原生错误、草稿及 Apply 重试](pull-native-recovery.md)，以及 XW-75 歌词冷启动和 XW-89 [播放位置保护](cold-start-recovery.md) 均已接受。最新执行源码为 `8877bee`。`8877bee` 的 [完整 macOS CI 38217251194](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38217251194) 全阶段通过：常规运行报告 901 项测试、123 个套件（51.299 秒，包含 opt-in 跳过项），独立磁盘恢复用例另以 1 项/1 套件通过（0.112 秒）；8 项发布配置检查、App Intents 元数据、预览打包和上传均通过。 Linear 有 24 项开放（18 项 In Review、6 项 In Progress），包含父任务与协调项；开放 Bug 标签任务为零。[0.6.0 已发布](https://github.com/xiaotwu/Muses-Polyhymnia/releases/tag/v0.6.0)：`ec6d0ec` 的完整 CI、正式签名公证、资产与自动更新源远端核验均通过，详见 [发布记录](release-0.6.0.md)。剩余 24 项安排到发布后，优先 XW-75 原串行键盘路径及其余具体呈现状态。完整产品矩阵尚未全部通过。
 
 本目录将仍有效的结论分为三类，并由 Linear 管理执行状态：
 
