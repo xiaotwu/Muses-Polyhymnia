@@ -9,10 +9,9 @@ func reject(_ message: String) -> Never {
 }
 
 let args = CommandLine.arguments
-guard args.count == 4 else { reject("Usage: verify-update-signatures.swift APP FEED ARCHIVE") }
+guard args.count == 3 || args.count == 4 else { reject("Usage: verify-update-signatures.swift APP FEED [ARCHIVE]") }
 let app = URL(fileURLWithPath: args[1])
 let feed = try Data(contentsOf: URL(fileURLWithPath: args[2]))
-let archive = try Data(contentsOf: URL(fileURLWithPath: args[3]), options: .mappedIfSafe)
 let plist = try PropertyListSerialization.propertyList(
     from: Data(contentsOf: app.appendingPathComponent("Contents/Info.plist")), format: nil) as! [String: Any]
 guard let encoded = plist["SUPublicEDKey"] as? String,
@@ -32,8 +31,18 @@ guard lines.count == 3, lines[2] == "-->",
     reject("Feed signature does not match the app public key")
 }
 let document = try XMLDocument(data: feed, options: .nodeLoadExternalEntitiesNever)
+if args.count == 3 {
+    print("Feed signature matches the application's embedded public key.")
+    exit(0)
+}
+let archiveURL = URL(fileURLWithPath: args[3])
+let archive = try Data(contentsOf: archiveURL, options: .mappedIfSafe)
+guard let version = plist["CFBundleShortVersionString"] as? String else { reject("Missing app version") }
+let expected = "https://github.com/xiaotwu/Muses-Polyhymnia/releases/download/v\(version)/\(archiveURL.lastPathComponent)"
 let enclosures = try document.nodes(forXPath: "/rss/channel/item/enclosure")
-guard enclosures.count == 1, let element = enclosures.first as? XMLElement,
+let matching = enclosures.compactMap { $0 as? XMLElement }
+    .filter { $0.attribute(forName: "url")?.stringValue == expected }
+guard matching.count == 1, let element = matching.first,
       let value = element.attribute(forName: "sparkle:edSignature")?.stringValue,
       let archiveSignature = Data(base64Encoded: value),
       key.isValidSignature(archiveSignature, for: archive) else {

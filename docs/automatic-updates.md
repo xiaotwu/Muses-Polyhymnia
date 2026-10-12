@@ -97,8 +97,12 @@ Published version archives cannot be overwritten by this script. If feed upload
 fails after publication, the new version is available manually; verify the
 published DMG before retrying only the feed upload.
 
-The generated appcast contains one stable full update and no deltas. Preserve
-compatible older entries before future OS/architecture changes. Keep
+The generated appcast contains the current stable full update and no deltas.
+Set `MUSES_PREVIOUS_APPCAST` to a downloaded production appcast when preserving
+older compatibility releases. Its existing signature is verified against the
+application key before Sparkle merges and re-signs the feed. The current update
+must be first and unique; additional versions must be older. For 0.6, retain
+0.5.11 for macOS 14–15 while the new entry requires macOS 26. Keep
 CFBundleVersion increasing; never mutate an archive after signing.
 
 Existing versions without Sparkle need one manual upgrade. A project signing

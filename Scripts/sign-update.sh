@@ -3,7 +3,7 @@
 # --appcast must run AFTER notarize-dmg.sh; signed archives are immutable.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-VER="${MUSES_VERSION:-0.5.11}"
+VER="${MUSES_VERSION:-0.6.0}"
 case "${1:-}" in
     "")
         [[ -d build/Muses.app ]] || { echo 'Build Muses.app first.' >&2; exit 1; }
@@ -18,13 +18,18 @@ case "${1:-}" in
         SPARKLE_TOOLS=".build/artifacts/sparkle/Sparkle/bin"
         FEED_DIR="build/update-feed-${VER}"
         mkdir -p "$FEED_DIR"
+        if [[ -n "${MUSES_PREVIOUS_APPCAST:-}" ]]; then
+            # Keep signed compatibility entries when the minimum OS changes.
+            swift Scripts/verify-update-signatures.swift build/Muses.app "$MUSES_PREVIOUS_APPCAST"
+            cp "$MUSES_PREVIOUS_APPCAST" "$FEED_DIR/appcast.xml"
+        fi
         cp "$DMG" "$FEED_DIR/"
         SIGN_ARGS=(--account "${MUSES_UPDATE_KEY_ACCOUNT:-muses-polyhymnia}")
         if [[ -n "${MUSES_UPDATE_PRIVATE_KEY_FILE:-}" ]]; then
             SIGN_ARGS=(--ed-key-file "$MUSES_UPDATE_PRIVATE_KEY_FILE")
         fi
         "$SPARKLE_TOOLS/generate_appcast" "${SIGN_ARGS[@]}" \
-            --maximum-deltas 0 \
+            --maximum-deltas 0 --maximum-versions 0 \
             --download-url-prefix "https://github.com/xiaotwu/Muses-Polyhymnia/releases/download/v${VER}/" \
             --link "https://github.com/xiaotwu/Muses-Polyhymnia/releases/tag/v${VER}" \
             "$FEED_DIR"
