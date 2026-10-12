@@ -42,7 +42,7 @@ Radio、本地扫描/音频文件导入/M3U/Add Local、长期迁移 capsule 继
 
 执行源码 `03b8a1e` 的 [完整 macOS CI 38116679660](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38116679660) 全阶段通过：895 项测试、123 个套件（45.849 秒），8 项发布配置检查，以及 App Intents 元数据、预览打包和上传。
 
-XW-83 的失败曲目重试、XW-85 的保留投影刷新和 XW-86 的 Intent API 修复已关闭。XW-85 在实际导入歌单和固定 Library query 中完成四次 Save、六个数据库检查点及原值恢复；最终业务 test case Passed，整体 xcresult 因后续 runner 取消为 Failed，具体证据见 [修复报告](remaining-review-fixes.md)。普通 Playlist 的保留详情补验见下；其余完整矩阵仍属父任务。XW-84 已补齐 [真实磁盘写入错误 778 的回滚与重试](pull-disk-recovery.md)，保留原生 Pull 错误/草稿展示及按钮重试条件。
+XW-83 的失败曲目重试、XW-85 的保留投影刷新和 XW-86 的 Intent API 修复已关闭。XW-85 在实际导入歌单和固定 Library query 中完成四次 Save、六个数据库检查点及原值恢复；最终业务 test case Passed，整体 xcresult 因后续 runner 取消为 Failed，具体证据见 [修复报告](remaining-review-fixes.md)。普通 Playlist 的保留详情补验见下；其余完整矩阵仍属父任务。XW-84 已补齐 [真实磁盘写入错误 778 的回滚与重试](pull-disk-recovery.md)，以及 [原生空间耗尽错误、排序草稿保留、同面板按钮重试与冷重开](pull-native-recovery.md)，现为 Done。自然冲突按钮和远端 Push 不在本次原生接受范围。
 
 `03b8a1e` 的新可写隔离副本已接受三个真实框架单元：最小化后同一窗口/PID 恢复、关窗后同一 PID 重建主窗口，以及 Quick Search 原草稿保留、关闭后首次歌词请求正确呈现。Now Playing 上的正确 query 与歌词面板关闭也已观察。后续正常启动的 Cua 对照确认基础 Command-[、真实 View→Back，以及从可见 Match Lyrics 入口关闭面板后的 Command-[ 均退出 Now Playing、恢复 PlayerBar，且仍暂停、音量 0%。该对照没有重放原先包含关窗、Quick Search 和 framework 请求的完整串行路径，因此保留 XCTest 超时，不称整轮通过。实例在前台离开后按精确 PID 合作退出；协调方独立核对 8 项保护哈希一致、原始 seed 仍为 0400、自有进程为零，且隔离产品、数据、偏好和 runner 容器均已移除。27 表审计保留 ORM/会话时戳变化及既有恢复路径填入的 9 个 historyRecordID，不声称所有持久化字节不变。
 

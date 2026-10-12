@@ -30,8 +30,8 @@ MUSES_PULL_DISK_FAILURE_TEST=1 swift test --skip-build --no-parallel --filter Pl
 
 Core Data 会为这个预期故障输出 I/O error 日志；通过标准仍是测试断言和退出状态。测试代码见 [PlaylistPullPersistenceTests](../../Tests/MusesTests/PlaylistPullPersistenceTests.swift)，CI 的独立步骤见 [build.yml](../../.github/workflows/build.yml)。私有原始日志和进程审计位于 `~/.muses/tmp/engineering-oct08/round-4/root/`。
 
-## XW-84 剩余范围
+## 后续原生验收
 
-原生 Pull Preview 中的错误文案、已解决冲突草稿保留和点击 Apply 重试仍需实际 UI 验收，因此 XW-84 保持 In Review。生产预览需要可读取的现有 OAuth 会话、匹配的频道身份和完整 Data API 快照。历史匿名 yt-dlp 导入失败不能证明该路径不可用。
+同日后续 [原生恢复小节](pull-native-recovery.md) 已完成：真实只读账号、匹配身份和完整 530 项/11 页快照生成正式预览；专用卷空间耗尽后，原生 SQLite 错误 13、排序草稿保留、27 表回滚、同面板 Apply 重试和正常冷重开均通过。XW-84 已 Done。没有自然冲突，不声称新验收了冲突选择按钮。历史匿名 yt-dlp 导入失败不能证明已认证路径不可用。
 
-这项回归只接受 Pull 保存错误与恢复；其它元数据保存、远端 Push/manage、原生应用冷启动和完整 OS/VoiceOver 矩阵保留各自范围。
+本页的测试仍只接受错误 778 的保存恢复及同进程新容器重开；原生结果由独立报告记录。其它元数据保存、远端 Push/manage、Intent 自动冷启动和完整 OS/VoiceOver 矩阵保留各自范围。
