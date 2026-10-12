@@ -2,7 +2,7 @@
 
 本页只把可复现行为或实际编译失败列为缺陷；未验收分支与测量候选分别见 [功能验收](feature-acceptance.md) 和 [优化调查](performance.md)。执行状态以对应 Linear 任务为准。
 
-2026-10-11 核对：此前 XW-69/70/76/77/78/80/81/82 与新增 XW-83/84/85/86/87/88 均 Done。XW-84 已通过受控失败、[真实磁盘写入错误恢复](pull-disk-recovery.md) 及 [原生错误、草稿和同面板重试](pull-native-recovery.md)。本轮恢复确认 `2eb22b7` 的完整 CI 全阶段成功，应用执行源码仍为 `3b44632`；具体测试计数与原生范围见 [统一记录](current-status.md)。
+2026-10-12 核对：此前 XW-69/70/76/77/78/80/81/82 与新增 XW-83/84/85/86/87/88/89 均 Done。XW-84 已通过 [真实磁盘写入恢复](pull-disk-recovery.md) 和 [原生错误、草稿及同面板重试](pull-native-recovery.md)。XW-89 修复真实冷启动后快速退出清零位置的问题，当前执行源码为 `8877bee`；验证和 CI 见 [统一记录](current-status.md)。
 
 | 后续修复 | 范围 | 分析与验证 |
 | --- | --- | --- |
@@ -17,6 +17,7 @@
 | XW-86 | 复用进程内共享服务，移除 OpenURLIntent 自定义协议交接 | [App Intents](app-intents-handoff.md)，Done；系统矩阵归 XW-75 |
 | XW-87 | Search 的歌曲与独立视频按钮保留不同 AX 标签 | [修复报告](remaining-review-fixes.md)，Done；实际歌曲/视频独立 AX 标签与 28pt 命中范围通过 |
 | XW-88 | 图库背景隔离不再禁用原生歌词面板 | [图库歌词报告](gallery-lyrics-acceptance.md)，Done |
+| XW-89 | 冷启动加载未完成时保留检查点位置，处理显式 seek、重试及视频交接 | [冷启动与位置恢复](cold-start-recovery.md)，109 项回归、独立审阅和真实退出后两处 20 秒保留通过，Done |
 
 ## XW-69：旧 Desktop 设置入口指向错误分类
 

@@ -11,7 +11,7 @@
 | XW-71，父 XW-25 | Help/按钮遍历、信息弹窗原按钮焦点返回，以及完整 OS/VoiceOver 矩阵；十类分类/历史、字体指针与 Up/Down/Return/取消、样本及语言/字号恢复已经接受 | 当前系统键盘模式 0；不通过修改 OS 设置或全局焦点机制制造通过结果 |
 | XW-72，父 XW-25 | 物理控件交接/完整焦点、真实未同步歌词、系统 Dark 菜单栏及其余外部矩阵；生命周期/Pin/快捷键、共享音量及真实同步桌面歌词已经接受 | 保持同一 PlaybackService。两首既有 test 录音的有界只读查找未找到真实未同步文档，不剥除时间戳或扩大整库查询 |
 | XW-73，父 XW-19 | 自然出现的真实公开来源失败后指针 Retry 恢复、当前候选成功身份匹配的 Web Home及其余来源/平台矩阵；非空 Library Albums/详情/正常刷新/Back 与 Artists 概览已补验 | [24 首真实来源导入与目录验收](library-catalog-acceptance.md) 保留稳定身份和原库真值；不把正常刷新当作错误 Retry 或完整 loading/外观矩阵 |
-| XW-75，父 XW-25，In Review | 已有 App Intents 包装元数据与现有授权下的原生调用；播放使用 `test` 项目，歌词使用真实搜索 | XW-86 已修复共享进程内交接；精确 bundle 的真实 AppIntentsTesting 证据见交接报告。自动冷启、手动 Siri 和其它系统矩阵分别记录 |
+| XW-75，父 XW-25，In Review | 已有 App Intents 包装元数据与现有授权下的原生调用；播放使用 `test` 项目，歌词使用真实搜索 | XW-86 已修复共享进程内交接；精确 bundle 的真实 AppIntentsTesting 证据见交接报告。停止目标的歌词 Intent 冷启动已通过；冷态 Play、手动 Siri 和其它系统矩阵分别记录 |
 
 每个任务记录实际源码、系统、窗口、数据来源、指针/键盘/菜单结果和残留边界。新发现的可复现缺陷单列子任务，维持小范围修复。已有 XW-17/15/8/18 等阶段任务保持 In Review，协调任务保持未完成，直到对应验收门槛满足。
 
@@ -46,7 +46,7 @@ XW-83 的失败曲目重试、XW-85 的保留投影刷新和 XW-86 的 Intent AP
 
 `03b8a1e` 的新可写隔离副本已接受三个真实框架单元：最小化后同一窗口/PID 恢复、关窗后同一 PID 重建主窗口，以及 Quick Search 原草稿保留、关闭后首次歌词请求正确呈现。Now Playing 上的正确 query 与歌词面板关闭也已观察。后续正常启动的 Cua 对照确认基础 Command-[、真实 View→Back，以及从可见 Match Lyrics 入口关闭面板后的 Command-[ 均退出 Now Playing、恢复 PlayerBar，且仍暂停、音量 0%。该对照没有重放原先包含关窗、Quick Search 和 framework 请求的完整串行路径，因此保留 XCTest 超时，不称整轮通过。实例在前台离开后按精确 PID 合作退出；协调方独立核对 8 项保护哈希一致、原始 seed 仍为 0400、自有进程为零，且隔离产品、数据、偏好和 runner 容器均已移除。27 表审计保留 ORM/会话时戳变化及既有恢复路径填入的 9 个 historyRecordID，不声称所有持久化字节不变。
 
-自动停止进程后的 Intent 冷启；原含关窗、Quick Search、framework 请求及关闭歌词后的完整串行键盘路径；视频与其他未测呈现状态；手动 Siri/Shortcuts、实际 macOS 26 及完整 VoiceOver/设备矩阵。空链接 import 与图库歌词单元已按各自范围接受。
+停止目标的歌词 Intent 冷启与 XW-89 的退出位置保留已通过，见 [新报告](cold-start-recovery.md)。剩余冷态 Play Intent；原含关窗、Quick Search、framework 请求及关闭歌词后的完整串行键盘路径；视频与其他未测呈现状态；手动 Siri/Shortcuts、实际 macOS 26 及完整 VoiceOver/设备矩阵。空链接 import 与图库歌词单元已按各自范围接受。
 
 XW-87：`03b8a1e` 已推送，Debug、Release、26 项既有回归和完整 CI 通过。实际 Library 查询 `1000` 读到 1112×68pt 歌曲行“1000日間, noa - Topic”，时长值“—”；独立视频按钮为“Play in floating video window 1000日間”，值为空、28×28pt、enabled 且 hittable。协调方独立核对两者标签和值不再串用，未激活歌曲或视频。私有测试原先把 seed 上传者当作预期显示艺术家，导致断言失败；源码使用 SongCreditCache 的解析署名，这不是标签修复失败。整段测试与清理结果另行记录，不据此宣称完整 VoiceOver 通过。
 
@@ -57,3 +57,5 @@ XW-88 已完成。图库上方的歌词面板原先继承了背景禁用状态�
 普通 Playlist 的独立小节已通过：新建并追加两首既有曲目、核对实际身份/顺序、在保留详情中保存标题并即时刷新、恢复原标题，以及按两项预览删除自有歌单。Cua 操作完成两次 Save；协调方独立核对七个 SQLite 检查点，655 首 Track、60 条播放事件及原有集合真值保留。前三次私有测试失败和其中一次实际播放副作用单独保留，本轮不借用 XCTest 通过结论。详见 [普通歌单验收](ordinary-playlist-metadata.md)。
 
 测试与 CI 提交 `8a58f7b` 的 [完整 macOS CI 38149867942](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38149867942) 全阶段通过：常规运行报告 896 项测试、123 个套件（53.867 秒），独立磁盘用例在其中跳过后另以 1 项/1 套件通过（0.144 秒）；8 项发布配置检查、App Intents 元数据、预览打包和上传均通过。应用执行源码仍为 `3b44632`。
+
+2026-10-12：`8877bee` 的停止目标歌词 Intent 复验完整 XCTest Passed 1/0（4.727 秒），两处保存位置仍为 20,000 ms，完整标量/JSON 和资料审计通过；隔离实例已清理。此前 `3b44632` 的冷启交付通过但位置清零，失败证据单独保留。最新 CI 与任务状态以 [当前状态](current-status.md) 为准。

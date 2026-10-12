@@ -1,8 +1,8 @@
 # 当前修复与验收状态
 
-2026-10-10 至 11 日继续审阅后，六项确认的问题已修复并推送到 `main`。本轮先确认 `2eb22b7` 的 [完整 macOS CI 38154202785](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38154202785) 全阶段通过：常规运行报告 896 项测试、123 个套件（45.507 秒，包含 opt-in 跳过项），独立磁盘用例另以 1 项/1 套件通过（0.150 秒）；8 项发布配置检查、App Intents 元数据、预览打包和上传均通过。应用执行源码仍为 `3b44632`。
+2026-10-10 至 12 日继续审阅后，七项确认的问题已修复并推送到 `main`。最新应用执行源码为 `8877bee`，XW-89 的受控加载回归、独立复审和原生复验均通过。`8877bee` 的 [完整 macOS CI 38217251194](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38217251194) 全阶段通过：常规运行报告 901 项测试、123 个套件（51.299 秒，包含 opt-in 跳过项），独立磁盘恢复用例另以 1 项/1 套件通过（0.112 秒）；8 项发布配置检查、App Intents 元数据、预览打包和上传均通过。
 
-Linear 当前有 24 项开放：18 项 In Review、6 项 In Progress，包含父任务与协调项。XW-83/84/85/86/87/88 均 Done；XW-84 已补齐真实原生错误、排序草稿保留、同面板 Apply 重试及冷重开。开放 Bug 标签任务为零，完整产品矩阵仍有明确条件待验。
+Linear 当前有 24 项开放：18 项 In Review、6 项 In Progress，包含父任务与协调项。XW-83/84/85/86/87/88/89 均 Done；XW-84 原生错误、草稿和 Apply 重试已完成，XW-75 已接受停止目标的歌词 Intent 冷启动。开放 Bug 标签任务为零，完整产品矩阵仍有明确条件待验。
 
 ## 已交付修复
 
@@ -14,10 +14,13 @@ Linear 当前有 24 项开放：18 项 In Review、6 项 In Progress，包含父
 | XW-86 | `8475d31`：两个既有 App Intents 改用 MainActor 上的共享进程内入口，移除 OpenURLIntent 自定义协议交接 | Done；13 项定向测试、元数据和完整 CI 通过；原生矩阵归 XW-75 |
 | XW-87 | `03b8a1e`：歌曲 AX 标签绑定到歌曲 Button，保留独立视频按钮的用途/标题；Debug、Release 和 26 项现有回归通过 | Done；实际歌曲/视频独立 AX 标签与 28pt 命中范围通过 |
 | XW-88 | `3b44632`：图库的禁用与辅助功能隐藏只作用于背景，避免歌词面板继承 disabled | Done；真实 framework query、输入框可用及 Close、图库身份、背景隔离、退出及清理通过 |
+| XW-89 | `8877bee`：待加载的保存位置用于生命周期/更新检查点；显式 seek、失败重试、换曲和视频交接保持各自位置归属 | Done；109 项/11 套件回归、独立复审及真实冷启动快速退出后两处 20 秒保留通过 |
 
 触发、修复和验证细节见 [播放/Pull/刷新修复](remaining-review-fixes.md) 与 [App Intents 交接](app-intents-handoff.md)、[图库歌词修复](gallery-lyrics-acceptance.md)。此前 XW-69/70/76/77/78/80/81/82 和 XW-79 均 Done，已接受范围继续复用，不重复运行。
 
 ## 最新原生结果
+
+XW-75 的新停止目标 SearchLyricsIntent 冷启动与 XW-89 位置保护已通过：六次零进程确认、一次真实框架调用、正确 query、可操作字段/Close、同曲暂停和正常 Command-Q，完整 XCTest Passed 1/0（4.727 秒），无外层警告。调用开始至确认退出为 4.672 秒；退出时引擎是否已就绪未直接探测，不把耗时作为加载状态或性能结论。实际调用前后检查点的队列/会话位置均为 20,000 ms；协调方独立核对完整标量、队列 JSON、27 表和完整 xcresult 归档。旧源码真实暴露的 20 秒变 0 已先由受控回归复现再修复，两条视频时序也经审阅、复现和修正。原始失败与观察器告警保留，新候选、数据/缓存、偏好和注册已清理，12 项保护哈希一致。详见 [冷启动与位置恢复](cold-start-recovery.md)。
 
 XW-84 使用用户提供的真实 `test`，在独立只读账号连接下导入完整 530 项、11 页，再从正式 Pull 入口生成预览。专用 128 MiB 测试卷耗尽空间后，面板显示 SQLite 错误 13，用户调整的首曲草稿仍保留；失败前后 27 张表的列类型和读取值完全一致。释放空间后，同一面板/PID 的 Apply 重试成功，530 项身份和预期顺序、Base/Remote 关系及正常冷重开均核对通过。首轮写锁等待后直接成功的无效触发单独保留。没有自然冲突，不增加冲突按钮或远端 Push 的验收结论。隔离登录、偏好、应用及测试卷已清理，十二项保护哈希一致。详见 [Pull 原生恢复](pull-native-recovery.md)。
 
@@ -35,13 +38,13 @@ XW-88 已完成。图库上方的歌词面板原先继承了背景禁用状态�
 
 XW-73 新增一项完整原生小节：真实导入 Roselia 的 24 首 YouTube Music 专辑，非空 Albums、全部曲目详情、概览 Refresh Catalog、返回及 Artists 概览均已核对。刷新后身份/顺序保持一致，Track 为 655→679；十份检查点和协调方独立审计确认原有集合、笔记、历史及队列语义保留，隔离应用与缓存已清理。仅接受这次正常刷新，未捕获瞬时 loading，也未覆盖专辑播放、艺人详情或错误 Retry。详见 [非空目录验收](library-catalog-acceptance.md)。
 
-XW-75 的唯一名称 Shortcuts 候选已完成注册、独立 setup 启动/退出和来源核查。搜索出现两个动作，但 Info 未给出可核实的唯一应用来源；没有创建快捷指令或执行 Intent，因此自动冷启仍未接受。四份实际检查点与清理已复核，详见 [App Intents 调查](app-intents-handoff.md#stopped-target-and-shortcuts-identity-investigation)。
+XW-75 的唯一名称 Shortcuts 候选已完成注册、独立 setup 启动/退出和来源核查。搜索出现两个动作，但 Info 未给出可核实的唯一应用来源；没有创建快捷指令或执行 Intent，该次调查未接受自动冷启；后续精确框架冷启动已在上文单独通过。四份实际检查点与清理已复核，详见 [App Intents 调查](app-intents-handoff.md#stopped-target-and-shortcuts-identity-investigation)。
 
 ## 剩余条件
 
 | 范围 | 下一步与实际前提 |
 | --- | --- |
-| XW-75 App Intents | 自动停止进程后的 Intent 冷启；原含关窗、Quick Search、framework 请求及关闭歌词后的完整串行键盘路径；视频与其他未测呈现状态；手动 Siri/Shortcuts、实际 macOS 26 及完整 VoiceOver/设备矩阵。空链接 import 与图库歌词单元已按各自范围接受。 |
+| XW-75 App Intents | 停止目标的歌词 Intent 冷启已通过；剩余冷态 Play Intent；原含关窗、Quick Search、framework 请求及关闭歌词后的完整串行键盘路径；视频与其他未测呈现状态；手动 Siri/Shortcuts、实际 macOS 26 及完整 VoiceOver/设备矩阵。空链接 import 与图库歌词单元已按各自范围接受。 |
 | XW-26 Pull/播放父项 | XW-84 的原生错误与同草稿重试已关闭，见 [原生恢复](pull-native-recovery.md)。父项保留真实评论/回复、其它来源/视频和未测持久化分支；自然远端冲突、Push/manage 与破坏性历史/group 保持原排除范围。 |
 | XW-71 Settings | 十类设置/历史、字体指针/键盘、语言/字号恢复和 Dark 840×804 三项检查已接受。剩余 Help 的 Tab/Space 与原按钮焦点、完整 VoiceOver、实际 macOS 26。 |
 | XW-72 辅助窗口 | MiniPlayer 生命周期/Pin/共享播放、真实同步桌面歌词和菜单栏 Escape/音量已接受。剩余物理控件交接/完整焦点、真实未同步歌词、系统 Dark 菜单栏。 |
@@ -50,7 +53,7 @@ XW-75 的唯一名称 Shortcuts 候选已完成注册、独立 setup 启动/退�
 
 最新 64 区域映射见 [验收对照](../ui-ux-acceptance-reconciliation.md)。没有新增已批准但完全缺失的产品功能。系统、账号、真实来源和测量前提由现有任务管理，不通过构造来源或扩大权限填补证据。
 
-2026-10-11 本轮已完成最新 CI 确认和 XW-84 原生恢复小节；接着推进 XW-75 自动冷启动。先复核上次精确 AppIntentsTesting 在认证前中断的实际位置，再选择最短的真实调用路径；若需 Shortcuts，运行前必须核实精确目标。Home Retry 只在真实来源错误出现时验收。已完成范围继续复用。
+2026-10-12 本轮完成 XW-84 原生恢复、XW-75 歌词冷启动，以及新发现 XW-89 的完整修复/复验小节。下一次先处理 XW-75 原含关窗、Quick Search、framework 请求和歌词关闭的串行键盘路径，再按已具备条件的剩余呈现状态推进。Home Retry 只在真实来源错误出现时验收；已完成范围继续复用。
 
 ## 协作与证据
 
