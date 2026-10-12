@@ -135,9 +135,10 @@ final class SessionService {
     }
 
     /// Checkpoint: writes the current position into the session row and the `QueueState` crash-recovery slot.
-    /// Uses an explicitly passed `positionMs` when provided (seek events carry their target); otherwise converts from `playback.transportState.position`.
+    /// Explicit seek targets take precedence; otherwise the playback facade
+    /// retains a pending restore offset until the engine can apply it.
     private func checkpoint(positionMs: Double? = nil, trackID: UUID? = nil) {
-        let posMs = positionMs ?? (max(0, playback.transportState.position) * 1000.0)
+        let posMs = positionMs ?? playback.checkpointPositionMs
         guard posMs.isFinite, posMs >= 0,
               let trackId = trackID ?? playback.transportState.track?.id else { return }
         queue.checkpointPosition(currentTrackId: trackId, lastPositionMs: posMs)
@@ -228,7 +229,7 @@ final class SessionService {
     func prepareForUpdate() throws {
         let state = playback.transportState
         if let track = state.track {
-            let positionMs = max(0, state.position) * 1000
+            let positionMs = playback.checkpointPositionMs
             guard positionMs.isFinite else { throw UpdateFailure.persistenceFailed }
             queue.checkpointPosition(currentTrackId: track.id, lastPositionMs: positionMs)
             podcastCheckpoint?(track, positionMs, state.duration)

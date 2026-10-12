@@ -7,6 +7,7 @@ final class RecordingEngine: PlayerEngine {
     let state = PlayerState()
     var loadCallCount = 0
     var loadError: PlayerError?
+    var beforeLoadCompletes: ((TrackSnapshot) async throws -> Void)?
     var lastLoadedTrack: TrackSnapshot?
     var playCallCount = 0
     var pauseCallCount = 0
@@ -34,6 +35,7 @@ final class RecordingEngine: PlayerEngine {
             state.isPlaying = false
             throw loadError
         }
+        try await beforeLoadCompletes?(track)
         state.duration = track.durationSeconds
         state.position = 0
         state.isPlaying = true

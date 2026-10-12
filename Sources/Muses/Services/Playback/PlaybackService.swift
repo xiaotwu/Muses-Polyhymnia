@@ -9,6 +9,14 @@ final class PlaybackService {
     /// The single production playback backend is YouTubeStreamEngine.
     var state: PlayerState { engine.state }
     var transportState: PlayerState { videoSession?.state ?? state }
+    /// An unresolved restore owns a real saved offset even while its engine
+    /// exposes a temporary zero. Active video remains the transport authority.
+    var checkpointPositionMs: Double {
+        if videoSession == nil, let pendingCheckpointPositionMs {
+            return pendingCheckpointPositionMs
+        }
+        return max(0, transportState.position) * 1000
+    }
     /// Capability snapshots used by Dock and menu commands. These reflect the
     /// current queue rather than merely the presence of a track.
     var canGoNext: Bool { queue.current() != nil && queue.peekNext() != nil }
@@ -53,6 +61,13 @@ final class PlaybackService {
     private var activeLoadTask: Task<Void, Never>?
     private var prepareTask: Task<Void, Never>?
     private var loadSeq: UInt64 = 0
+    private var pendingResume: (sequence: UInt64, trackID: UUID, positionMs: Double)?
+    private var pendingCheckpointPositionMs: Double? {
+        guard let pendingResume, pendingResume.sequence == loadSeq,
+              pendingResume.trackID == state.track?.id,
+              queue.current()?.track.id == pendingResume.trackID else { return nil }
+        return pendingResume.positionMs
+    }
     private struct PlaybackIdentity: Equatable {
         let loadSeq: UInt64
         let trackId: UUID
@@ -227,7 +242,7 @@ final class PlaybackService {
         }
         if state.error != nil, let track = state.track {
             playbackRequested = true
-            scheduleLoad(track)
+            scheduleLoad(track, resumeMs: pendingCheckpointPositionMs)
             return
         }
         if playbackRequested || state.isPlaying {
@@ -263,7 +278,7 @@ final class PlaybackService {
         if state.error != nil {
             // A failed load has no resumable backend. Reuse this occurrence and
             // only emit a start after a new load actually succeeds.
-            scheduleLoad(track)
+            scheduleLoad(track, resumeMs: pendingCheckpointPositionMs)
             return
         }
         if lastCompletedTrackId == track.id {
@@ -335,6 +350,7 @@ final class PlaybackService {
         if ownsTransport { videoSession = nil }
         if isCurrent {
             if session.ready, session.state.error == nil {
+                updatePendingResume(to: session.state.position)
                 engine.seek(to: session.state.position)
                 if let trackId = state.track?.id {
                     eventBus.post(.trackSeeked(trackId: trackId, toMs: session.state.position * 1000))
@@ -360,6 +376,7 @@ final class PlaybackService {
         guard let session = videoSession else { return }
         // Capture displacement position before dropping transport ownership.
         if session.ready, session.state.error == nil, session.videoId == state.track?.youTubeId {
+            updatePendingResume(to: session.state.position)
             engine.seek(to: session.state.position)
         }
         videoSession = nil
@@ -372,7 +389,8 @@ final class PlaybackService {
         guard state.track?.youTubeId == videoId else {
             return VideoPlaybackStart(volume: volume)
         }
-        return VideoPlaybackStart(position: state.position,
+        let position = pendingCheckpointPositionMs.map { $0 / 1000 } ?? state.position
+        return VideoPlaybackStart(position: position,
                                   shouldPlay: playbackRequested || state.isPlaying,
                                   volume: volume)
     }
@@ -426,10 +444,16 @@ final class PlaybackService {
     func seek(to time: Double) {
         if let videoSession { videoSession.seek(to: time); return }
         guard time.isFinite else { return }
+        updatePendingResume(to: time)
         engine.seek(to: time)
         if let track = state.track {
             eventBus.post(.trackSeeked(trackId: track.id, toMs: time * 1000.0))
         }
+    }
+    private func updatePendingResume(to seconds: Double) {
+        guard seconds.isFinite, seconds >= 0,
+              pendingCheckpointPositionMs != nil else { return }
+        pendingResume?.positionMs = seconds * 1000
     }
     func skipPodcast(by seconds: Double) {
         guard transportState.track?.mediaKind == .podcastEpisode,
@@ -567,6 +591,11 @@ final class PlaybackService {
         completionEligibleIdentity = nil
         let position = resumeMs ?? (track.mediaKind == .podcastEpisode
             ? podcastResumeProvider?(track.youTubeId) : nil)
+        if let position, position.isFinite, position >= 0 {
+            pendingResume = (seq, track.id, position)
+        } else {
+            pendingResume = nil
+        }
         activeLoadTask = Task { await load(track, seq: seq, resumeMs: position) }
     }
 
@@ -689,8 +718,9 @@ final class PlaybackService {
 
     private func consumeResume(_ resumeMs: Double?, for track: TrackSnapshot,
                                seq: UInt64) {
-        guard loadRequestIsCurrent(seq: seq, trackId: track.id),
-              let resumeMs else { return }
+        guard loadRequestIsCurrent(seq: seq, trackId: track.id) else { return }
+        defer { pendingResume = nil }
+        guard let resumeMs = pendingCheckpointPositionMs ?? resumeMs else { return }
         let targetSec = resumeMs / 1000.0
         // A test double or a temporarily unavailable stream may not have
         // reported engine duration yet. The immutable track snapshot is a
@@ -701,7 +731,15 @@ final class PlaybackService {
         let clamped = duration > 0
             ? min(targetSec, max(0, duration - 2.0))
             : targetSec
-        if clamped > 0 { seek(to: clamped) }
+        if clamped > 0 {
+            if videoSession != nil {
+                // Finish restoring the suspended native backend without
+                // seeking or checkpointing over the active video's position.
+                engine.seek(to: clamped)
+            } else {
+                seek(to: clamped)
+            }
+        }
     }
 
     /// Shared start-of-track side effects for `load` and gapless `playPrepared`.

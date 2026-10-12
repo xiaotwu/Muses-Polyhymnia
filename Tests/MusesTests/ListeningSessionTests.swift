@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 import SwiftData
+import AppKit
 @testable import Muses
 
 /// Listening Sessions + Crash Recovery acceptance (Final Spec §10.5):
@@ -285,6 +286,179 @@ struct ListeningSessionTests {
     }
 
     // MARK: - Startup restore
+
+    @Test("A pending startup load preserves its saved position at lifecycle checkpoints",
+          arguments: ["sleep", "wake", "terminate", "update"], [true, false])
+    func pendingRestoreCheckpoint(boundary: String, statisticsEnabled: Bool) async throws {
+        let container = try makeContainer()
+        let track = snap("Pending restore")
+        seedRestorable(container: container, track: track, positionMs: 65_000)
+        let queue = makeQueue(container: container)
+        queue.restore()
+        let (playback, engine) = makePlayback(queue: queue)
+        var releaseLoad: CheckedContinuation<Void, Never>?
+        engine.beforeLoadCompletes = { _ in
+            await withCheckedContinuation { releaseLoad = $0 }
+        }
+        defer { releaseLoad?.resume() }
+        let service = SessionService(modelContainer: container, eventBus: playback.eventBus,
+                                     playback: playback, queue: queue, enabledProvider: { statisticsEnabled })
+        for _ in 0..<100 where releaseLoad == nil { await Task.yield() }
+        try #require(releaseLoad != nil)
+        #expect(engine.state.position == 0)
+        #expect(engine.playCallCount == 0)
+
+        switch boundary {
+        case "sleep": service.handleSleep()
+        case "wake": service.handleWake()
+        case "terminate": NotificationCenter.default.post(name: NSApplication.willTerminateNotification, object: nil)
+        default: try service.prepareForUpdate()
+        }
+
+        #expect(queueStateRow(container)?.lastPositionMs == 65_000)
+        #expect(fetchSessions(container).first?.currentPositionMs == 65_000)
+        #expect(queueStateRow(container)?.currentTrackId == track.id)
+        #expect(!playback.transportState.isPlaying)
+    }
+
+    @Test("An explicit seek replaces a pending restore and completed loads use the engine clock",
+          arguments: [0.0, 12.0])
+    func pendingRestoreSeekAndCompletion(position: Double) async throws {
+        let container = try makeContainer()
+        let track = snap("Pending seek")
+        seedRestorable(container: container, track: track, positionMs: 65_000)
+        let queue = makeQueue(container: container)
+        queue.restore()
+        let (playback, engine) = makePlayback(queue: queue)
+        var releaseLoad: CheckedContinuation<Void, Never>?
+        engine.beforeLoadCompletes = { _ in await withCheckedContinuation { releaseLoad = $0 } }
+        defer { releaseLoad?.resume() }
+        let service = SessionService(modelContainer: container, eventBus: playback.eventBus,
+                                     playback: playback, queue: queue, enabledProvider: { true })
+        for _ in 0..<100 where releaseLoad == nil { await Task.yield() }
+        try #require(releaseLoad != nil)
+        playback.seek(to: position)
+        service.handleSleep()
+        #expect(queueStateRow(container)?.lastPositionMs == position * 1000)
+        releaseLoad?.resume()
+        releaseLoad = nil
+        for _ in 0..<100 where engine.state.duration == 0 { await Task.yield() }
+        try #require(engine.state.duration == 200)
+        #expect(engine.state.position == position)
+        #expect(!engine.state.isPlaying)
+        #expect(engine.playCallCount == 0)
+        engine.seek(to: 88)
+        try service.prepareForUpdate()
+        #expect(queueStateRow(container)?.lastPositionMs == 88_000)
+        #expect(fetchSessions(container).first?.currentPositionMs == 88_000)
+    }
+
+    @Test("A failed startup restore preserves its position through explicit retry",
+          arguments: ["play", "toggle"])
+    func failedRestoreRetry(action: String) async throws {
+        let container = try makeContainer()
+        let track = snap("Failed restore")
+        seedRestorable(container: container, track: track, positionMs: 65_000)
+        let queue = makeQueue(container: container)
+        queue.restore()
+        let (playback, engine) = makePlayback(queue: queue)
+        engine.loadError = .sourceUnavailable
+        let service = SessionService(modelContainer: container, eventBus: playback.eventBus,
+                                     playback: playback, queue: queue, enabledProvider: { true })
+        for _ in 0..<100 where engine.loadCallCount == 0 { await Task.yield() }
+        try #require(engine.loadCallCount == 1)
+        service.handleSleep()
+        try service.prepareForUpdate()
+        #expect(queueStateRow(container)?.lastPositionMs == 65_000)
+        #expect(fetchSessions(container).first?.currentPositionMs == 65_000)
+        #expect(engine.playCallCount == 0)
+        engine.loadError = nil
+        if action == "play" { playback.play() } else { playback.toggle() }
+        for _ in 0..<100 where engine.lastSeekTime == nil { await Task.yield() }
+        #expect(engine.loadCallCount == 2)
+        #expect(engine.lastSeekTime == 65)
+        #expect(engine.playCallCount == 1)
+        try service.prepareForUpdate()
+        #expect(queueStateRow(container)?.lastPositionMs == 65_000)
+        #expect(fetchSessions(container).first?.currentPositionMs == 65_000)
+        playback.pause()
+    }
+
+    @Test("Replacing a pending restore does not seek the replacement track")
+    func replacementDiscardsPendingRestore() async throws {
+        let container = try makeContainer()
+        let restored = snap("Restored"), replacement = snap("Replacement")
+        seedRestorable(container: container, track: restored, positionMs: 65_000)
+        let queue = makeQueue(container: container)
+        queue.restore()
+        let (playback, engine) = makePlayback(queue: queue)
+        var releaseLoad: CheckedContinuation<Void, Never>?
+        engine.beforeLoadCompletes = { track in
+            if track.id == restored.id {
+                await withCheckedContinuation { releaseLoad = $0 }
+                try Task.checkCancellation()
+            }
+        }
+        defer { releaseLoad?.resume() }
+        let service = SessionService(modelContainer: container, eventBus: playback.eventBus,
+                                     playback: playback, queue: queue, enabledProvider: { true })
+        for _ in 0..<100 where releaseLoad == nil { await Task.yield() }
+        try #require(releaseLoad != nil)
+        playback.playTrack(replacement, context: [restored, replacement], from: .songs)
+        for _ in 0..<100 where engine.playCallCount == 0 { await Task.yield() }
+        try #require(engine.playCallCount == 1)
+        releaseLoad?.resume()
+        releaseLoad = nil
+        try service.prepareForUpdate()
+        #expect(queue.current()?.track.id == replacement.id)
+        #expect(queueStateRow(container)?.currentTrackId == replacement.id)
+        #expect(queueStateRow(container)?.lastPositionMs == 0)
+        #expect(fetchSessions(container).first?.currentPositionMs == 0)
+        #expect(engine.lastSeekTime == nil)
+        playback.pause()
+    }
+
+    @Test("Video checkpoints and handoff replace a pending native restore position",
+          arguments: [true, false])
+    func pendingRestoreVideoPosition(closeBeforeNativeLoad: Bool) async throws {
+        let container = try makeContainer()
+        let track = snap("Pending video")
+        seedRestorable(container: container, track: track, positionMs: 65_000)
+        let queue = makeQueue(container: container)
+        queue.restore()
+        let (playback, engine) = makePlayback(queue: queue)
+        var releaseLoad: CheckedContinuation<Void, Never>?
+        engine.beforeLoadCompletes = { _ in await withCheckedContinuation { releaseLoad = $0 } }
+        defer { releaseLoad?.resume() }
+        let service = SessionService(modelContainer: container, eventBus: playback.eventBus,
+                                     playback: playback, queue: queue, enabledProvider: { true })
+        for _ in 0..<100 where releaseLoad == nil { await Task.yield() }
+        try #require(releaseLoad != nil)
+        let video = playback.beginVideoSession(videoId: track.youTubeId)
+        try service.prepareForUpdate()
+        #expect(queueStateRow(container)?.lastPositionMs == 65_000)
+        #expect(fetchSessions(container).first?.currentPositionMs == 65_000)
+        video.didBecomeReady()
+        video.receive(position: 83, duration: 200, playerState: 2)
+        try service.prepareForUpdate()
+        #expect(queueStateRow(container)?.lastPositionMs == 83_000)
+        if closeBeforeNativeLoad { playback.finishVideoSession(video, resume: false) }
+        releaseLoad?.resume()
+        releaseLoad = nil
+        for _ in 0..<100 where engine.state.duration == 0 { await Task.yield() }
+        try #require(engine.state.duration == 200)
+        if !closeBeforeNativeLoad {
+            #expect(video.state.position == 83)
+            try service.prepareForUpdate()
+            #expect(queueStateRow(container)?.lastPositionMs == 83_000)
+            playback.finishVideoSession(video, resume: false)
+        }
+        #expect(engine.lastSeekTime == 83)
+        #expect(!engine.state.isPlaying)
+        try service.prepareForUpdate()
+        #expect(queueStateRow(container)?.lastPositionMs == 83_000)
+        #expect(fetchSessions(container).first?.currentPositionMs == 83_000)
+    }
 
     private func seedRestorable(container: ModelContainer, track: TrackSnapshot,
                                 positionMs: Double, updatedAt: Date = .init()) {
