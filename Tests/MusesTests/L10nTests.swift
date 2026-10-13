@@ -6,16 +6,6 @@ import AppKit
 /// i18n infrastructure + theme foundation tests.
 @Suite("L10n + Theme")
 struct L10nThemeTests {
-    @Test("Anonymous Home failure reasons have Traditional Chinese translations")
-    func anonymousHomeFailureTranslations() {
-        for source in ["YouTube Music 当前离线。", "YouTube Music 响应超时。",
-                       "YouTube Music 暂时限制了请求。", "YouTube Music 响应超过安全上限。",
-                       "YouTube Music 已更改首页响应结构。", "YouTube Music 推荐暂时不可用。"] {
-            #expect(L10n.traditionalStrings[source] != nil)
-            #expect(L10n.traditionalStrings[source] != source)
-        }
-    }
-
     @Test("tr() returns correct text based on system language")
     func trReturnsCorrectLanguage() {
         // tr() always dispatches on Locale.current; here we just verify the function exists and is callable
@@ -54,16 +44,15 @@ struct L10nThemeTests {
 
     @Test("Cached section copy follows the app language without altering editorial titles")
     func cachedSectionCopy() {
-        let cached = HomeSection(id: "new-releases", title: "新發行", subtitle: "来自 YouTube Music",
-                                 kind: .youTubeCarousel, items: [], source: .cached, cachedOrigin: .publicDiscovery)
-        #expect(cached.localizedTitle == tr("New releases", "新发行"))
-        #expect(cached.localizedSubtitle == tr("From YouTube Music", "来自 YouTube Music"))
+        let cached = HomeSection(id: "yt-liked", title: "YouTube 喜歡", subtitle: "来自你的账号",
+                                 kind: .youTubeCarousel, items: [], source: .cached, cachedOrigin: .officialAccount)
+        #expect(cached.localizedTitle == tr("Liked on YouTube", "YouTube 喜欢"))
+        #expect(cached.localizedSubtitle == tr("From your account", "来自你的账号"))
         let editorial = HomeSection(id: "new-releases", title: "Editorial title", kind: .youTubeCarousel,
                                     items: [], source: .signedInWeb)
         #expect(editorial.localizedTitle == "Editorial title")
-        let artist = "后海大鲨鱼"
-        let mixed = HomeSection(id: "top-artist", title: "為你精選 · \(artist)", kind: .youTubeCarousel, items: [])
-        #expect(mixed.localizedTitle.hasSuffix(artist))
+        let cachedEditorial = editorial.presentedFromCache(staleReason: "offline")
+        #expect(cachedEditorial.localizedTitle == "Editorial title")
     }
 
     @Test("L10n.isChinese detects Chinese locale")

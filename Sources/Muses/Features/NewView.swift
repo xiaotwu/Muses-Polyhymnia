@@ -18,7 +18,6 @@ struct NewView: View {
     @State private var recommendationTask: Task<Void, Never>?
     @State private var galleryPreview: GalleryMediaPreview?
     @State private var playbackError: String?
-    @State private var personalTask: Task<Void, Never>?
 
     private var featuredTracks: [TrackSnapshot] {
         discoverySource == .account ? [] : Array(newTracks.prefix(3))
@@ -42,11 +41,18 @@ struct NewView: View {
     }
 
     private var visiblePersonalSections: [HomeSection] {
-        discoverySource == .library ? [] : personalSections
+        guard discoverySource != .library, youTubeAccount.isConnected,
+              let channelID = youTubeAccount.activeChannelID else { return [] }
+        return personalSections.filter { $0.source == .officialAccount && $0.accountChannelID == channelID }
     }
 
     private var hasContent: Bool {
         (discoverySource != .account && !newTracks.isEmpty) || !visiblePersonalSections.isEmpty
+    }
+
+    private var personalContentIsLoading: Bool {
+        youTubeAccount.isConnected && (youTubeAccount.isConnecting
+            || youTubeAccount.channelState.isLoading || youTubeAccount.likedVideosState.isLoading)
     }
 
     var body: some View {
@@ -60,7 +66,7 @@ struct NewView: View {
                 Menu {
                     Button(tr("All discovery sources", "全部发现来源")) { discoverySource = .all }
                     Button(tr("Library rediscovery", "资料库重发现")) { discoverySource = .library }
-                    Button(tr("Account recommendations", "账号推荐")) { discoverySource = .account }
+                    Button(tr("From your account", "来自你的账号")) { discoverySource = .account }
                     Divider()
                     Button(tr("Subscribed channels", "订阅频道")) { discoverySource = .subscriptions }
                 } label: {
@@ -69,8 +75,9 @@ struct NewView: View {
                 .menuStyle(.borderlessButton).fixedSize()
                 .padding(.horizontal, AppleMusicTokens.contentPaddingX)
 
-                Text(tr("Library rediscovery and account-based recommendations. These are not a release-date chart.",
-                        "资料库重发现与基于账号的推荐，并非按发行日期排列的新歌榜。"))
+                Text(tr("Library rediscovery and songs liked by your connected YouTube account.",
+                        "资料库重发现与已连接 YouTube 账号喜欢的歌曲。",
+                        zhHant: "資料庫重探索與已連接 YouTube 帳號喜歡的歌曲。"))
                     .font(MusesTypography.callout)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, AppleMusicTokens.contentPaddingX)
@@ -79,9 +86,26 @@ struct NewView: View {
                     Text(playbackError).font(.callout).foregroundStyle(.secondary)
                         .padding(.horizontal, AppleMusicTokens.contentPaddingX)
                 }
+                if discoverySource != .library && discoverySource != .subscriptions,
+                   youTubeAccount.isConnected {
+                    if youTubeAccount.likedVideosState.isLoading {
+                        ProgressView(tr("Loading YouTube likes…", "正在加载 YouTube 喜欢…", zhHant: "正在載入 YouTube 喜歡…"))
+                            .padding(.horizontal, AppleMusicTokens.contentPaddingX)
+                    }
+                    if let error = youTubeAccount.likedVideosState.errorMessage {
+                        HStack {
+                            Text(error).font(.callout).foregroundStyle(.secondary)
+                            Spacer()
+                            Button(tr("Retry", "重试")) { Task { await youTubeAccount.refresh() } }
+                                .disabled(youTubeAccount.isConnecting)
+                        }
+                        .padding(.horizontal, AppleMusicTokens.contentPaddingX)
+                    }
+                }
                 if discoverySource == .subscriptions {
                     subscriptionDiscovery
-                } else if recommendationsLoading && !hasContent {
+                } else if !hasContent && (recommendationsLoading
+                    || (discoverySource == .account && personalContentIsLoading)) {
                     loadingState
                 } else if hasContent {
                     editorialSection
@@ -101,11 +125,12 @@ struct NewView: View {
                     }
                 } else if discoverySource == .account {
                     ContentUnavailableView {
-                        Label(youTubeAccount.isConnected ? tr("No account recommendations", "暂无账号推荐") : tr("Connect YouTube", "连接 YouTube"),
+                        Label(youTubeAccount.isConnected ? tr("No YouTube likes available", "暂无可用的 YouTube 喜欢", zhHant: "暫無可用的 YouTube 喜歡") : tr("Connect YouTube", "连接 YouTube"),
                               systemImage: "person.crop.circle")
                     } description: {
-                        Text(tr("Recommendations use the connected account’s likes and subscription signals.",
-                                "推荐使用已连接账号的喜欢与订阅线索。"))
+                        Text(tr("This source shows songs liked by your connected YouTube account. Browse subscribed channels in their own source.",
+                                "此来源显示已连接 YouTube 账号喜欢的歌曲。订阅频道保留在独立来源中。",
+                                zhHant: "此來源顯示已連接 YouTube 帳號喜歡的歌曲。訂閱頻道保留在獨立來源中。"))
                     } actions: {
                         Button(tr("Account Settings", "账号设置")) {
                             NotificationCenter.default.post(name: .musesOpenSettings, object: SettingsCategory.youtube)
@@ -127,14 +152,13 @@ struct NewView: View {
         .onDisappear {
             recommendationTask?.cancel()
             recommendationTask = nil
-            personalTask?.cancel()
-            personalTask = nil
         }
         .onChange(of: library.likedRevision) { _, _ in loadRecommendations() }
         .onChange(of: library.metadataRevision) { _, _ in loadRecommendations() }
         .onChange(of: library.playRevision) { _, _ in loadRecommendations() }
         .onChange(of: youTubeAccount.isConnected) { _, _ in loadPersonalDiscovery() }
         .onChange(of: youTubeAccount.activeChannelID) { _, _ in loadPersonalDiscovery() }
+        .onChange(of: youTubeAccount.likedVideosState) { _, _ in loadPersonalDiscovery() }
     }
 
     @ViewBuilder
@@ -397,24 +421,12 @@ struct NewView: View {
     }
 
     private func loadPersonalDiscovery() {
-        personalTask?.cancel()
-        let liked = youTubeAccount.account?.likedVideos ?? []
-        let subscriptions = youTubeAccount.account?.subscriptions.map(\.title) ?? []
-        guard youTubeAccount.isConnected, (!liked.isEmpty || !subscriptions.isEmpty) else {
+        guard youTubeAccount.isConnected, let channelID = youTubeAccount.activeChannelID else {
             personalSections = []
             return
         }
-        let channelID = youTubeAccount.activeChannelID
-        personalTask = Task {
-            let result = await YouTubePersonalDiscovery.sections(
-                liked: liked,
-                subscriptionTitles: subscriptions,
-                fetchMix: { url in try await youTubeSearch.fetchPlaylist(url: url) },
-                search: { query in try await youTubeSearch.search(query: query, limit: 12) }
-            )
-            guard !Task.isCancelled, channelID == youTubeAccount.activeChannelID else { return }
-            personalSections = result
-        }
+        let liked = youTubeAccount.likedVideosState.value ?? youTubeAccount.account?.likedVideos ?? []
+        personalSections = YouTubePersonalDiscovery.sections(liked: liked, accountChannelID: channelID)
     }
 
     private func deduplicatedYouTubeTracks(_ tracks: [TrackSnapshot]) -> [TrackSnapshot] {

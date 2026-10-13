@@ -75,7 +75,7 @@ struct WebHomeUIContractTests {
         #expect(source.contains("discovery.loadMore(sectionID:"))
         #expect(source.contains(".accessibilityLabel"))
         #expect(source.contains("Load more"))
-        #expect(source.contains("Public discovery"))
+        #expect(HomeSourceSelection.allCases == [.recommended, .account])
         #expect(source.contains("Account and personalized Home settings"))
         #expect(source.contains("guard youTubeAccount.isConnected"))
         #expect(source.contains("openHomeAccountSettings()"))

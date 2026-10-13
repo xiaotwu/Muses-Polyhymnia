@@ -6,6 +6,38 @@ import Testing
 /// Direct perform calls cover the in-process handoff, not Siri/Shortcuts execution.
 @Suite("App Intent in-process handoff") @MainActor
 struct AppIntentHandoffTests {
+    @Test("Play handoff retains a cold window request without replacing shared playback")
+    func coldWindowFactoryHandoff() async throws {
+        let engine = RecordingEngine()
+        let playback = PlaybackService(engine: engine, queue: QueueService())
+        defer { playback.pause() }
+        let track = makeTrack("abcdefghijk")
+        let coordinator = MainWindowPresentationCoordinator()
+        let router = ExternalPlaybackRouter(playback: playback) { _ in track }
+        var intent = PlayYouTubeLinkIntent(playbackRouter: router) {
+            coordinator.request(presentExisting: { false })
+        }
+        intent.link = try #require(URL(string: "https://youtu.be/abcdefghijk"))
+
+        let result = try await intent.perform()
+        #expect(coordinator.isPending)
+        #expect(!coordinator.isCreationRequested)
+        for _ in 0..<100 where engine.loadCallCount == 0 { await Task.yield() }
+        #expect(playback.transportState.track?.id == track.id)
+        #expect(engine.lastLoadedTrack?.id == track.id)
+
+        var creations = 0
+        coordinator.installFactory { creations += 1 }
+        #expect(coordinator.fulfillPendingRequest(presentExisting: { false }))
+        #expect(creations == 1)
+        #expect(coordinator.isPending)
+        coordinator.mainWindowConfigured {}
+        #expect(!coordinator.isPending)
+        #expect(playback.transportState.track?.id == track.id)
+        #expect(playback.queue.current()?.track.id == track.id)
+        try expectOrdinaryResult(result)
+    }
+
     @Test("video parameters reach the injected app router and its playback instance",
           arguments: ["https://youtu.be/abcdefghijk", "https://music.youtube.com/watch?v=abcdefghijk",
                       "https://www.youtube.com/shorts/abcdefghijk"])

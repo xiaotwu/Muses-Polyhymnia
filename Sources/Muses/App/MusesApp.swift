@@ -232,13 +232,7 @@ struct MusesApp: App {
             ) ?? .muses
         }
         let localHome = MusesHomeProvider(library: library)
-        let anonymousInnertube = AnonymousInnertubeHomeProvider(
-            clientFactory: { language, region in
-                InnertubeClient(configuration: .current(
-                    language: language, region: region))
-            })
         let youtubeMusicHome = YouTubeMusicHomeProvider(
-            anonymous: anonymousInnertube,
             authenticated: webHome.isBuildEnabled ? webHome : nil)
         let homeProvider = ModeSwitchingHomeDiscoveryProvider(
             modeProvider: mode,
@@ -541,6 +535,10 @@ private struct MusesAppCommands: Commands {
 
     var body: some Commands {
         let _ = languageRaw
+        // The command graph exists before any RootView can register a window.
+        let _ = MusesSingleInstance.installMainWindowFactory {
+            openWindow(id: MusesSingleInstance.mainSceneID)
+        }
         CommandGroup(replacing: .appSettings) {
             Button(tr("Settings…", "设置…", zhHant: "設定…")) {
                 guard browseNavigation?.canBrowse != false else { return }
@@ -716,11 +714,6 @@ private struct MiniPlayerOpener: View {
     @AppStorage(PrefKey.ffMiniPlayer) private var miniEnabled = false
     var body: some View {
         Color.clear.frame(width: 0, height: 0)
-            .onAppear {
-                // OpenWindowAction belongs to the scene, not a retained RootView.
-                // Keep this route available after the last browse window closes.
-                MusesSingleInstance.createMainWindow = { openWindow(id: MusesSingleInstance.mainSceneID) }
-            }
             .onReceive(NotificationCenter.default.publisher(for: .musesOpenMiniPlayer)) { _ in
                 guard miniEnabled else { return }
                 openWindow(id: "mini-player")

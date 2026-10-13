@@ -74,49 +74,34 @@ final class HomeDiscoveryService {
         let mode = recommendationMode
         activeMode = mode
         activeScope = input.scope
-        let baselineCache = cache.get(for: input, layer: .baseline, mode: mode)
-        let webCache = provider.hasWebEnhancement
-            ? cache.get(for: input, layer: .web, mode: mode)
-            : nil
-        let baselineIsFresh = baselineCache.map {
-            cache.isFresh($0, layer: .baseline)
-        } ?? false
-        let webIsFresh = webCache.map {
-            cache.isFresh($0, layer: .web)
-        } ?? false
+        let baselineCache = mode == .muses
+            ? cache.get(for: input, layer: .baseline, mode: mode) : nil
+        let webCache = mode == .youtubeMusic && provider.hasWebEnhancement
+            ? cache.get(for: input, layer: .web, mode: mode) : nil
+        let selectedCache = mode == .muses ? baselineCache : webCache
+        let layer: HomeFeedCache.Layer = mode == .muses ? .baseline : .web
 
-        if let baselineCache {
-            let baselineReason = baselineIsFresh ? nil : "expired"
-            let baselineSections = baselineCache.value.sections.map {
-                $0.presentedFromCache(staleReason: baselineReason)
+        if let selectedCache {
+            let fresh = cache.isFresh(selectedCache, layer: layer)
+            sections = selectedCache.value.sections.map {
+                $0.presentedFromCache(staleReason: fresh ? nil : "expired")
             }
-            let webSections = webCache?.value.sections.map {
-                $0.presentedFromCache(staleReason: webIsFresh ? nil : "expired")
-            } ?? []
-            sections = compose(web: webSections, baseline: baselineSections)
-            lastUpdatedAt = [baselineCache.value.fetchedAt, webCache?.value.fetchedAt]
-                .compactMap { $0 }.max()
-            isShowingStale = !baselineIsFresh || (webCache != nil && !webIsFresh)
-
-            if case .account(let channelID) = input.scope, webCache != nil {
-                webCapability = .saved(
-                    accountChannelID: channelID,
-                    stale: !webIsFresh,
-                    reason: webIsFresh ? nil : "expired")
+            lastUpdatedAt = selectedCache.value.fetchedAt
+            isShowingStale = !fresh
+            if mode == .youtubeMusic, case .account(let channelID) = input.scope {
+                webCapability = .saved(accountChannelID: channelID,
+                                       stale: !fresh, reason: fresh ? nil : "expired")
             } else {
-                webCapability = initialWebCapability(for: input.scope)
+                webCapability = .notConfigured
             }
             PerfTrace.event("home.discovery.cachedHit")
-            let webRequirementSatisfied = !provider.hasWebEnhancement
-                || input.scope == .guest
-                || webIsFresh
-            if baselineIsFresh && webRequirementSatisfied
-                && !provider.needsLiveRefreshForContinuations {
+            if fresh && !provider.needsLiveRefreshForContinuations {
                 PerfTrace.event("home.discovery.fresh")
                 return
             }
         } else {
             sections = loadingPlaceholders(for: input)
+            lastUpdatedAt = nil
             PerfTrace.event("home.discovery.cold")
             isShowingStale = false
             webCapability = initialWebCapability(for: input.scope)
@@ -125,10 +110,11 @@ final class HomeDiscoveryService {
     }
 
     func loadMore() {
-        guard isEnabled, provider.hasGlobalContinuation,
+        let input = buildInput()
+        guard isEnabled, recommendationMode == .youtubeMusic, provider.hasWebEnhancement,
+              case .account(let channelID) = input.scope, provider.hasGlobalContinuation,
               !isLoadingMore, !isRefreshing, morePage < 12 else { return }
         let page = morePage + 1
-        let input = buildInput()
         let mode = recommendationMode
         let operation = operationID
         isLoadingMore = true
@@ -139,6 +125,7 @@ final class HomeDiscoveryService {
             guard !Task.isCancelled,
                   operation == self.operationID,
                   mode == self.recommendationMode,
+                  self.provider.hasWebEnhancement,
                   input.scope == self.buildInput().scope else {
                 return
             }
@@ -148,7 +135,9 @@ final class HomeDiscoveryService {
                     "暂时无法加载更多首页推荐。",
                     zhHant: "暫時無法載入更多首頁推薦。")
             } else {
-                for section in extra {
+                for section in extra where section.source == .signedInWeb
+                    && section.accountChannelID == channelID
+                    && section.schemaVersion > 0 && section.status == .loaded {
                     if self.sections.contains(where: { $0.id == section.id }) {
                         self.appendContinuation(section.items, to: section.id)
                     } else {
@@ -160,15 +149,7 @@ final class HomeDiscoveryService {
                         }
                         guard !unique.isEmpty else { continue }
                         let appended = self.replacingItems(in: section, with: unique)
-                        if section.source == .signedInWeb,
-                           let baselineIndex = self.sections.firstIndex(where: {
-                               $0.source != .signedInWeb
-                                   && $0.cachedOrigin != .signedInWeb
-                           }) {
-                            self.sections.insert(appended, at: baselineIndex)
-                        } else {
-                            self.sections.append(appended)
-                        }
+                        self.sections.append(appended)
                     }
                 }
                 self.morePage = page
@@ -179,15 +160,19 @@ final class HomeDiscoveryService {
     }
 
     var hasGlobalContinuation: Bool {
-        provider.hasGlobalContinuation && morePage < 12
+        recommendationMode == .youtubeMusic && provider.hasWebEnhancement
+            && activeScope != .guest && provider.hasGlobalContinuation && morePage < 12
     }
 
     func hasContinuation(for sectionID: String) -> Bool {
-        provider.hasContinuation(for: sectionID)
+        recommendationMode == .youtubeMusic && provider.hasWebEnhancement
+            && activeScope != .guest && provider.hasContinuation(for: sectionID)
     }
 
     func loadMore(sectionID: String) {
         guard isEnabled,
+              recommendationMode == .youtubeMusic, provider.hasWebEnhancement,
+              buildInput().scope != .guest,
               provider.hasContinuation(for: sectionID),
               loadingSectionIDs.insert(sectionID).inserted else { return }
         let input = buildInput()
@@ -198,6 +183,7 @@ final class HomeDiscoveryService {
             let items = await self.provider.more(sectionID: sectionID, input: input)
             guard !Task.isCancelled,
                   operation == self.operationID,
+                  self.provider.hasWebEnhancement,
                   input.scope == self.buildInput().scope,
                   mode == self.recommendationMode else {
                 self.loadingSectionIDs.remove(sectionID)
@@ -293,6 +279,11 @@ final class HomeDiscoveryService {
         sections.removeAll {
             $0.source == .signedInWeb || $0.cachedOrigin == .signedInWeb
         }
+        if recommendationMode == .youtubeMusic {
+            lastUpdatedAt = nil
+            isShowingStale = false
+            lastRefreshError = nil
+        }
         webCapability = initialWebCapability(for: buildInput().scope)
         reload()
     }
@@ -362,108 +353,75 @@ final class HomeDiscoveryService {
                   operation == self.operationID,
                   input.scope == self.buildInput().scope,
                   mode == self.recommendationMode else { return }
-            let cachedBaseline = self.cache.get(for: input, layer: .baseline, mode: mode)
-            let previousBaselineSections = cachedBaseline?.value.sections
-                ?? self.sections.filter {
-                    $0.source != .signedInWeb && $0.cachedOrigin != .signedInWeb
+            self.activeScope = input.scope
+            self.activeMode = mode
+            if mode == .muses {
+                let cached = self.cache.get(for: input, layer: .baseline, mode: mode)
+                let failure = result.failures.first { $0.layer == .baseline }
+                let valid = self.cache.accepts(result.baselineSnapshot, for: input,
+                                              layer: .baseline, mode: mode)
+                let previous = Dictionary(uniqueKeysWithValues:
+                    (cached?.value.sections ?? []).map { ($0.id, $0) })
+                var sectionError: String?
+                var sections = valid ? result.baselineSnapshot.sections.map { section -> HomeSection in
+                    guard case .failed(let reason) = section.status else { return section }
+                    sectionError = sectionError ?? reason
+                    guard let saved = previous[section.id], !saved.items.isEmpty else { return section }
+                    return saved.presentedFromCache(staleReason: reason ?? "refresh failed")
+                } : []
+                if sections.isEmpty, let failure {
+                    sections = cached?.value.sections.map {
+                        $0.presentedFromCache(staleReason: failure.message ?? failure.code.rawValue)
+                    } ?? []
                 }
-            let previous = Dictionary(
-                uniqueKeysWithValues: previousBaselineSections.map { ($0.id, $0) })
-            let baselineFailure = result.failures.first { $0.layer == .baseline }
-            var firstBaselineFailure: String?
-            var mergedBaseline = result.baselineSnapshot.sections.map { section -> HomeSection in
-                guard case .failed(let message) = section.status else { return section }
-                firstBaselineFailure = firstBaselineFailure ?? message
-                if let cached = previous[section.id], !cached.items.isEmpty {
-                    return HomeSection(id: cached.id, title: cached.title,
-                                       subtitle: cached.subtitle, kind: cached.kind,
-                                       items: cached.items, status: .loaded,
-                                       source: cached.source,
-                                       cachedOrigin: cached.cachedOrigin,
-                                       accountChannelID: cached.accountChannelID,
-                                       schemaVersion: cached.schemaVersion,
-                                       fetchedAt: cached.fetchedAt,
-                                       expiresAt: cached.expiresAt,
-                                       staleReason: message ?? cached.staleReason)
+                if valid, result.cacheDirectives.storeBaseline {
+                    _ = self.cache.set(result.baselineSnapshot, for: input, layer: .baseline, mode: mode)
                 }
-                return section
-            }
-
-            // An anonymous request can fail before any shelves are available.
-            // Preserve only this scope/mode/locale's cache; an empty successful
-            // response must still replace old data rather than masquerade as stale.
-            if mergedBaseline.isEmpty, let baselineFailure {
-                let reason = baselineFailure.message ?? baselineFailure.code.rawValue
-                mergedBaseline = previousBaselineSections.filter { !$0.items.isEmpty }
-                    .map { $0.presentedFromCache(staleReason: reason) }
-                if mergedBaseline.isEmpty {
-                    mergedBaseline = [HomeSection(
-                        id: "home:baseline-failure", title: "YouTube Music",
-                        kind: .youTubeCarousel, items: [],
-                        status: .failed(reason), source: .publicDiscovery)]
-                }
-            }
-
-            if result.cacheDirectives.storeBaseline {
-                _ = self.cache.set(result.baselineSnapshot, for: input, layer: .baseline, mode: mode)
-            }
-
-            let webFailure = result.failures.first { $0.layer == .web }
-            let webSections: [HomeSection]
-            if let webSnapshot = result.webSnapshot {
-                if result.cacheDirectives.storeWeb {
-                    _ = self.cache.set(webSnapshot, for: input, layer: .web, mode: mode)
-                }
-                webSections = webSnapshot.sections
-                self.webCapability = result.webCapability
+                self.sections = sections
+                self.lastUpdatedAt = result.cacheDirectives.storeBaseline && valid
+                    ? result.baselineSnapshot.fetchedAt : cached?.value.fetchedAt
+                self.isShowingStale = sections.contains { $0.source == .cached || $0.staleReason != nil }
+                self.lastRefreshError = failure?.message ?? sectionError
+                self.webCapability = .notConfigured
             } else {
-                let savedWeb = self.cache.get(for: input, layer: .web, mode: mode)
-                let savedReason = webFailure?.message
-                    ?? result.failures.first(where: { $0.layer == .web })?.code.rawValue
-                webSections = savedWeb?.value.sections.map {
-                    $0.presentedFromCache(staleReason: savedReason)
-                } ?? []
-                if case .account(let channelID) = input.scope, savedWeb != nil {
-                    PerfTrace.event("home.web.stale")
-                    self.webCapability = .saved(
-                        accountChannelID: channelID,
-                        stale: true,
-                        reason: savedReason)
+                let canUseWeb = self.provider.hasWebEnhancement && input.scope != .guest
+                let failure = result.failures.first { $0.layer == .web }
+                if canUseWeb, case .account(let channelID) = input.scope,
+                   failure == nil, let snapshot = result.webSnapshot,
+                   self.cache.accepts(snapshot, for: input, layer: .web, mode: mode) {
+                    if result.cacheDirectives.storeWeb {
+                        _ = self.cache.set(snapshot, for: input, layer: .web, mode: mode)
+                    }
+                    self.sections = snapshot.sections
+                    self.webCapability = .available(accountChannelID: channelID)
+                    self.lastUpdatedAt = snapshot.fetchedAt
+                    self.isShowingStale = false
                 } else {
-                    self.webCapability = result.webCapability
+                    // Consent and build support gate durable snapshots too. A
+                    // failed request may retain only this enabled account's last
+                    // verified success, never public or another source's data.
+                    let saved = canUseWeb
+                        ? self.cache.get(for: input, layer: .web, mode: mode) : nil
+                    let reason = failure?.message ?? failure?.code.rawValue
+                    self.sections = saved?.value.sections.map {
+                        $0.presentedFromCache(staleReason: reason)
+                    } ?? []
+                    self.lastUpdatedAt = saved?.value.fetchedAt
+                    self.isShowingStale = saved != nil
+                    if let saved, case .account(let channelID) = input.scope {
+                        PerfTrace.event("home.web.stale")
+                        self.webCapability = .saved(accountChannelID: channelID, stale: true,
+                                                    reason: reason ?? saved.value.staleReason)
+                    } else {
+                        self.webCapability = canUseWeb ? result.webCapability
+                            : self.initialWebCapability(for: input.scope)
+                    }
                 }
+                self.lastRefreshError = canUseWeb ? failure?.message : nil
             }
-
-            self.sections = self.compose(web: webSections, baseline: mergedBaseline)
-            self.lastRefreshError = baselineFailure?.message
-                ?? firstBaselineFailure
-                ?? webFailure?.message
-            self.isShowingStale = webSections.contains { $0.source == .cached }
-                || mergedBaseline.contains { $0.source == .cached || $0.staleReason != nil }
-            self.lastUpdatedAt = [
-                result.cacheDirectives.storeBaseline
-                    ? result.baselineSnapshot.fetchedAt : cachedBaseline?.value.fetchedAt,
-                result.webSnapshot?.fetchedAt,
-                self.cache.get(for: input, layer: .web, mode: mode)?.value.fetchedAt
-            ].compactMap { $0 }.max()
             self.isRefreshing = false
             PerfTrace.event("home.discovery.refreshed")
         }
-    }
-
-    private func compose(web: [HomeSection], baseline: [HomeSection]) -> [HomeSection] {
-        let webIDs = Set(web.map(\.id))
-        let webMediaIDs = Set(web.flatMap(\.items).compactMap(\.homeMediaIdentity))
-        let remainingBaseline = baseline.compactMap { section -> HomeSection? in
-            guard !webIDs.contains(section.id) else { return nil }
-            let filtered = section.items.filter { item in
-                guard let identity = item.homeMediaIdentity else { return true }
-                return !webMediaIDs.contains(identity)
-            }
-            if !section.items.isEmpty, filtered.isEmpty { return nil }
-            return replacingItems(in: section, with: filtered)
-        }
-        return web + remainingBaseline
     }
 
     private func replacingItems(
@@ -487,8 +445,9 @@ final class HomeDiscoveryService {
     }
 
     private func initialWebCapability(for scope: HomeFeedScope) -> HomeWebCapability {
-        guard provider.hasWebEnhancement else { return .notConfigured }
+        guard recommendationMode == .youtubeMusic else { return .notConfigured }
         if scope == .guest { return .signedOut }
+        guard provider.hasWebEnhancement else { return .notConfigured }
         return .unavailable(reason: nil)
     }
 
@@ -504,60 +463,8 @@ final class HomeDiscoveryService {
                             source: .localLibrary)
             ]
         }
-        // Reuse the provider's plan naming? Its plans are private. Derive equivalent titles from the input here,
-        // keeping them consistent with the provider (title generation lives in the provider; this is a placeholder only).
-        var placeholders: [HomeSection] = []
-        if let recent = input.recentlyPlayedArtistNames.first {
-            placeholders.append(HomeSection(
-                id: "listen-again",
-                title: tr("Listen again", "再听一次"),
-                subtitle: recent,
-                kind: .youTubeCarousel, items: [], status: .loading))
-        }
-        if let artist = input.topArtistNames.first {
-            placeholders.append(HomeSection(
-                id: "top-artist",
-                title: tr("Mixed for you · \(artist)", "为你精选 · \(artist)", zhHant: "為你精選 · \(artist)"),
-                subtitle: tr("From YouTube Music", "来自 YouTube Music"),
-                kind: .youTubeCarousel, items: [], status: .loading))
-        }
-        placeholders.append(HomeSection(
-            id: "quick-picks",
-            title: tr("Quick picks", "快速精选"),
-            subtitle: nil,
-            kind: .youTubeCarousel, items: [], status: .loading))
-        placeholders.append(seasonalPlaceholder())
-        placeholders.append(HomeSection(
-            id: "new-releases",
-            title: tr("New releases", "新发行"),
-            subtitle: nil,
-            kind: .youTubeCarousel, items: [], status: .loading))
-        if let liked = input.likedArtistNames.first, liked != input.topArtistNames.first {
-            placeholders.append(HomeSection(
-                id: "from-liked",
-                title: tr("Because you like \(liked)", "因为你喜欢 \(liked)", zhHant: "因為你喜歡 \(liked)"),
-                subtitle: tr("From YouTube Music", "来自 YouTube Music"),
-                kind: .youTubeCarousel, items: [], status: .loading))
-        }
-        placeholders.append(HomeSection(
-            id: "trending",
-            title: tr("Charts", "排行榜"),
-            subtitle: tr("From YouTube Music", "来自 YouTube Music"),
-            kind: .youTubeCarousel, items: [], status: .loading))
-        return placeholders
-    }
-
-    private func seasonalPlaceholder(now: Date = .init()) -> HomeSection {
-        let title: String
-        switch Calendar.current.component(.month, from: now) {
-        case 6...8: title = tr("That summer feeling", "夏日氛围")
-        case 9...11: title = tr("Autumn atmosphere", "秋日氛围")
-        case 12, 1, 2: title = tr("Winter listening", "冬日聆听")
-        default: title = tr("Spring refresh", "春日焕新")
-        }
-        return HomeSection(id: "seasonal", title: title,
-                           subtitle: tr("Soundtrack the season", "本季原声"),
-                           kind: .youTubeCarousel, items: [], status: .loading)
+        // Account loading does not invent remote shelf names from local history.
+        return []
     }
 
     // MARK: - Input building

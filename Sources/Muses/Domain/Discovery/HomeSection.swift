@@ -31,7 +31,7 @@ enum HomeCardAvailability: String, Codable, Sendable, Hashable {
     case deleted
 }
 
-/// YouTube discovery card. Legacy/public cards use a video id directly;
+/// YouTube card. Direct-video cards use a video id directly;
 /// normalized Web Home cards additionally preserve their whitelisted browse
 /// and play endpoints without retaining any raw response data.
 struct YouTubeDiscoveryCard: Codable, Sendable, Identifiable, Hashable {
@@ -134,12 +134,11 @@ enum SectionStatus: Codable, Sendable, Equatable, Hashable {
 }
 
 /// The actual capability that produced a Home section. This is product truth,
-/// not decorative metadata: account, public, and Web-session content must not
+/// not decorative metadata: on-device, account, and Web-session content must not
 /// silently impersonate one another.
 enum HomeSource: String, Codable, Sendable, Hashable {
     case signedInWeb
     case officialAccount
-    case publicDiscovery
     case localLibrary
     case cached
 
@@ -147,7 +146,6 @@ enum HomeSource: String, Codable, Sendable, Hashable {
         switch self {
         case .signedInWeb: tr("YouTube Music personalized", "YouTube Music 个性化")
         case .officialAccount: tr("Your YouTube account", "你的 YouTube 账号")
-        case .publicDiscovery: tr("Public discovery", "公共发现")
         case .localLibrary: tr("Your library", "你的资料库")
         case .cached: tr("Saved result", "已保存结果")
         }
@@ -203,11 +201,11 @@ struct HomeSnapshot: Codable, Sendable {
     private static func primarySource(in sections: [HomeSection]) -> HomeSource {
         let sources = Set(sections.map(\.source))
         for candidate in [HomeSource.signedInWeb, .officialAccount,
-                          .publicDiscovery, .localLibrary, .cached]
+                          .localLibrary, .cached]
             where sources.contains(candidate) {
             return candidate
         }
-        return .publicDiscovery
+        return .localLibrary
     }
 }
 
@@ -232,7 +230,7 @@ struct HomeSection: Codable, Sendable, Identifiable {
     init(id: String, title: String, subtitle: String? = nil,
          kind: HomeSectionKind, items: [DiscoveryItem],
          status: SectionStatus = .loaded,
-         source: HomeSource = .publicDiscovery,
+         source: HomeSource,
          cachedOrigin: HomeSource? = nil,
          accountChannelID: String? = nil,
          schemaVersion: Int = 1,
@@ -278,8 +276,8 @@ struct HomeSection: Codable, Sendable, Identifiable {
         kind = try values.decode(HomeSectionKind.self, forKey: .kind)
         items = try values.decode([DiscoveryItem].self, forKey: .items)
         status = try values.decode(SectionStatus.self, forKey: .status)
-        source = try values.decodeIfPresent(HomeSource.self, forKey: .source)
-            ?? .publicDiscovery
+        // Missing or retired provenance cannot be reclassified as local/account content.
+        source = try values.decode(HomeSource.self, forKey: .source)
         cachedOrigin = try values.decodeIfPresent(HomeSource.self, forKey: .cachedOrigin)
         accountChannelID = try values.decodeIfPresent(String.self, forKey: .accountChannelID)
         schemaVersion = try values.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 1

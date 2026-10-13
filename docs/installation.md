@@ -17,6 +17,6 @@ installation to update when playback and other operations are idle. The first
 upgrade from an older version without this updater still requires a manual
 installation. See [automatic updates](automatic-updates.md) for details.
 
-Start with Home, explore music, or import a playlist. You can connect an account in **Settings → Account** for your subscriptions and a more personal Home. Muses asks before using an optional browser session for Home.
+Start with Muses recommendations from your library, explore music, or import a playlist. You can connect an account in **Settings → Account** for your likes, subscriptions and genuine YouTube Music recommendations. Account Home requires separate consent to use the approved browser session. You can keep using Muses recommendations without enabling it.
 
 If macOS asks for access to a browser session, follow the explanation shown in the app. You can continue listening without enabling it.

@@ -749,9 +749,7 @@ struct ChromeLayoutTests {
         #expect(help.contains("macOS default output device"))
 
         let home = try readSource("Sources/Muses/Features/HomeView+Sections.swift")
-        #expect(HomeGuestStatusPolicy.unsignedInShowsSingleCue)
-        #expect(HomeGuestStatusPolicy.unsignedInHidesGuestBanner)
-        #expect(home.contains("Public discovery"))
+        #expect(HomeSourceSelection.allCases == [.recommended, .account])
         #expect(!home.contains("Make Home yours"))
         #expect(!home.contains("guestBanner"))
         #expect(home.contains("openHomeAccountSettings()"))
@@ -797,48 +795,39 @@ struct ChromeLayoutTests {
         #expect(YouTubeMusicCatalog.mix(videoId: "abc").contains("RDabc"))
     }
 
-    @Test("personal discovery: empty liked and no subs → no sections")
-    func personalDiscoveryEmpty() async {
-        let sections = await YouTubePersonalDiscovery.sections(liked: []) { _ in [] }
+    @Test("account discovery has no invented content when likes are empty")
+    func personalDiscoveryEmpty() {
+        let sections = YouTubePersonalDiscovery.sections(liked: [], accountChannelID: "UC_one")
         #expect(sections.isEmpty)
     }
 
-    @Test("personal discovery: liked plus mix")
-    func personalDiscoveryLikedAndMix() async {
+    @Test("account discovery contains only actual liked videos and their channel owner")
+    func personalDiscoveryLikedVideos() {
         let liked = [YouTubeVideo(id: "yt_sample_1", title: "Song A", channelTitle: "Ch", thumbnailURL: nil)]
-        let mix = [YTDlpBridge.YTDlpPlaylistEntry(id: "m1", title: "Mix Song", uploader: "U")]
-        let sections = await YouTubePersonalDiscovery.sections(liked: liked) { url in
-            #expect(url.contains("RDyt_sample_1"))
-            return mix
-        }
-        #expect(sections.count == 2)
+        let sections = YouTubePersonalDiscovery.sections(liked: liked, accountChannelID: "UC_one")
+        #expect(sections.count == 1)
         #expect(sections[0].id == "yt-liked")
-        let mixIds = sections[1].items.compactMap { if case .youTube(let c) = $0 { c.id } else { nil } }
-        #expect(mixIds == ["m1"])
+        #expect(sections[0].source == .officialAccount)
+        #expect(sections[0].accountChannelID == "UC_one")
+        let ids = sections[0].items.compactMap { if case .youTube(let card) = $0 { card.id } else { nil } }
+        #expect(ids == liked.map(\.id))
     }
 
-    @Test("personal discovery: mix failure still returns liked")
-    func personalDiscoveryMixFailureKeepsLiked() async {
+    @Test("account discovery requires a concrete owner even when liked videos exist")
+    func personalDiscoveryRequiresOwner() {
         let liked = [YouTubeVideo(id: "yt_sample_1", title: "Song A", channelTitle: "Ch", thumbnailURL: nil)]
-        let sections = await YouTubePersonalDiscovery.sections(liked: liked) { _ in
-            throw NSError(domain: "test", code: 1)
-        }
-        #expect(sections.map(\.id) == ["yt-liked"])
+        #expect(YouTubePersonalDiscovery.sections(liked: liked, accountChannelID: "").isEmpty)
     }
 
-    @Test("personal discovery: subscriptions search rail")
-    func personalDiscoverySubscriptions() async {
-        let entries = [YTDlpBridge.YTDlpPlaylistEntry(id: "s1", title: "Sub Song", uploader: "Channel X")]
-        let sections = await YouTubePersonalDiscovery.sections(
-            liked: [],
-            subscriptionTitles: ["Channel X"],
-            fetchMix: { _ in [] },
-            search: { query in
-                #expect(query.contains("Channel X"))
-                return entries
-            }
-        )
-        #expect(sections.contains { $0.id == "yt-subs" })
+    @Test("account discovery limits its preview without changing the account's order")
+    func personalDiscoveryKeepsAccountOrder() {
+        let liked = (0..<25).map { index in
+            YouTubeVideo(id: String(format: "video%06d", index), title: "Song \(index)",
+                         channelTitle: "Channel", thumbnailURL: nil)
+        }
+        let sections = YouTubePersonalDiscovery.sections(liked: liked, accountChannelID: "UC_one")
+        let ids = sections.flatMap(\.items).compactMap { if case .youTube(let card) = $0 { card.id } else { nil } }
+        #expect(ids == liked.prefix(20).map(\.id))
     }
 
     @Test("Apple Music shell contract")

@@ -14,14 +14,13 @@ struct HomeView: View {
     @Query(sort: \YouTubeImport.importedAt, order: .reverse) var imports: [YouTubeImport]
 
     @State var galleryPreview: GalleryMediaPreview?
-    @State var homeSourceSelection: HomeSourceSelection = .recommended
     @State var recentlyPlayed: [TrackSnapshot] = []
-    @State var fallbackEntries: [YTDlpBridge.YTDlpPlaylistEntry] = []
-    @State var fallbackLoading = false
-    @State var fallbackError: String?
     @State var interactionError: String?
-    @State var fallbackTask: Task<Void, Never>?
     @State var accountChangeTask: Task<Void, Never>?
+
+    var homeSourceSelection: HomeSourceSelection {
+        HomeSourceSelection(mode: discovery.recommendationMode)
+    }
 
     var activeImports: [YouTubeImport] {
         imports.filter { $0.deletedAt == nil }
@@ -32,11 +31,7 @@ struct HomeView: View {
     }
 
     var remoteTopPickItems: [DiscoveryItem] {
-        let remote = visibleDiscoverySections.flatMap(\.items).filter(isPresentableDiscoveryItem)
-        let fallback = fallbackEntries.map {
-            DiscoveryItem.youTube(YouTubeDiscoveryCard(entry: $0))
-        }
-        return remote.isEmpty ? fallback : remote
+        visibleDiscoverySections.flatMap(\.items).filter(isPresentableDiscoveryItem)
     }
 
     var topPickItems: [DiscoveryItem] {
@@ -49,7 +44,7 @@ struct HomeView: View {
     }
 
     var firstVisibleDiscoverySectionID: String? {
-        discovery.sections.first { !$0.items.filter(isPlayableDiscoveryItem).isEmpty }?.id
+        visibleDiscoverySections.first { !$0.items.filter(isPlayableDiscoveryItem).isEmpty }?.id
     }
 
     var body: some View {
@@ -65,7 +60,7 @@ struct HomeView: View {
 
                     moodChips
 
-                    if discovery.isShowingStale {
+                    if showsStaleRecommendations {
                         staleBanner
                     }
 
@@ -84,43 +79,35 @@ struct HomeView: View {
                         .padding(.horizontal, AppleMusicTokens.contentPaddingX)
                     }
 
-                    if homeSourceSelection != .imports {
-                        if visibleDiscoverySections.isEmpty,
-                           homeSourceSelection == .account || homeSourceSelection == .publicDiscovery,
-                           !discovery.isRefreshing {
-                            ContentUnavailableView {
-                                Label(homeSourceSelection.title, systemImage: homeSourceSelection == .account ? "person.crop.circle" : "globe")
-                            } description: {
-                                Text(homeSourceSelection == .account
-                                     ? tr("No account recommendations are available. Personalized Web Home requires its own browser consent.",
-                                          "暂无可用的账号推荐。个性化 Web 首页需要独立的浏览器同意。")
-                                     : tr("No public recommendations are available right now.", "暂时没有可用的公共推荐。"))
-                            } actions: {
-                                Button(homeSourceSelection == .account ? tr("Account Settings", "账号设置") : tr("Retry", "重试")) {
-                                    if homeSourceSelection == .account { openHomeAccountSettings() }
-                                    else { discovery.reload() }
-                                }
-                            }
+                    if homeSourceSelection == .account && visibleDiscoverySections.isEmpty {
+                        if discovery.isRefreshing {
+                            ProgressView(tr("Loading account recommendations…", "正在加载账号推荐…", zhHant: "正在載入帳號推薦…"))
+                                .padding(.horizontal, AppleMusicTokens.contentPaddingX)
                         } else {
-                            homeSpotlight
-                            topPicks
-                            discoveryShelves
-                        }
-                        PodcastContinueShelf()
-                    }
-
-                    if homeSourceSelection == .imports || (homeSourceSelection == .recommended && !activeImports.isEmpty) {
-                        if activeImports.isEmpty {
                             ContentUnavailableView {
-                                Label(tr("No imported playlists", "暂无已导入歌单"), systemImage: "music.note.list")
+                                Label(accountHomeEmptyTitle, systemImage: "person.crop.circle")
                             } description: {
-                                Text(tr("Import a YouTube playlist from All Playlists.", "从全部歌单导入 YouTube 歌单。"))
+                                Text(accountHomeEmptyMessage)
                             } actions: {
-                                Button(tr("Open Playlists", "打开歌单")) {
-                                    NotificationCenter.default.post(name: .musesNavigateFromSearch, object: GlobalSearchRoute.section(.playlists))
+                                Button(tr("Account Settings", "账号设置"), action: openHomeAccountSettings)
+                                if webHome.isEnabled && webHome.hasCurrentConsent,
+                                   youTubeAccount.activeChannelID != nil {
+                                    Button(tr("Retry", "重试"), action: discovery.reload)
+                                        .disabled(!discovery.isEnabled)
+                                }
+                                Button(tr("Muses recommendations", "Muses 推荐", zhHant: "Muses 推薦")) {
+                                    selectHomeSource(.recommended)
                                 }
                             }
-                        } else { importedPlaylistsShelf }
+                        }
+                    } else {
+                        homeSpotlight
+                        topPicks
+                        discoveryShelves
+                    }
+                    if homeSourceSelection == .recommended {
+                        PodcastContinueShelf()
+                        if !activeImports.isEmpty { importedPlaylistsShelf }
                     }
                 }
                 .padding(.top, AppleMusicSpacing.browseTitleTop)
@@ -136,19 +123,12 @@ struct HomeView: View {
         .background(BrowseBackground())
         .galleryMediaPreview(item: $galleryPreview)
         .onAppear {
-            if discovery.recommendationMode == .youtubeMusic {
-                homeSourceSelection = .publicDiscovery
-            }
             refreshRecentlyPlayed()
             if discovery.isEnabled {
                 discovery.load()
-            } else {
-                loadFallback()
             }
         }
         .onDisappear {
-            fallbackTask?.cancel()
-            fallbackTask = nil
             accountChangeTask?.cancel()
             accountChangeTask = nil
             discovery.cancel()
@@ -262,8 +242,8 @@ struct DiscoveryFailureStrip: View {
     }
 }
 
-/// An explicit public-discovery fallback when the provider returned content
-/// that could not be verified as music. This is intentionally distinct from
+/// A source-unavailable state when returned content could not be verified as music.
+/// This is intentionally distinct from
 /// both a successful empty result and a transport failure.
 struct DiscoveryUnavailableShelf: View {
     let title: String

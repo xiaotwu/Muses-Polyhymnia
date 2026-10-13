@@ -623,7 +623,7 @@ struct YouTubeSettingsView: View {
         case .disabled:
             tr("Off", "已关闭", zhHant: "已關閉")
         case .baselineUnavailable:
-            tr("Public Home unavailable", "公共首页暂不可用", zhHant: "公共首頁暫不可用")
+            tr("Muses recommendations unavailable", "Muses 推荐暂不可用", zhHant: "Muses 推薦暫不可用")
         }
     }
 

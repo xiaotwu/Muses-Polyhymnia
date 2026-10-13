@@ -177,12 +177,6 @@ enum EmptyStatePolicy {
     static let playlistsUnavailableRetries = true
 }
 
-enum HomeGuestStatusPolicy {
-    /// Unsigned-in Home keeps one cue: the short status plus Sign In.
-    static let unsignedInShowsSingleCue = true
-    static let unsignedInHidesGuestBanner = true
-}
-
 enum NewPagePolicy {
     static let featuredUsesLandscapeEditorialCards = true
     static let bestNewSongsUsesAdaptiveMatrix = true

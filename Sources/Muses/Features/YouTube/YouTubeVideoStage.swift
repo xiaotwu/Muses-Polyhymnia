@@ -268,6 +268,10 @@ struct YouTubeVideoOverlay: View {
                 videoSession = session
             }
             escapeMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+                guard isPresented,
+                      ContentKeyboardScope.acceptsShortcuts(
+                        in: MusesSingleInstance.mainWindow(in: NSApp.windows), event: event
+                      ) else { return event }
                 if chaptersPresented {
                     if event.keyCode == 53 {
                         chaptersPresented = false
@@ -309,7 +313,13 @@ struct YouTubeVideoOverlay: View {
             // opening; never apply the previous video's start offset to it.
             close()
         }
-        .onExitCommand { close() }
+        .onExitCommand {
+            guard isPresented,
+                  ContentKeyboardScope.acceptsShortcuts(
+                    in: MusesSingleInstance.mainWindow(in: NSApp.windows)
+                  ), !chaptersPresented, !commentsPresented else { return }
+            close()
+        }
         .animation(MusesMotion.overlayAnimation(reduceMotion: reduceMotion), value: isPresented)
     }
 
