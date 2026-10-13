@@ -82,7 +82,10 @@ New 保留资料库重发现，账号来源是诚实的未连接空态，没有�
 
 候选证据在 `~/.muses/tmp/engineering-oct13/postrelease-candidate/` 与 `postrelease-candidate-runner/`；
 源与测试日志在同级 `xw90-source/` 和完整 Swift、Release、元数据、磁盘日志。
-GitHub CI 与合并结果由 [当前状态](current-status.md) 接续。
+精确 head `7da9e4e` 的 [CI 38481575596](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38481575596) 全阶段成功：
+14 项发布检查，912 项 / 126 套件 Swift 报告（56.844 秒），独立磁盘恢复（0.130 秒），元数据、预览与上传。
+[PR #2](https://github.com/xiaotwu/Muses-Polyhymnia/pull/2) 已合并为 `9f482a5`；XW-90/91/92 Done。
+合并源码与验证源码一致。完整父项和重复 main CI 结果由 [当前状态](current-status.md) 接续；当前正式安装仍为 0.6.0。
 
 ## 下一步边界
 

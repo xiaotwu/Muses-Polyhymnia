@@ -1,6 +1,6 @@
 # 技术工作索引与对话归并
 
-发布后新小节见 [正式版检查与修复](post-release-formal-inspection.md)：已补齐 XW-75 原串行路径与真实歌词预览；XW-90/92 的正式版缺陷和 XW-91 公共发现退休已实现、候选复验和独立审阅通过，等待远端 CI/合并。当前 28 项开放（21 In Review、6 In Progress、1 Backlog），含 2 项 Bug；XW-93 是单独调查候选。下文 24 项/零 Bug 为发布前历史检查点。
+发布后新小节见 [正式版检查与修复](post-release-formal-inspection.md)：XW-90/92 的正式版缺陷和 XW-91 公共发现退休已通过候选复验、独立审阅与完整 CI，[PR #2](https://github.com/xiaotwu/Muses-Polyhymnia/pull/2) 已合并，三项 Done。当前 25 项开放（18 In Review、6 In Progress、1 Backlog），开放 Bug 为零；XW-93 是单独调查候选。XW-75 仍有系统/设备条件，XW-73 仍有真实账号/目录条件；下文发布前检查点保留历史范围。
 
 更新时间：2026-10-13。当前工作入口是 Codex 对话「整理并执行Linear剩余任务」。近期列表之外，已补查旧项目路径的十四个较早对话；二十二个历史对话及一个已完成的执行对话均已归并，可恢复归档，共二十三个。归档不表示其中提及的所有验收都通过，也不删除历史证据。
 
