@@ -1,11 +1,56 @@
 import AppKit
 
+/// Retains an external presentation request until the actual main window attaches.
+/// Factories can arrive after an App Intent starts the process without a scene.
+@MainActor
+final class MainWindowPresentationCoordinator {
+    private var factory: (() -> Void)?
+    private(set) var isPending = false
+    private(set) var isCreationRequested = false
+
+    func installFactory(_ factory: @escaping () -> Void) {
+        self.factory = factory
+    }
+
+    @discardableResult
+    func request(presentExisting: () -> Bool) -> Bool {
+        isPending = true
+        return fulfillPendingRequest(presentExisting: presentExisting)
+    }
+
+    @discardableResult
+    func fulfillPendingRequest(presentExisting: () -> Bool) -> Bool {
+        guard isPending else { return false }
+        if presentExisting() {
+            complete()
+            return true
+        }
+        guard let factory else { return false }
+        guard !isCreationRequested else { return true }
+        isCreationRequested = true
+        factory()
+        return true
+    }
+
+    func mainWindowConfigured(present: () -> Void) {
+        guard isPending else { return }
+        complete()
+        present()
+    }
+
+    private func complete() {
+        isPending = false
+        isCreationRequested = false
+    }
+}
+
 /// Same bundle ID can still launch twice from different `.app` paths (dev builds /
 /// worktrees). The second process must not open the SwiftData store.
 enum MusesSingleInstance {
     static let mainSceneID = "main"
     @MainActor private static let configuredMainWindows = NSHashTable<NSWindow>.weakObjects()
-    @MainActor static var createMainWindow: (() -> Void)?
+    @MainActor private static let mainWindowPresentation = MainWindowPresentationCoordinator()
+    @MainActor private static var mainWindowBootstrapScheduled = false
     @MainActor static var pendingSettings = false
     @MainActor static var pendingVideoPresentation = false
     @MainActor static var pendingSearchRoute: GlobalSearchRoute?
@@ -67,20 +112,42 @@ enum MusesSingleInstance {
         windows.first(where: isMainWindow)
     }
 
+    /// Commands exist even when a foreground Intent starts the app without its
+    /// main view. Install their scene action without requiring RootView.onAppear.
+    @MainActor
+    static func installMainWindowFactory(_ factory: @escaping () -> Void) {
+        mainWindowPresentation.installFactory(factory)
+        guard mainWindowPresentation.isPending, !mainWindowBootstrapScheduled else { return }
+        mainWindowBootstrapScheduled = true
+        // Finish the command/scene graph update before asking SwiftUI to open it.
+        Task { @MainActor in
+            await Task.yield()
+            mainWindowBootstrapScheduled = false
+            mainWindowPresentation.fulfillPendingRequest(presentExisting: presentExistingMainWindow)
+        }
+    }
+
     /// Brings forward only the configured browse window. Auxiliary Search and
     /// Mini Player windows must never be promoted into the main-window role.
     @MainActor
     @discardableResult
     static func orderFrontMainWindow() -> Bool {
         NSApp.activate(ignoringOtherApps: true)
-        guard let window = mainWindow(in: NSApp.windows) else {
-            guard let createMainWindow else { return false }
-            createMainWindow()
-            return true
-        }
+        return mainWindowPresentation.request(presentExisting: presentExistingMainWindow)
+    }
+
+    @MainActor
+    private static func presentExistingMainWindow() -> Bool {
+        guard let window = mainWindow(in: NSApp.windows) else { return false }
+        presentMainWindow(window)
+        return true
+    }
+
+    @MainActor
+    private static func presentMainWindow(_ window: NSWindow) {
+        NSApp.activate(ignoringOtherApps: true)
         if window.isMiniaturized { window.deminiaturize(nil) }
         window.makeKeyAndOrderFront(nil)
-        return true
     }
 
     /// Idempotent main-window configuration. Standard traffic-light buttons
@@ -114,6 +181,7 @@ enum MusesSingleInstance {
         ] {
             window.standardWindowButton(type)?.isHidden = false
         }
+        mainWindowPresentation.mainWindowConfigured { presentMainWindow(window) }
         return minimumSize
     }
 }
