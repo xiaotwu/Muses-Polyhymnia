@@ -2,77 +2,13 @@ import Foundation
 import Testing
 @testable import Muses
 
-@Suite("Innertube Home")
-struct InnertubeHomeTests {
-    @Test("anonymous parser normalizes supported renderers and ignores raw fields")
-    func parserNormalizesFixture() throws {
-        let page = try InnertubeHomeParser().parse(fixture("supported-home"))
-
-        #expect(page.parserSchemaVersion == 1)
-        #expect(page.sections.count == 4)
-        #expect(Set(page.sections.map(\.kind))
-                == Set([.youTubeCarousel, .songGrid, .mixed, .quickPicks]))
-        #expect(page.sections.allSatisfy { $0.id.hasPrefix("ytm:FEmusic_home:") })
-        #expect(page.sections.allSatisfy { $0.source == .publicDiscovery })
-        #expect(page.sections.flatMap(\.items).allSatisfy { $0.homeMediaIdentity != nil })
-        #expect(page.shelfContinuations.values.contains("VOLATILE_CAROUSEL_TOKEN"))
-        #expect(page.continuation == nil)
-    }
-
-    @Test("two-row playlist artwork keeps trusted images and safe missing fallbacks")
-    func twoRowArtwork() throws {
-        let page = try InnertubeHomeParser().parse(fixture("two-row-artwork"))
-        let cards = page.sections.flatMap(\.items).compactMap { item -> YouTubeDiscoveryCard? in
-            guard case .youTube(let card) = item else { return nil }
-            return card
-        }
-        #expect(cards.count == 3)
-        #expect(cards[0].thumbnailURL == "https://yt3.googleusercontent.com/cover=w544-h544")
-        #expect(cards[1].thumbnailURL == nil)
-        #expect(cards[2].thumbnailURL == nil)
-    }
-
-    @Test("unknown-only response fails closed")
-    func unknownOnlyFailsClosed() throws {
-        #expect(throws: InnertubeError.shapeChanged) {
-            try InnertubeHomeParser().parse(fixture("unknown-only"))
-        }
-    }
-
-    @Test("anonymous client sends no cookies, auth, or local recommendation signals")
-    func anonymousRequestPrivacyBoundary() async throws {
-        let bootstrap = Data("""
-        <script>window.ytcfg={"INNERTUBE_API_KEY":"public-key",
-        "INNERTUBE_CLIENT_VERSION":"1.20260917.00.00",
-        "VISITOR_DATA":"guest-visitor"};</script>
-        """.utf8)
-        let transport = RecordingInnertubeTransport(responses: [
-            .init(data: bootstrap, statusCode: 200),
-            .init(data: try fixture("supported-home"), statusCode: 200)
-        ])
-        let configuration = InnertubeClientConfiguration(
-            clientName: "WEB_REMIX", clientVersion: nil,
-            language: "en", region: "US", userAgent: "MusesTests",
-            requestTimeout: 1, maximumResponseBytes: 5 * 1024 * 1024)
-        let client = InnertubeClient(configuration: configuration, transport: transport)
-
-        _ = try await client.home(continuation: nil)
-        let requests = await transport.recorded()
-        let browse = try #require(requests.last)
-
-        #expect(requests.count == 2)
-        #expect(browse.headers["Cookie"] == nil)
-        #expect(browse.headers["Authorization"] == nil)
-        #expect(browse.body?.contains("FEmusic_home") == true)
-        #expect(browse.body?.contains("likedArtistNames") == false)
-        #expect(browse.body?.contains("seedVideo") == false)
-    }
-
+@Suite("Home recommendations and partition lifetime")
+struct HomeRecommendationTests {
     @Test("mode cache trees cannot read each other's snapshot")
     @MainActor
     func cacheModeIsolation() {
-        let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("muses-home-mode-\(UUID().uuidString)", isDirectory: true)
+        let root = isolatedHomeTestDirectory("muses-home-mode-")
+        defer { try? FileManager.default.removeItem(at: root) }
         let cache = HomeFeedCache(directory: root)
         let input = HomeDiscoveryInput(
             topArtistNames: [], recentlyPlayedArtistNames: [], likedArtistNames: [],
@@ -98,9 +34,8 @@ struct InnertubeHomeTests {
     @Test("Home cache and continuation identity include language and region")
     @MainActor
     func cacheLocaleIsolation() {
-        let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("muses-home-locale-\(UUID().uuidString)",
-                                    isDirectory: true)
+        let root = isolatedHomeTestDirectory("muses-home-locale-")
+        defer { try? FileManager.default.removeItem(at: root) }
         let cache = HomeFeedCache(directory: root)
         let english = HomeDiscoveryInput(
             topArtistNames: [], recentlyPlayedArtistNames: [],
@@ -115,38 +50,38 @@ struct InnertubeHomeTests {
             scope: .guest,
             sections: [HomeSection(
                 id: "source", title: "Source", kind: .youTubeCarousel,
-                items: [], source: .publicDiscovery)],
+                items: [], source: .localLibrary)],
             fetchedAt: now, expiresAt: now.addingTimeInterval(600))
 
         #expect(cache.set(snapshot, for: english, layer: .baseline,
-                          mode: .youtubeMusic))
+                          mode: .muses))
         #expect(cache.get(for: english, layer: .baseline,
-                          mode: .youtubeMusic) != nil)
+                          mode: .muses) != nil)
         #expect(cache.get(for: traditional, layer: .baseline,
-                          mode: .youtubeMusic) == nil)
+                          mode: .muses) == nil)
         #expect(cache.directoryURL(
-            for: .guest, layer: .baseline, mode: .youtubeMusic,
+            for: .guest, layer: .baseline, mode: .muses,
             language: "en", region: "US").path
             != cache.directoryURL(
-                for: .guest, layer: .baseline, mode: .youtubeMusic,
+                for: .guest, layer: .baseline, mode: .muses,
                 language: "zh-Hant", region: "TW").path)
 
         #expect(cache.set(snapshot, for: traditional, layer: .baseline,
-                          mode: .youtubeMusic))
+                          mode: .muses))
         let legacyLayer = root
             .appendingPathComponent(
-                "youtube-music-v1/guest/\(HomeFeedCache.Layer.baseline.directoryName)",
+                "muses-v1/guest/\(HomeFeedCache.Layer.baseline.directoryName)",
                                     isDirectory: true)
         try? FileManager.default.createDirectory(
             at: legacyLayer, withIntermediateDirectories: true)
         let legacyFile = legacyLayer.appendingPathComponent("legacy.json")
         try? Data("legacy".utf8).write(to: legacyFile)
         cache.invalidate(scope: .guest, layer: .baseline,
-                         mode: .youtubeMusic)
+                         mode: .muses)
         #expect(cache.get(for: english, layer: .baseline,
-                          mode: .youtubeMusic) == nil)
+                          mode: .muses) == nil)
         #expect(cache.get(for: traditional, layer: .baseline,
-                          mode: .youtubeMusic) == nil)
+                          mode: .muses) == nil)
         #expect(!FileManager.default.fileExists(atPath: legacyFile.path))
     }
 
@@ -154,8 +89,7 @@ struct InnertubeHomeTests {
           arguments: [false, true])
     @MainActor
     func webCacheRecoversAfterPrivacyDeletion(openBothLocales: Bool) async throws {
-        let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("muses-home-recovery-\(UUID().uuidString)", isDirectory: true)
+        let root = isolatedHomeTestDirectory("muses-home-recovery-")
         defer { try? FileManager.default.removeItem(at: root) }
         let selectedScope = HomeFeedScope.account(channelID: "UC1234567890123456789012")
         let otherScope = HomeFeedScope.account(channelID: "UC9876543210987654321098")
@@ -171,7 +105,7 @@ struct InnertubeHomeTests {
         let guest = input(.guest)
         let now = Date()
         func snapshot(_ input: HomeDiscoveryInput, id: String,
-                      source: HomeSource = .publicDiscovery) -> HomeSnapshot {
+                      source: HomeSource = .localLibrary) -> HomeSnapshot {
             let channel: String?
             if source == .signedInWeb, case .account(let id) = input.scope {
                 channel = id
@@ -188,10 +122,10 @@ struct InnertubeHomeTests {
                 fetchedAt: now, expiresAt: now.addingTimeInterval(600))
         }
         let baseline: [(input: HomeDiscoveryInput, mode: HomeRecommendationMode, id: String)] = [
-            (english, .youtubeMusic, "baseline-en"),
-            (traditional, .youtubeMusic, "baseline-zh"),
-            (guest, .youtubeMusic, "guest-baseline"),
-            (english, .muses, "other-mode-baseline")
+            (english, .muses, "baseline-en"),
+            (traditional, .muses, "baseline-zh"),
+            (guest, .muses, "guest-baseline"),
+            (other, .muses, "other-account-baseline")
         ]
         let seed = HomeFeedCache(directory: root)
         for entry in baseline {
@@ -279,72 +213,6 @@ struct InnertubeHomeTests {
         #expect(artistSections.first?.items.count == 1)
     }
 
-    @Test("Real anonymous Home locale and shelf continuation matrix",
-          .enabled(if: ProcessInfo.processInfo.environment[
-            "MUSES_TEST_PUBLIC_CATALOG"] == "1"))
-    @MainActor
-    func liveAnonymousHomeMatrix() async throws {
-        for (language, region) in [("en", "US"), ("zh-Hans", "US"), ("zh-Hant", "TW")] {
-            let provider = AnonymousInnertubeHomeProvider { language, region in
-                InnertubeClient(configuration: .current(
-                    language: language, region: region))
-            }
-            let input = HomeDiscoveryInput(
-                topArtistNames: [], recentlyPlayedArtistNames: [],
-                likedArtistNames: [], timeBand: .morning, hour: 9,
-                scope: .guest, language: language, region: region)
-            let result = await provider.fetch(for: input)
-            let sections = result.baselineSnapshot.sections
-            #expect(result.failures.isEmpty, "Home locale: \(language)/\(region)")
-            #expect(!sections.isEmpty, "Home locale: \(language)/\(region)")
-            #expect(sections.allSatisfy { $0.source == .publicDiscovery })
-            let playlistCards = sections.flatMap(\.items).compactMap { item -> YouTubeDiscoveryCard? in
-                guard case .youTube(let card) = item,
-                      card.browseEndpoint?.identifier.hasPrefix("VL") == true else { return nil }
-                return card
-            }
-            #expect(!playlistCards.isEmpty)
-            #expect(playlistCards.contains { $0.thumbnailURL != nil })
-
-            if let section = sections.first(where: {
-                provider.hasContinuation(for: $0.id)
-            }) {
-                let more = await provider.more(
-                    sectionID: section.id, input: input)
-                #expect(!more.isEmpty)
-            }
-        }
-    }
-
-    @Test("Real anonymous Home global continuation when supplied by service",
-          .enabled(if: ProcessInfo.processInfo.environment[
-            "MUSES_TEST_GLOBAL_HOME_CONTINUATION"] == "1"))
-    func liveGlobalHomeContinuation() async throws {
-        var continuedPage: InnertubeHomePage?
-        for (language, region) in [
-            ("en", "US"), ("en", "GB"), ("ja", "JP"),
-            ("ko", "KR"), ("zh-Hant", "TW")
-        ] {
-            let client = InnertubeClient(configuration: .current(
-                language: language, region: region))
-            let first = try await client.home(continuation: nil)
-            if let token = first.continuation {
-                continuedPage = try await client.home(continuation: token)
-                break
-            }
-        }
-        let page = try #require(continuedPage)
-        #expect(!page.sections.isEmpty)
-    }
-
-    private func fixture(_ name: String) throws -> Data {
-        let url = try #require(Bundle.module.url(
-            forResource: name,
-            withExtension: "json",
-            subdirectory: "Fixtures/WebHome"))
-        return try Data(contentsOf: url)
-    }
-
     private func recommendationTrack(
         videoID: String,
         artist: String,
@@ -365,28 +233,4 @@ struct InnertubeHomeTests {
             addedAt: Date(timeIntervalSince1970: 1_900_000_000),
             lastPlayedAt: lastPlayedAt)
     }
-}
-
-private struct RecordedInnertubeRequest: Sendable {
-    let headers: [String: String]
-    let body: String?
-}
-
-private actor RecordingInnertubeTransport: InnertubeTransport {
-    private var responses: [InnertubeTransportResponse]
-    private var requests: [RecordedInnertubeRequest] = []
-
-    init(responses: [InnertubeTransportResponse]) {
-        self.responses = responses
-    }
-
-    func data(for request: URLRequest) async throws -> InnertubeTransportResponse {
-        requests.append(RecordedInnertubeRequest(
-            headers: request.allHTTPHeaderFields ?? [:],
-            body: request.httpBody.map { String(decoding: $0, as: UTF8.self) }))
-        guard !responses.isEmpty else { throw InnertubeError.offline }
-        return responses.removeFirst()
-    }
-
-    func recorded() -> [RecordedInnertubeRequest] { requests }
 }

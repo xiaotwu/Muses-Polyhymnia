@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 /// SWR cache for the Home discovery feed.
@@ -47,6 +48,7 @@ final class HomeFeedCache {
         self.webFreshWindow = webFreshWindow
         self.webStaleLimit = webStaleLimit
         invalidateLegacyCombinedFiles()
+        retireAnonymousHomePartitions()
     }
 
     private static var defaultDirectory: URL {
@@ -66,10 +68,10 @@ final class HomeFeedCache {
              layer: Layer,
              mode: HomeRecommendationMode = .muses,
              now: Date = .init()) -> SWRCache<HomeSnapshot>.Cached? {
-        guard layer != .web || input.scope != .guest,
+        guard (layer == .baseline ? mode == .muses : mode == .youtubeMusic),
+              layer != .web || input.scope != .guest,
               let cached = cache(for: input, layer: layer, mode: mode).get(Self.key(for: input, mode: mode)),
-              cached.value.belongs(to: input.scope),
-              snapshot(cached.value, isValidFor: layer) else { return nil }
+              accepts(cached.value, for: input, layer: layer, mode: mode) else { return nil }
         if layer == .web,
            now.timeIntervalSince(cached.value.fetchedAt) > webStaleLimit {
             return nil
@@ -90,9 +92,7 @@ final class HomeFeedCache {
              for input: HomeDiscoveryInput,
              layer: Layer,
              mode: HomeRecommendationMode = .muses) -> Bool {
-        guard snapshot.belongs(to: input.scope),
-              self.snapshot(snapshot, isValidFor: layer),
-              layer != .web || input.scope != .guest else { return false }
+        guard accepts(snapshot, for: input, layer: layer, mode: mode) else { return false }
         cache(for: input, layer: layer, mode: mode).set(
             Self.key(for: input, mode: mode), value: snapshot, fetchedAt: snapshot.fetchedAt)
         return true
@@ -184,19 +184,97 @@ final class HomeFeedCache {
         return safe(language) + "-" + safe(region)
     }
 
-    private func snapshot(_ snapshot: HomeSnapshot, isValidFor layer: Layer) -> Bool {
+    /// Presentation and persistence share the same provenance boundary. A value
+    /// rejected for storage must not bypass validation on a live refresh.
+    func accepts(_ snapshot: HomeSnapshot, for input: HomeDiscoveryInput,
+                 layer: Layer, mode: HomeRecommendationMode) -> Bool {
+        guard snapshot.belongs(to: input.scope), snapshot.schemaVersion > 0,
+              Set(snapshot.sections.map(\.id)).count == snapshot.sections.count else { return false }
         switch layer {
         case .baseline:
-            return snapshot.sections.allSatisfy { $0.source != .signedInWeb }
+            guard mode == .muses, snapshot.source == .localLibrary else { return false }
+            return snapshot.sections.allSatisfy {
+                $0.source == .localLibrary && $0.accountChannelID == nil
+                    && $0.cachedOrigin == nil && $0.schemaVersion > 0
+            }
         case .web:
-            guard case .account(let channelID) = snapshot.scope,
+            guard mode == .youtubeMusic, snapshot.source == .signedInWeb,
+                  case .account(let channelID) = snapshot.scope,
                   !snapshot.sections.isEmpty else { return false }
             return snapshot.sections.allSatisfy {
                 $0.source == .signedInWeb
                     && $0.accountChannelID == channelID
-                    && $0.schemaVersion > 0
+                    && $0.cachedOrigin == nil && $0.schemaVersion > 0
+                    && $0.status == .loaded
             }
         }
+    }
+
+    /// Anonymous Home used only this mode's baseline layer. Retire those exact
+    /// rebuildable directories across scopes/locales while preserving account
+    /// Web snapshots, Muses recommendations and every other cache family.
+    private func retireAnonymousHomePartitions() {
+        let modeDirectory = directory.appendingPathComponent(
+            HomeRecommendationMode.youtubeMusic.cacheNamespace, isDirectory: true)
+        guard hasSafeRetirementRoot(), isOrdinaryDirectory(modeDirectory) else { return }
+        let scopes = (try? FileManager.default.contentsOfDirectory(
+            at: modeDirectory, includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
+            options: [.skipsHiddenFiles])) ?? []
+        for scope in scopes where isScopeNamespace(scope.lastPathComponent) {
+            guard isOrdinaryDirectory(scope) else { continue }
+            removeRetiredBaseline(in: scope)
+            let locales = (try? FileManager.default.contentsOfDirectory(
+                at: scope, includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
+                options: [.skipsHiddenFiles])) ?? []
+            for locale in locales where locale.lastPathComponent != Layer.web.directoryName
+                && locale.lastPathComponent != Layer.baseline.directoryName
+                && isLocaleNamespace(locale.lastPathComponent)
+                && isOrdinaryDirectory(locale) {
+                removeRetiredBaseline(in: locale)
+            }
+        }
+    }
+
+    private func removeRetiredBaseline(in parent: URL) {
+        let target = parent.appendingPathComponent(Layer.baseline.directoryName, isDirectory: true)
+        guard isOrdinaryDirectory(target) else { return }
+        try? FileManager.default.removeItem(at: target)
+    }
+
+    private func isOrdinaryDirectory(_ url: URL) -> Bool {
+        let values = try? url.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+        let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
+        let owner = (attributes?[.ownerAccountID] as? NSNumber)?.uint32Value
+        return values?.isDirectory == true && values?.isSymbolicLink != true
+            && owner == getuid()
+    }
+
+    private func hasSafeRetirementRoot() -> Bool {
+        guard isOrdinaryDirectory(directory) else { return false }
+        // Foundation standardization can rewrite /private/var back to the /var
+        // symlink. Inspect the supplied path rather than canonicalizing it.
+        var ancestor = directory.deletingLastPathComponent()
+        // Never resolve an app-owned cleanup through a symlink, including a
+        // symlink above home-feed. Refusal leaves retired data unreadable.
+        while ancestor.path != "/" {
+            let values = try? ancestor.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+            guard values?.isDirectory == true, values?.isSymbolicLink != true else { return false }
+            ancestor.deleteLastPathComponent()
+        }
+        return true
+    }
+
+    private func isScopeNamespace(_ name: String) -> Bool {
+        if name == "guest" { return true }
+        guard name.hasPrefix("account-") else { return false }
+        let channelID = String(name.dropFirst("account-".count))
+        return !channelID.isEmpty
+            && HomeFeedScope(accountChannelID: channelID).cacheNamespace == name
+    }
+
+    private func isLocaleNamespace(_ name: String) -> Bool {
+        name.contains("-") && name.count <= 81
+            && name.allSatisfy { $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" }
     }
 
     /// Pre-partition versions wrote combined snapshots as JSON files directly
@@ -204,7 +282,7 @@ final class HomeFeedCache {
     /// baseline or Web, so delete only those direct child files. Account/layer
     /// subdirectories and unrelated files are never traversed or removed.
     private func invalidateLegacyCombinedFiles() {
-        guard directory.path.count > 8,
+        guard directory.path.count > 8, hasSafeRetirementRoot(),
               let children = try? FileManager.default.contentsOfDirectory(
                 at: directory,
                 includingPropertiesForKeys: [.isRegularFileKey],

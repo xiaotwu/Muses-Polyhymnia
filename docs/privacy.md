@@ -23,15 +23,15 @@ Home has two user-selectable sources. Changing the source does not merge their r
 
 ### Muses
 
-Muses is the default. Recommendations are computed on-device from the local library, likes and listening history. The profile is deterministic, remains on this Mac and is never sent to YouTube or Google as recommendation input.
+Muses is the default. Recommendations are computed on-device from your YouTube-backed library, likes and listening history. The profile is deterministic, remains on this Mac and is never sent to YouTube or Google as recommendation input.
 
 ### YouTube Music
 
-YouTube Music mode requests recommendation shelves directly from YouTube Music. Anonymous requests contain the protocol metadata needed by YouTube Music, but no Muses library, likes, listening history, cookies or authorization headers. If the request fails, Muses can show a previously saved normalized snapshot from the same mode and scope; it does not silently switch recommendation sources.
+Account mode displays recommendations from your own YouTube Music account. It requires both a connected YouTube account and separate browser-session consent. Anonymous Home discovery is retired; the app never uses it as a fallback. If an account request fails, Muses may show only a validated saved snapshot belonging to the same connected channel, or an explicit recovery state. You can switch to Muses recommendations without granting browser access.
 
-Signed-in YouTube Music recommendations are an additional, explicit choice. When authorized:
+When authorized:
 
-1. A **separate one-shot helper executable** performs every web request. It is launched, does one job, and exits. The main app never embeds web content and does not use WKWebView.
+1. A **separate one-shot helper executable** performs every Home web request. It is launched, does one job, and exits. Home displays normalized native content rather than embedding the browser page.
 2. The helper starts by exporting your browser's YouTube cookies into a **permission-restricted temporary jar** (`0700` directory, `0600` file). That jar is deleted the moment the helper exits.
 3. Authentication uses a per-request **SAPISIDHASH generated in memory**. Continuation (pagination) tokens exist only in the app's volatile memory and are never encoded into saved caches.
 4. Every saved Home snapshot is **whitelist-parsed and normalized**. Raw responses are not kept; unknown response shapes fail closed instead of being stored or rendered.
@@ -55,3 +55,5 @@ The YouTube Music Home layer is read-only display data. By design it cannot:
 ## Network traffic
 
 The app talks to YouTube/Google endpoints to resolve streams, fetch metadata and, when selected, render YouTube Music Home. There is no analytics SDK, no third-party telemetry and no server operated for Muses. Update checks call the GitHub Releases API.
+
+Explicit YouTube Search, catalog browsing and Smart Shuffle remain available through their separate existing request paths. New shows real account likes and subscribed channels; it does not automatically manufacture recommendation rails from subscription-title searches or anonymous RD mixes.

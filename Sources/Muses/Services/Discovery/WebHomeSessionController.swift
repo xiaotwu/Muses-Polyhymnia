@@ -772,7 +772,7 @@ final class WebHomeSessionController: HomeDiscoveryProvider {
         case .malformedResponse:
             tr("The Web Home helper returned an invalid response.", "Web Home Helper 返回了无效响应。")
         case .baselineUnavailable:
-            tr("Public Home is temporarily unavailable.", "公共首页暂不可用。")
+            tr("Muses recommendations are temporarily unavailable.", "Muses 推荐暂不可用。", zhHant: "Muses 推薦暫不可用。")
         }
     }
 

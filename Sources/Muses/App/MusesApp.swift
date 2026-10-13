@@ -232,13 +232,7 @@ struct MusesApp: App {
             ) ?? .muses
         }
         let localHome = MusesHomeProvider(library: library)
-        let anonymousInnertube = AnonymousInnertubeHomeProvider(
-            clientFactory: { language, region in
-                InnertubeClient(configuration: .current(
-                    language: language, region: region))
-            })
         let youtubeMusicHome = YouTubeMusicHomeProvider(
-            anonymous: anonymousInnertube,
             authenticated: webHome.isBuildEnabled ? webHome : nil)
         let homeProvider = ModeSwitchingHomeDiscoveryProvider(
             modeProvider: mode,

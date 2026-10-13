@@ -1,6 +1,6 @@
 import Foundation
 
-/// A Home feed is either public guest discovery or owned by one concrete
+/// A Home feed is either an on-device guest feed or owned by one concrete
 /// YouTube channel. The scope is deliberately non-optional so callers cannot
 /// accidentally fall back to the guest cache while refreshing an account.
 enum HomeFeedScope: Codable, Hashable, Sendable {
@@ -46,7 +46,8 @@ struct HomeDiscoveryInput: Sendable, Equatable {
     let timeBand: ListeningContext.TimeBand
     /// Current hour (0-23), letting providers refine themes.
     let hour: Int
-    /// Recently played YouTube video ids, used as mix seeds (`list=RD{id}`).
+    /// Recent YouTube identities for on-device context. Network-backed Home
+    /// providers never encode these values or derive anonymous mixes from them.
     let seedVideoIds: [String]
     /// Cache and refresh ownership. This is never optional: a signed-out load
     /// cannot accidentally reuse another account's saved Home response.
@@ -168,9 +169,8 @@ struct HomeFetchResult: Sendable {
 }
 
 /// Home discovery provider. A refresh returns content, capability, failures,
-/// and cache policy atomically. `hasWebEnhancement` is immutable configuration,
-/// not mutable outcome state, and is used only to decide whether a fresh Web
-/// partition is required before skipping refresh.
+/// and cache policy atomically. `hasWebEnhancement` reflects current consent
+/// and build support; it gates both live requests and saved account snapshots.
 @MainActor
 protocol HomeDiscoveryProvider: AnyObject {
     var hasWebEnhancement: Bool { get }

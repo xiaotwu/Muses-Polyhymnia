@@ -1,202 +1,94 @@
 import Foundation
 
-@MainActor
-final class AnonymousInnertubeHomeProvider: HomeDiscoveryProvider {
-    typealias ClientFactory = @MainActor @Sendable (
-        _ language: String, _ region: String
-    ) -> any InnertubeServing
-    private var client: any InnertubeServing
-    private let clientFactory: ClientFactory?
-    private var clientLocale: String?
-    private var continuation: String?
-    private var shelfContinuations: [String: String] = [:]
-    private var continuationScope: HomeFeedScope?
-    private var continuationLocale: String?
-    private var continuationGeneration = UUID()
-    private var attemptedHomeFetchThisSession = false
-
-    var hasGlobalContinuation: Bool { continuation != nil }
-    var needsLiveRefreshForContinuations: Bool {
-        !attemptedHomeFetchThisSession
-    }
-
-    func resetContinuations() {
-        continuationGeneration = UUID()
-        continuation = nil
-        shelfContinuations.removeAll(keepingCapacity: false)
-        continuationScope = nil
-        continuationLocale = nil
-        attemptedHomeFetchThisSession = false
-    }
-
-    init(client: any InnertubeServing) {
-        self.client = client
-        self.clientFactory = nil
-    }
-
-    init(clientFactory: @escaping ClientFactory) {
-        self.clientFactory = clientFactory
-        self.client = clientFactory("en", "US")
-    }
-
-    func fetch(for input: HomeDiscoveryInput) async -> HomeFetchResult {
-        let locale = input.language + "|" + input.region
-        if let clientFactory, clientLocale != locale {
-            client = clientFactory(input.language, input.region)
-            clientLocale = locale
-        }
-        continuationGeneration = UUID()
-        let generation = continuationGeneration
-        attemptedHomeFetchThisSession = true
-        continuationScope = input.scope
-        continuationLocale = locale
-        continuation = nil
-        shelfContinuations.removeAll(keepingCapacity: false)
-        do {
-            let page = try await client.home(continuation: nil)
-            guard !Task.isCancelled, generation == continuationGeneration else {
-                return .baseline(scope: input.scope, sections: [])
-            }
-            continuation = page.continuation
-            shelfContinuations = page.shelfContinuations
-            let now = Date()
-            let snapshot = HomeSnapshot(
-                scope: input.scope,
-                sections: page.sections,
-                fetchedAt: now,
-                expiresAt: now.addingTimeInterval(HomeFeedCache.webFreshWindow),
-                schemaVersion: page.parserSchemaVersion)
-            return HomeFetchResult(
-                baselineSnapshot: snapshot,
-                webSnapshot: nil,
-                webCapability: .notConfigured,
-                failures: [],
-                cacheDirectives: HomeCacheDirectives(storeBaseline: true, storeWeb: false))
-        } catch {
-            guard generation == continuationGeneration else {
-                return .baseline(scope: input.scope, sections: [])
-            }
-            continuation = nil
-            shelfContinuations.removeAll(keepingCapacity: false)
-            let code = failureCode(error)
-            return .baseline(
-                scope: input.scope,
-                sections: [],
-                failures: [HomeFetchFailure(
-                    layer: .baseline,
-                    code: code,
-                    message: failureMessage(code))])
-        }
-    }
-
-    func more(page: Int, input: HomeDiscoveryInput) async -> [HomeSection] {
-        guard continuationScope == input.scope,
-              continuationLocale == input.language + "|" + input.region,
-              let token = continuation else { return [] }
-        let expected = continuationGeneration
-        do {
-            let result = try await client.home(continuation: token)
-            guard expected == continuationGeneration,
-                  continuationScope == input.scope,
-                  continuationLocale == input.language + "|" + input.region else { return [] }
-            continuation = result.continuation
-            PerfTrace.event("home.innertube.continuation")
-            return result.sections
-        } catch {
-            return []
-        }
-    }
-
-    func hasContinuation(for sectionID: String) -> Bool {
-        shelfContinuations[sectionID] != nil
-    }
-
-    func more(sectionID: String, input: HomeDiscoveryInput) async -> [DiscoveryItem] {
-        guard continuationScope == input.scope,
-              continuationLocale == input.language + "|" + input.region,
-              let token = shelfContinuations[sectionID] else { return [] }
-        let expected = continuationGeneration
-        do {
-            let page = try await client.home(continuation: token)
-            guard expected == continuationGeneration,
-                  continuationScope == input.scope,
-                  continuationLocale == input.language + "|" + input.region else { return [] }
-            // A shelf continuation is scoped to one renderer. Never append a
-            // different shelf's response merely because the server returned a
-            // valid page with a changed shape.
-            guard let section = page.sections.first(where: { $0.id == sectionID }) else {
-                return []
-            }
-            let items = section.items
-            if let next = page.shelfContinuations[sectionID] {
-                shelfContinuations[sectionID] = next
-            } else {
-                shelfContinuations.removeValue(forKey: sectionID)
-            }
-            PerfTrace.event("home.innertube.continuation")
-            return items
-        } catch {
-            return []
-        }
-    }
-
-    private func failureCode(_ error: Error) -> HomeFetchFailureCode {
-        guard let error = error as? InnertubeError else { return .offline }
-        return switch error {
-        case .offline: .offline
-        case .timedOut, .cancelled: .timedOut
-        case .rateLimited: .rateLimited
-        case .responseTooLarge: .responseTooLarge
-        case .malformedResponse: .malformedResponse
-        case .shapeChanged: .shapeChanged
-        case .unauthorized: .sessionExpired
-        }
-    }
-
-    private func failureMessage(_ code: HomeFetchFailureCode) -> String {
-        switch code {
-        case .offline: tr("YouTube Music is offline.", "YouTube Music 当前离线。")
-        case .timedOut: tr("YouTube Music took too long to respond.", "YouTube Music 响应超时。")
-        case .rateLimited: tr("YouTube Music temporarily limited requests.", "YouTube Music 暂时限制了请求。")
-        case .responseTooLarge: tr("The YouTube Music response exceeded the safety limit.", "YouTube Music 响应超过安全上限。")
-        case .shapeChanged: tr("YouTube Music changed its Home response.", "YouTube Music 已更改首页响应结构。")
-        default: tr("YouTube Music recommendations are temporarily unavailable.", "YouTube Music 推荐暂时不可用。")
-        }
-    }
-}
-
-/// YouTube Music mode: anonymous Innertube is the baseline and the existing
-/// one-shot helper may atomically add the explicitly consented signed-in feed.
+/// Account Home has one source: the explicitly consented, isolated Web helper.
+/// No anonymous request or fallback is made when that capability is unavailable.
 @MainActor
 final class YouTubeMusicHomeProvider: HomeDiscoveryProvider {
-    private let layered: LayeredHomeProvider
+    private let authenticated: HomeDiscoveryProvider?
 
-    init(anonymous: HomeDiscoveryProvider, authenticated: HomeDiscoveryProvider?) {
-        layered = LayeredHomeProvider(
-            baseline: anonymous,
-            webEnhancement: authenticated)
+    init(authenticated: HomeDiscoveryProvider?) {
+        self.authenticated = authenticated
     }
 
-    var hasWebEnhancement: Bool { layered.hasWebEnhancement }
-    var hasGlobalContinuation: Bool { layered.hasGlobalContinuation }
+    var hasWebEnhancement: Bool { authenticated?.hasWebEnhancement == true }
+    var hasGlobalContinuation: Bool {
+        hasWebEnhancement && authenticated?.hasGlobalContinuation == true
+    }
     var needsLiveRefreshForContinuations: Bool {
-        layered.needsLiveRefreshForContinuations
+        hasWebEnhancement && authenticated?.needsLiveRefreshForContinuations == true
     }
-    func resetContinuations() { layered.resetContinuations() }
+    func resetContinuations() { authenticated?.resetContinuations() }
     func hasContinuation(for sectionID: String) -> Bool {
-        layered.hasContinuation(for: sectionID)
+        hasWebEnhancement && authenticated?.hasContinuation(for: sectionID) == true
     }
 
     func fetch(for input: HomeDiscoveryInput) async -> HomeFetchResult {
+        let empty = HomeFetchResult.baseline(scope: input.scope, sections: []).baselineSnapshot
+        guard case .account(let channelID) = input.scope else {
+            return result(baseline: empty, capability: .signedOut)
+        }
+        guard let authenticated, authenticated.hasWebEnhancement else {
+            return result(baseline: empty, capability: .notConfigured)
+        }
+
         PerfTrace.event("home.mode.youtubeMusic")
-        return await layered.fetch(for: input)
+        let fetched = await authenticated.fetch(for: input)
+        guard !Task.isCancelled, authenticated.hasWebEnhancement else {
+            return result(baseline: empty, capability: .notConfigured)
+        }
+        let failures = fetched.failures.filter { $0.layer == .web }
+        guard failures.isEmpty, let snapshot = fetched.webSnapshot else {
+            let capability: HomeWebCapability
+            if case .available = fetched.webCapability {
+                capability = .unavailable(reason: nil)
+            } else {
+                capability = fetched.webCapability
+            }
+            return result(baseline: empty, capability: capability, failures: failures)
+        }
+        guard snapshot.belongs(to: input.scope), snapshot.source == .signedInWeb,
+              !snapshot.sections.isEmpty,
+              snapshot.sections.allSatisfy({
+                  $0.source == .signedInWeb && $0.accountChannelID == channelID
+                      && $0.schemaVersion > 0 && $0.status == .loaded
+              }) else {
+            let message = tr("Personalized Home data did not match the active account or schema.",
+                             "个性化首页数据与当前账号或架构不匹配。")
+            return result(baseline: empty, capability: .rejected(reason: message), failures: [
+                HomeFetchFailure(layer: .web, code: .shapeChanged, message: message)
+            ])
+        }
+        return HomeFetchResult(
+            baselineSnapshot: empty, webSnapshot: snapshot,
+            webCapability: .available(accountChannelID: channelID), failures: [],
+            cacheDirectives: HomeCacheDirectives(
+                storeBaseline: false, storeWeb: fetched.cacheDirectives.storeWeb))
     }
 
     func more(page: Int, input: HomeDiscoveryInput) async -> [HomeSection] {
-        await layered.more(page: page, input: input)
+        guard case .account(let channelID) = input.scope,
+              let authenticated, authenticated.hasWebEnhancement else { return [] }
+        let sections = await authenticated.more(page: page, input: input)
+        guard !Task.isCancelled, authenticated.hasWebEnhancement,
+              sections.allSatisfy({
+                  $0.source == .signedInWeb && $0.accountChannelID == channelID
+                      && $0.schemaVersion > 0 && $0.status == .loaded
+              }) else { return [] }
+        return sections
     }
 
     func more(sectionID: String, input: HomeDiscoveryInput) async -> [DiscoveryItem] {
-        await layered.more(sectionID: sectionID, input: input)
+        guard case .account = input.scope,
+              let authenticated, authenticated.hasWebEnhancement else { return [] }
+        let items = await authenticated.more(sectionID: sectionID, input: input)
+        guard !Task.isCancelled, authenticated.hasWebEnhancement else { return [] }
+        return items
+    }
+
+    private func result(baseline: HomeSnapshot, capability: HomeWebCapability,
+                        failures: [HomeFetchFailure] = []) -> HomeFetchResult {
+        HomeFetchResult(baselineSnapshot: baseline, webSnapshot: nil,
+                        webCapability: capability, failures: failures,
+                        cacheDirectives: .preserveAll)
     }
 }

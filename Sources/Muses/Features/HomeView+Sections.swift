@@ -74,14 +74,12 @@ extension HomeView {
                     .padding(.horizontal, AppleMusicTokens.contentPaddingX)
                 }
             }
-        } else if discovery.isRefreshing || fallbackLoading || discovery.sections.contains(where: isLoading) {
+        } else if discovery.isRefreshing || visibleDiscoverySections.contains(where: isLoading) {
             portraitSkeletons
         } else {
             HomeDiscoveryEmptyState(onSearch: {
                 NotificationCenter.default.post(name: .musesFocusSearch, object: nil)
-            }, onRetry: {
-                if discovery.isEnabled { discovery.reload() } else { loadFallback() }
-            })
+            }, onRetry: discovery.reload)
             .padding(.horizontal, AppleMusicTokens.contentPaddingX)
         }
     }
@@ -202,14 +200,8 @@ extension HomeView {
                     .foregroundStyle(BrandColors.textSecondary)
                     .padding(.horizontal, AppleMusicTokens.contentPaddingX)
             }
-        } else {
+        } else if homeSourceSelection == .recommended {
             listenAgainShelf
-            if let fallbackError, fallbackEntries.isEmpty {
-                DiscoveryFailureStrip(message: fallbackError, onRetry: loadFallback)
-                    .padding(.horizontal, AppleMusicTokens.contentPaddingX)
-            } else if !fallbackEntries.isEmpty {
-                fallbackShelf
-            }
         }
     }
 
@@ -444,47 +436,6 @@ extension HomeView {
         }
     }
 
-    var fallbackShelf: some View {
-        VStack(alignment: .leading, spacing: 13) {
-            SectionHeader(title: tr("Explore on YouTube Music", "探索 YouTube Music"))
-            ResponsiveCarousel(
-                cardSize: MusicObjectMetrics.albumRail,
-                spacing: 18,
-                alignment: .top
-            ) {
-                ForEach(fallbackEntries, id: \.id) { entry in
-                    AlbumObjectView(
-                        title: entry.title,
-                        subtitle: fallbackEntrySubtitle(entry),
-                        artwork: ArtworkSource.resolve(
-                            remoteURL: nil, youTubeId: entry.id),
-                        size: MusicObjectMetrics.albumRail,
-                        role: .browse,
-                        style: .home,
-                        showsHoverPlay: true,
-                        onSelect: {
-                            galleryPreview = .init(id: entry.id, title: entry.title,
-                                subtitle: fallbackEntrySubtitle(entry),
-                                artwork: .resolve(remoteURL: nil, youTubeId: entry.id),
-                                duration: entry.duration,
-                                onPlay: { Task { await play(entry) } })
-                        },
-                        onPlay: { Task { await play(entry) } }
-                    )
-                    .youTubeEntryContextMenu(entry: entry, videoContext: fallbackEntries, showsMenuButton: true,
-                                             menuButtonTrailingInset: 0) {
-                        Task { await play(entry) }
-                    }
-                }
-            }
-        }
-    }
-
-    private func fallbackEntrySubtitle(_ entry: YTDlpBridge.YTDlpPlaylistEntry) -> String {
-        let metadata = SongCreditCache.shared.entry(videoID: entry.id)
-        return metadata?.artist ?? entry.artist ?? metadata?.uploader ?? entry.uploader ?? "YouTube Music"
-    }
-
     var importedPlaylistsShelf: some View {
         VStack(alignment: .leading, spacing: 13) {
             SectionHeader(title: tr("Imported Playlists", "已导入歌单"))
@@ -552,41 +503,24 @@ extension HomeView {
     }
 
     var visibleDiscoverySections: [HomeSection] {
-        discovery.sections.filter { section in
-            let origin = section.cachedOrigin ?? section.source
-            switch homeSourceSelection {
-            case .recommended: return true
-            case .publicDiscovery: return origin == .publicDiscovery
-            case .account: return origin == .signedInWeb || origin == .officialAccount
-            case .imports: return false
-            }
-        }
+        homeSourceSelection.visibleSections(
+            discovery.sections, accountChannelID: youTubeAccount.activeChannelID)
     }
 
     var homeSourceStatus: some View {
         Menu {
-            Button(tr("Recommended on this Mac", "这台 Mac 上的推荐")) {
+            Button(tr("Muses recommendations", "Muses 推荐", zhHant: "Muses 推薦")) {
                 selectHomeSource(.recommended)
             }
-            Button(tr("Public discovery", "公共发现")) {
-                selectHomeSource(.publicDiscovery)
-            }
-            Button(tr("Your account", "你的账号")) {
-                guard youTubeAccount.isConnected else {
-                    openHomeAccountSettings()
-                    return
-                }
+            Button(tr("Your YouTube Music account", "你的 YouTube Music 账号", zhHant: "你的 YouTube Music 帳號")) {
                 selectHomeSource(.account)
-            }
-            Button(tr("Imported playlists", "已导入歌单")) {
-                homeSourceSelection = .imports
             }
             Divider()
             Text(homeSourceStatusText)
-            if discovery.isShowingStale { Text(staleBannerDetail) }
+            if showsStaleRecommendations { Text(staleBannerDetail) }
             if let error = discovery.lastRefreshError { Text(error) }
             Button(tr("Refresh", "刷新")) { discovery.reload() }
-                .disabled(homeSourceSelection == .imports || discovery.isRefreshing)
+                .disabled(!discovery.isEnabled || discovery.isRefreshing)
             Button(tr("Account and personalized Home settings…", "账号与个性化首页设置…")) {
                 openHomeAccountSettings()
             }
@@ -606,8 +540,7 @@ extension HomeView {
     }
 
     func selectHomeSource(_ source: HomeSourceSelection) {
-        homeSourceSelection = source
-        let mode: HomeRecommendationMode = source == .recommended ? .muses : .youtubeMusic
+        let mode = source.mode
         if mode != discovery.recommendationMode {
             UserDefaults.standard.set(mode.rawValue, forKey: PrefKey.homeRecommendationMode)
             discovery.recommendationModeDidChange()
@@ -615,17 +548,13 @@ extension HomeView {
     }
 
     var homeSourceStatusText: String {
-        if homeSourceSelection == .imports {
-            return tr("Playlists already imported into your library; no browser session is required.",
-                      "已导入资料库的歌单，无需浏览器会话。")
-        }
-        if homeSourceSelection == .publicDiscovery {
-            return tr("Anonymous public discovery. Account recommendations are shown only in the Account source.",
-                      "匿名公共发现；账号推荐仅在账号来源中显示。")
-        }
-        if discovery.recommendationMode == .muses {
+        if homeSourceSelection == .recommended {
             return tr("Recommended privately on this Mac",
                       "由这台 Mac 私密推荐", zhHant: "由這台 Mac 私密推薦")
+        }
+        guard youTubeAccount.isConnected, youTubeAccount.activeChannelID != nil else {
+            return tr("Connect YouTube to see recommendations from your account.",
+                      "连接 YouTube 后查看来自你账号的推荐。", zhHant: "連接 YouTube 後查看來自你帳號的推薦。")
         }
         let accountName = youTubeAccount.account?.channel?.title
         switch discovery.webCapability {
@@ -636,26 +565,22 @@ extension HomeView {
             return tr("Saved YouTube Music personalized · " + (accountName ?? "Account"),
                       "已保存的 YouTube Music 个性化 · " + (accountName ?? "账号"))
         case .unavailable, .rejected:
-            return tr("Anonymous YouTube Music discovery · signed-in enhancement unavailable",
-                      "匿名 YouTube Music 公共发现 · 登录增强不可用",
-                      zhHant: "匿名 YouTube Music 公開探索 · 登入增強不可用")
+            return tr("YouTube Music account recommendations are unavailable.",
+                      "YouTube Music 账号推荐暂不可用。", zhHant: "YouTube Music 帳號推薦暫不可用。")
         case .notConfigured, .signedOut:
-            return tr("Anonymous YouTube Music discovery (Public discovery)",
-                      "匿名 YouTube Music 公共发现",
-                      zhHant: "匿名 YouTube Music 公開探索")
+            return tr("Personalized Home requires separate browser consent in Account settings.",
+                      "个性化首页需要在账号设置中单独同意浏览器访问。", zhHant: "個人化首頁需要在帳號設定中另行同意瀏覽器存取。")
         }
     }
 
     var homeSourceStatusIcon: String {
-        if homeSourceSelection == .imports { return "music.note.list" }
-        if homeSourceSelection == .publicDiscovery { return "globe" }
-        if discovery.recommendationMode == .muses { return "macbook" }
+        if homeSourceSelection == .recommended { return "macbook" }
         return switch discovery.webCapability {
         case .available: "person.crop.circle.fill.badge.checkmark"
         case .saved: "clock.arrow.circlepath"
         case .unavailable, .rejected: "arrow.down.right.circle"
         case .notConfigured, .signedOut:
-            youTubeAccount.activeChannelID == nil ? "globe" : "person.crop.circle"
+            "person.crop.circle"
         }
     }
 
@@ -663,11 +588,7 @@ extension HomeView {
         HStack(spacing: 10) {
             Image(systemName: "clock.arrow.circlepath")
             VStack(alignment: .leading, spacing: 2) {
-                Text(isShowingSavedWeb
-                     ? tr("Showing saved YouTube Music personalization.",
-                          "正在显示已保存的 YouTube Music 个性化内容。")
-                     : tr("Showing saved Home recommendations.",
-                          "正在显示已保存的首页推荐。"))
+                Text(savedRecommendationsTitle)
                     .font(MusesTypography.caption.weight(.semibold))
                 Text(staleBannerDetail)
                     .font(MusesTypography.caption2)
@@ -689,9 +610,50 @@ extension HomeView {
     }
 
     var isShowingSavedWeb: Bool {
-        discovery.sections.contains {
+        visibleDiscoverySections.contains {
             $0.source == .cached && $0.cachedOrigin == .signedInWeb
         }
+    }
+
+    var showsStaleRecommendations: Bool {
+        discovery.isShowingStale && visibleDiscoverySections.contains {
+            $0.source == .cached || $0.staleReason != nil
+        }
+    }
+
+    var savedRecommendationsTitle: String {
+        if isShowingSavedWeb {
+            return tr("Showing saved YouTube Music personalization.",
+                      "正在显示已保存的 YouTube Music 个性化内容。")
+        }
+        if homeSourceSelection == .account {
+            return tr("Showing saved account recommendations.",
+                      "正在显示已保存的账号推荐。", zhHant: "正在顯示已儲存的帳號推薦。")
+        }
+        return tr("Showing saved Muses recommendations.",
+                  "正在显示已保存的 Muses 推荐。", zhHant: "正在顯示已儲存的 Muses 推薦。")
+    }
+
+    var accountHomeEmptyTitle: String {
+        guard youTubeAccount.isConnected, youTubeAccount.activeChannelID != nil else {
+            return tr("Connect YouTube", "连接 YouTube")
+        }
+        guard webHome.isBuildEnabled else {
+            return tr("Account recommendations unavailable", "账号推荐暂不可用", zhHant: "帳號推薦暫不可用")
+        }
+        if !webHome.isEnabled || !webHome.hasCurrentConsent {
+            return tr("Set up Personalized Home", "设置个性化首页", zhHant: "設定個人化首頁")
+        }
+        return tr("Account recommendations unavailable", "账号推荐暂不可用", zhHant: "帳號推薦暫不可用")
+    }
+
+    var accountHomeEmptyMessage: String {
+        guard youTubeAccount.isConnected, youTubeAccount.activeChannelID != nil else {
+            return tr("Connect your YouTube account, then review the separate browser consent for Personalized Home.",
+                      "连接你的 YouTube 账号，再查看个性化首页的独立浏览器同意流程。",
+                      zhHant: "連接你的 YouTube 帳號，再查看個人化首頁的獨立瀏覽器同意流程。")
+        }
+        return WebHomeRecoveryCopy.message(for: webHome.status)
     }
 
     var staleBannerDetail: String {
@@ -706,7 +668,8 @@ extension HomeView {
     }
 
     var shouldShowWebRecovery: Bool {
-        guard discovery.recommendationMode == .youtubeMusic,
+        guard homeSourceSelection == .account,
+              !visibleDiscoverySections.isEmpty,
               webHome.isEnabled,
               !isShowingSavedWeb,
               discovery.lastRefreshError != nil else { return false }
@@ -784,16 +747,6 @@ extension HomeView {
             .filter { !$0.youTubeId.isEmpty }
     }
 
-    func loadFallback() {
-        fallbackTask?.cancel()
-        fallbackTask = nil
-        fallbackLoading = false
-        fallbackEntries = []
-        fallbackError = tr("Official discovery is unavailable. Enable discovery or try again later.",
-                           "官方发现内容暂不可用，请开启发现功能或稍后重试。",
-                           zhHant: "官方探索內容暫不可用，請啟用探索功能或稍後重試。")
-    }
-
     func play(_ snapshot: TrackSnapshot,
                       context: [TrackSnapshot],
                       source: QueueSource = .search) {
@@ -829,24 +782,6 @@ extension HomeView {
                 )
             }
             let context = TrackSnapshot.playbackContext(playing: snapshot, youTubeEntries: entries)
-            interactionError = nil
-            playback.playTrack(snapshot, context: context, from: .search)
-        PlaybackPresentation.nowPlaying()
-        } catch {
-            interactionError = tr(
-                "This YouTube Music item could not be prepared: \(error.localizedDescription)",
-                "无法准备此 YouTube Music 内容：\(error.localizedDescription)", zhHant: "無法準備此 YouTube Music 內容：\(error.localizedDescription)"
-            )
-        }
-    }
-
-    func play(_ entry: YTDlpBridge.YTDlpPlaylistEntry) async {
-        do {
-            let snapshot = try await youTubeSearch.resolveTrack(entry: entry)
-            let context = TrackSnapshot.playbackContext(
-                playing: snapshot,
-                youTubeEntries: fallbackEntries
-            )
             interactionError = nil
             playback.playTrack(snapshot, context: context, from: .search)
         PlaybackPresentation.nowPlaying()
@@ -925,7 +860,7 @@ extension HomeView {
     }
 
     func itemsContaining(_ card: YouTubeDiscoveryCard) -> [DiscoveryItem] {
-        discovery.sections.first { section in
+        visibleDiscoverySections.first { section in
             section.items.contains { item in
                 guard case .youTube(let candidate) = item else { return false }
                 return candidate.id == card.id
@@ -1059,7 +994,7 @@ extension HomeView {
     func sourceAwareSubtitle(_ section: HomeSection) -> String {
         let source: String
         if section.source == .cached {
-            let origin = section.cachedOrigin?.label ?? HomeSource.publicDiscovery.label
+            let origin = section.cachedOrigin?.label ?? HomeSource.cached.label
             source = tr("Saved · \(origin)", "已保存 · \(origin)", zhHant: "已保存 · \(origin)")
         } else {
             source = section.source.label
@@ -1070,14 +1005,35 @@ extension HomeView {
     }
 }
 
-enum HomeSourceSelection: String {
-    case recommended, publicDiscovery, account, imports
+enum HomeSourceSelection: String, CaseIterable {
+    case recommended, account
+
+    init(mode: HomeRecommendationMode) {
+        self = mode == .muses ? .recommended : .account
+    }
+
+    var mode: HomeRecommendationMode {
+        self == .recommended ? .muses : .youtubeMusic
+    }
+
+    func visibleSections(_ sections: [HomeSection], accountChannelID: String?) -> [HomeSection] {
+        sections.filter { section in
+            let origin = section.cachedOrigin ?? section.source
+            switch self {
+            case .recommended:
+                return origin == .localLibrary
+            case .account:
+                guard let accountChannelID, !accountChannelID.isEmpty,
+                      section.accountChannelID == accountChannelID else { return false }
+                return origin == .signedInWeb || origin == .officialAccount
+            }
+        }
+    }
+
     var title: String {
         switch self {
-        case .recommended: tr("Recommended on this Mac", "这台 Mac 上的推荐")
-        case .publicDiscovery: tr("Public discovery", "公共发现")
-        case .account: tr("Your account", "你的账号")
-        case .imports: tr("Imported playlists", "已导入歌单")
+        case .recommended: "Muses"
+        case .account: tr("Your YouTube Music account", "你的 YouTube Music 账号", zhHant: "你的 YouTube Music 帳號")
         }
     }
 }

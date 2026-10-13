@@ -5,731 +5,467 @@ import Testing
 @Suite("Home discovery trust and cache scope")
 @MainActor
 struct HomeDiscoveryTrustTests {
-    @Test("global Home pages append new shelves and deduplicate an existing shelf")
-    func globalContinuationMergesWithoutDuplicates() async throws {
-        let provider = GlobalPageHomeProvider()
-        let service = HomeDiscoveryService(
-            provider: provider, cache: temporaryCache(),
-            library: LibraryService(modelContainer: try makeModelContainer(inMemory: true)),
-            enabledProvider: { true }, modeProvider: { .youtubeMusic })
-        service.load()
-        for _ in 0..<50 where service.isRefreshing {
-            try await Task.sleep(for: .milliseconds(20))
-        }
-        #expect(service.hasGlobalContinuation)
-
-        service.loadMore()
-        for _ in 0..<50 where service.isLoadingMore {
-            try await Task.sleep(for: .milliseconds(20))
-        }
-
-        #expect(service.sections.map(\.id) == ["shelf-a", "shelf-b"])
-        #expect(service.sections[0].items.map(\.homeMediaIdentity)
-                == ["video:one", "video:two"])
-        #expect(service.sections[1].items.map(\.homeMediaIdentity)
-                == ["video:three"])
-        #expect(!service.hasGlobalContinuation)
-    }
-
-    @Test("offline Home continuation keeps its cursor and retries the same page")
-    func offlineContinuationRetries() async throws {
-        let provider = GlobalPageHomeProvider()
-        provider.failNextPage = true
-        let service = HomeDiscoveryService(
-            provider: provider, cache: temporaryCache(),
-            library: LibraryService(modelContainer: try makeModelContainer(inMemory: true)),
-            enabledProvider: { true }, modeProvider: { .youtubeMusic })
-        service.load()
-        for _ in 0..<50 where service.isRefreshing {
-            try await Task.sleep(for: .milliseconds(20))
-        }
-        service.loadMore()
-        for _ in 0..<50 where service.isLoadingMore {
-            try await Task.sleep(for: .milliseconds(20))
-        }
-        #expect(service.globalContinuationError != nil)
-        #expect(service.hasGlobalContinuation)
-        #expect(service.sections.map(\.id) == ["shelf-a"])
-
-        service.loadMore()
-        for _ in 0..<50 where service.isLoadingMore {
-            try await Task.sleep(for: .milliseconds(20))
-        }
-        #expect(provider.requestedPages == [1, 1])
-        #expect(service.globalContinuationError == nil)
-        #expect(service.sections.map(\.id) == ["shelf-a", "shelf-b"])
-    }
-
-    @Test("failed anonymous cold refresh preserves expired disk snapshot and recovers")
-    func anonymousFailurePreservesSnapshot() async throws {
-        let root = FileManager.default.temporaryDirectory
-            .appending(path: "muses-home-offline-\(UUID().uuidString)")
+    @Test("one failed Muses section retains only its own saved items while other sections refresh")
+    func localPartialFailureDoesNotPoisonFeed() async throws {
+        let root = temporaryRoot()
         defer { try? FileManager.default.removeItem(at: root) }
-        let provider = EmptyFailureHomeProvider()
         let cache = HomeFeedCache(directory: root)
-        let library = LibraryService(modelContainer: try makeModelContainer(inMemory: true))
-        let service = HomeDiscoveryService(
-            provider: provider, cache: cache, library: library,
-            enabledProvider: { true }, modeProvider: { .youtubeMusic })
-        let section = HomeSection(
-            id: "saved-public", title: "Saved", kind: .youTubeCarousel,
-            items: [.youTube(YouTubeDiscoveryCard(
-                id: "video:known_video", title: "Known video",
-                browseEndpoint: nil,
-                playEndpoint: HomeCardEndpoint(kind: .video, identifier: "known_video"),
-                availability: .available))],
-            source: .publicDiscovery)
-        let old = Date().addingTimeInterval(-7200)
-        #expect(cache.set(HomeSnapshot(
-            scope: .guest, sections: [section], fetchedAt: old,
-            expiresAt: old.addingTimeInterval(900)),
-            for: service.buildInput(), layer: .baseline, mode: .youtubeMusic))
-        await cache.flushPendingWrites()
-        // A new cache instance proves disk restoration, not an in-memory hit.
-        let reopenedCache = HomeFeedCache(directory: root)
-        try #require(reopenedCache.get(
-            for: service.buildInput(), layer: .baseline, mode: .youtubeMusic)?.value.sections.first?.id == "saved-public")
-        let reopened = HomeDiscoveryService(
-            provider: provider, cache: reopenedCache, library: library,
-            enabledProvider: { true }, modeProvider: { .youtubeMusic })
-        reopened.load()
-        for _ in 0..<50 where reopened.isRefreshing {
-            try await Task.sleep(for: .milliseconds(20))
-        }
-        #expect(reopened.sections.first?.id == "saved-public")
-        #expect(reopened.sections.first?.source == .cached)
-        #expect(reopened.isShowingStale)
-        #expect(reopened.lastRefreshError == "Offline")
-        #expect(reopened.lastUpdatedAt == old)
-        provider.failed = false
-        reopened.reload()
-        for _ in 0..<50 where reopened.isRefreshing {
-            try await Task.sleep(for: .milliseconds(20))
-        }
-        #expect(reopened.sections.isEmpty) // A genuine empty success replaces stale data.
-        #expect(!reopened.isShowingStale)
-        #expect(reopened.lastRefreshError == nil)
-    }
-
-    @Test("cold anonymous failure without a cache exposes a retryable failed section")
-    func anonymousColdFailureIsVisible() async throws {
-        let service = HomeDiscoveryService(
-            provider: EmptyFailureHomeProvider(), cache: temporaryCache(),
+        let local = PartialLocalHomeStub()
+        let service = HomeDiscoveryService(provider: local, cache: cache,
             library: LibraryService(modelContainer: try makeModelContainer(inMemory: true)),
-            enabledProvider: { true }, modeProvider: { .youtubeMusic })
+            enabledProvider: { true }, modeProvider: { .muses })
         service.load()
-        for _ in 0..<50 where service.isRefreshing {
-            try await Task.sleep(for: .milliseconds(20))
-        }
-        #expect(service.sections.first?.status == .failed("Offline"))
-        #expect(!service.isShowingStale)
-        #expect(service.lastRefreshError == "Offline")
-    }
-
-    @Test("guest and account Home caches are physically isolated")
-    func feedCacheDoesNotCrossAccountBoundary() {
-        let cache = HomeFeedCache(directory: FileManager.default.temporaryDirectory
-            .appendingPathComponent("muses-home-cache-\(UUID().uuidString)", isDirectory: true))
-        let guest = input(scope: .guest)
-        let account = input(scope: .account(channelID: "UC_account"))
-        let section = HomeSection(id: "home", title: "Home", kind: .youTubeCarousel,
-                                  items: [], status: .loaded)
-
-        let now = Date()
-        let snapshot = HomeSnapshot(
-            scope: account.scope, sections: [section], fetchedAt: now,
-            expiresAt: now.addingTimeInterval(HomeFeedCache.baselineFreshWindow))
-        #expect(cache.set(snapshot, for: account, layer: .baseline))
-        #expect(cache.get(for: account, layer: .baseline)?.value.sections.map(\.id) == [section.id])
-        #expect(cache.get(for: guest, layer: .baseline) == nil)
-    }
-
-    @Test("baseline and Web partitions use independent paths and freshness windows")
-    func sourcePartitionsAreIndependent() throws {
-        let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("muses-home-partitions-\(UUID().uuidString)", isDirectory: true)
-        let cache = HomeFeedCache(
-            directory: root,
-            baselineFreshWindow: 30 * 60,
-            webFreshWindow: 15 * 60,
-            webStaleLimit: 7 * 24 * 60 * 60)
-        let account = input(scope: .account(channelID: "UC_account"))
-        let now = Date()
-        let fetchedAt = now.addingTimeInterval(-(15 * 60 + 1))
-        let baseline = HomeSnapshot(
-            scope: account.scope,
-            sections: [baselineSection],
-            fetchedAt: fetchedAt,
-            expiresAt: now.addingTimeInterval(60))
-        let web = HomeSnapshot(
-            scope: account.scope,
-            sections: [HomeSection(
-                id: "web", title: "Web", kind: .quickPicks, items: [],
-                source: .signedInWeb, accountChannelID: "UC_account")],
-            fetchedAt: fetchedAt,
-            expiresAt: now.addingTimeInterval(60))
-
-        #expect(cache.set(baseline, for: account, layer: .baseline))
-        #expect(cache.set(web, for: account, layer: .web))
-        let cachedBaseline = try #require(cache.get(for: account, layer: .baseline, now: now))
-        let cachedWeb = try #require(cache.get(for: account, layer: .web, now: now))
-
-        #expect(cache.isFresh(cachedBaseline, layer: .baseline, now: now))
-        #expect(!cache.isFresh(cachedWeb, layer: .web, now: now))
-        #expect(cache.directoryURL(
-            for: account.scope, layer: .baseline,
-            language: account.language, region: account.region).path
-            .hasSuffix("account-UC_account/en-us/baseline-official-v3"))
-        #expect(cache.directoryURL(
-            for: account.scope, layer: .web,
-            language: account.language, region: account.region).path
-            .hasSuffix("account-UC_account/en-us/web"))
-    }
-
-    @Test("legacy combined JSON is invalidated without touching partition directories")
-    func legacyCombinedCacheIsInvalidated() throws {
-        let root = FileManager.default.temporaryDirectory
-            .appendingPathComponent("muses-home-legacy-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        let legacy = root.appendingPathComponent("legacy.json")
-        let partition = root.appendingPathComponent("account-UC_one", isDirectory: true)
-        try Data("legacy".utf8).write(to: legacy)
-        try FileManager.default.createDirectory(at: partition, withIntermediateDirectories: true)
-
-        _ = HomeFeedCache(directory: root)
-
-        #expect(!FileManager.default.fileExists(atPath: legacy.path))
-        #expect(FileManager.default.fileExists(atPath: partition.path))
-    }
-
-    @Test("Web snapshots older than seven days are not presented")
-    func webStaleLimitIsSevenDays() {
-        let cache = HomeFeedCache(
-            directory: FileManager.default.temporaryDirectory
-                .appendingPathComponent("muses-home-stale-\(UUID().uuidString)", isDirectory: true))
-        let account = input(scope: .account(channelID: "UC_account"))
-        let now = Date()
-        let fetchedAt = now.addingTimeInterval(-(HomeFeedCache.webStaleLimit + 1))
-        let web = HomeSnapshot(
-            scope: account.scope,
-            sections: [HomeSection(
-                id: "web", title: "Web", kind: .quickPicks, items: [],
-                source: .signedInWeb, accountChannelID: "UC_account")],
-            fetchedAt: fetchedAt,
-            expiresAt: fetchedAt.addingTimeInterval(HomeFeedCache.webFreshWindow))
-
-        #expect(cache.set(web, for: account, layer: .web))
-        #expect(cache.get(for: account, layer: .web, now: now) == nil)
-    }
-
-    @Test("Home snapshot manifest rejects cross-account section metadata")
-    func snapshotManifestRejectsCrossAccountContent() {
-        let now = Date()
-        let snapshot = HomeSnapshot(
-            scope: .account(channelID: "UC_one"),
-            sections: [HomeSection(
-                id: "wrong", title: "Wrong", kind: .youTubeCarousel,
-                items: [], source: .signedInWeb,
-                accountChannelID: "UC_two")],
-            fetchedAt: now, expiresAt: now.addingTimeInterval(60))
-
-        #expect(!snapshot.belongs(to: .account(channelID: "UC_one")))
-        #expect(!snapshot.belongs(to: .account(channelID: "UC_two")))
-        #expect(!snapshot.belongs(to: .guest))
-    }
-
-    @Test("blank account ids use the guest scope")
-    func blankAccountIsGuest() {
-        #expect(HomeFeedScope(accountChannelID: "  ") == .guest)
-        #expect(HomeFeedScope(accountChannelID: "UC_one") == .account(channelID: "UC_one"))
-    }
-
-    @Test("older cached sections decode as public discovery")
-    func legacySectionDecodeDefaultsSource() throws {
-        let original = HomeSection(id: "legacy", title: "Legacy", kind: .youTubeCarousel,
-                                   items: [], status: .loaded)
-        let encoded = try JSONEncoder().encode(original)
-        var object = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
-        object.removeValue(forKey: "source")
-        object.removeValue(forKey: "schemaVersion")
-        let legacy = try JSONSerialization.data(withJSONObject: object)
-        let decoded = try JSONDecoder().decode(HomeSection.self, from: legacy)
-
-        #expect(decoded.source == .publicDiscovery)
-        #expect(decoded.schemaVersion == 1)
-    }
-
-    @Test("cache presentation keeps the actual upstream source")
-    func cachedSectionKeepsOrigin() {
-        let live = HomeSection(id: "account", title: "Account", kind: .quickPicks,
-                               items: [], source: .officialAccount,
-                               accountChannelID: "UC_one")
-        let cached = live.presentedFromCache(staleReason: "offline")
-
-        #expect(cached.source == .cached)
-        #expect(cached.cachedOrigin == .officialAccount)
-        #expect(cached.accountChannelID == "UC_one")
-        #expect(cached.staleReason == "offline")
-    }
-
-    @Test("Web enhancement failure and account mismatch preserve baseline")
-    func layeredProviderRejectsUnsafeEnhancement() async {
-        let baseline = StubHomeProvider(sections: [baselineSection])
-        let wrongAccountWeb = StubHomeProvider(webSections: [
-            HomeSection(id: "web", title: "Web", kind: .youTubeCarousel,
-                        items: [], source: .signedInWeb,
-                        accountChannelID: "UC_other")
-        ])
-        let mismatched = LayeredHomeProvider(
-            baseline: baseline, webEnhancement: wrongAccountWeb)
-        let mismatchResult = await mismatched.fetch(
-            for: input(scope: .account(channelID: "UC_one")))
-        #expect(mismatchResult.baselineSnapshot.sections.map(\.id) == ["baseline"])
-        #expect(mismatchResult.webSnapshot == nil)
-        if case .rejected = mismatchResult.webCapability {} else {
-            Issue.record("Expected the mismatched Web payload to be rejected")
-        }
-
-        let failedWeb = StubHomeProvider(
-            webFailure: HomeFetchFailure(
-                layer: .web, code: .sessionExpired, message: "session expired"))
-        let failed = LayeredHomeProvider(baseline: baseline, webEnhancement: failedWeb)
-        let failedResult = await failed.fetch(
-            for: input(scope: .account(channelID: "UC_one")))
-        #expect(failedResult.baselineSnapshot.sections.map(\.id) == ["baseline"])
-        #expect(failedResult.webSnapshot == nil)
-        #expect(failedResult.webCapability == .unavailable(reason: "session expired"))
-        #expect(!failedResult.cacheDirectives.storeWeb)
-    }
-
-    @Test("valid Web sections enhance and supersede matching baseline slots")
-    func layeredProviderAcceptsExactAccount() async {
-        let baseline = StubHomeProvider(sections: [
-            baselineSection,
-            HomeSection(id: "shared", title: "Baseline shared", kind: .youTubeCarousel,
-                        items: [], source: .publicDiscovery)
-        ])
-        let web = StubHomeProvider(webSections: [
-            HomeSection(id: "shared", title: "Personalized shared", kind: .youTubeCarousel,
-                        items: [], source: .signedInWeb,
-                        accountChannelID: "UC_one", schemaVersion: 2)
-        ])
-        let provider = LayeredHomeProvider(baseline: baseline, webEnhancement: web)
-        let result = await provider.fetch(
-            for: input(scope: .account(channelID: "UC_one")))
-
-        #expect(result.webSnapshot?.sections.map(\.id) == ["shared"])
-        #expect(result.baselineSnapshot.sections.map(\.id) == ["baseline", "shared"])
-        #expect(result.webCapability == .available(accountChannelID: "UC_one"))
-        #expect(result.cacheDirectives.storeWeb)
-    }
-
-    @Test("a Web failure keeps and presents the same-account last success")
-    func failedWebRefreshPreservesLastSuccess() async throws {
-        let provider = SuccessfulThenFailedWebProvider()
-        let cache = temporaryCache()
-        var channelID: String? = "UC_one"
-        let service = HomeDiscoveryService(
-            provider: provider,
-            cache: cache,
-            library: LibraryService(modelContainer: try makeModelContainer(inMemory: true)),
-            enabledProvider: { true },
-            accountChannelIDProvider: { channelID })
-
-        service.load()
-        for _ in 0..<50 where provider.fetchCount < 1 || service.isRefreshing {
-            try await Task.sleep(for: .milliseconds(20))
-        }
-        #expect(service.sections.first?.source == .signedInWeb)
-
+        try await settled(service)
+        local.failSection = true
         service.reload()
-        for _ in 0..<50 where provider.fetchCount < 2 || service.isRefreshing {
-            try await Task.sleep(for: .milliseconds(20))
-        }
+        try await settled(service)
+        #expect(service.sections.map(\.id) == ["local-a", "local-b", "local-c"])
+        #expect(service.sections[0].source == .cached)
+        #expect(service.sections[0].cachedOrigin == .localLibrary)
+        #expect(service.sections[0].items.map(\.homeMediaIdentity) == ["video:old-a"])
+        #expect(service.sections[1].source == .localLibrary)
+        #expect(service.sections[1].items.map(\.homeMediaIdentity) == ["video:new-b"])
+        #expect(service.sections[2].status == .failed("failed c"))
+        #expect(service.isShowingStale)
+        #expect(service.lastRefreshError == "failed a")
+        await cache.flushPendingWrites()
+        let cold = HomeFeedCache(directory: root)
+        #expect(cold.get(for: service.buildInput(), layer: .baseline, mode: .muses)?
+            .value.sections[1].items.map(\.homeMediaIdentity) == ["video:old-b"])
+    }
 
+    @Test("account Home never calls a provider while signed out or disabled")
+    func unavailableAccountDoesNotFetch() async {
+        let web = AccountHomeStub()
+        let provider = YouTubeMusicHomeProvider(authenticated: web)
+        let signedOut = await provider.fetch(for: input(.guest))
+        #expect(signedOut.webCapability == .signedOut)
+        #expect(signedOut.baselineSnapshot.sections.isEmpty)
+        #expect(signedOut.webSnapshot == nil)
+        #expect(web.inputs.isEmpty)
+        web.enabled = false
+        let disabled = await provider.fetch(for: input(.account(channelID: "UC_one")))
+        #expect(disabled.webCapability == .notConfigured)
+        #expect(disabled.cacheDirectives == .preserveAll)
+        #expect(web.inputs.isEmpty)
+        let buildDisabled = await YouTubeMusicHomeProvider(authenticated: nil)
+            .fetch(for: input(.account(channelID: "UC_one")))
+        #expect(buildDisabled.webCapability == .notConfigured)
+        #expect(buildDisabled.baselineSnapshot.sections.isEmpty)
+    }
+
+    @Test("account Home rejects a mismatched response and preserves its failure code")
+    func accountProviderRejectsUnsafeResponse() async {
+        let web = AccountHomeStub()
+        web.responseChannel = "UC_other"
+        let provider = YouTubeMusicHomeProvider(authenticated: web)
+        let rejected = await provider.fetch(for: input(.account(channelID: "UC_one")))
+        #expect(rejected.webSnapshot == nil)
+        #expect(rejected.baselineSnapshot.sections.isEmpty)
+        #expect(rejected.failures.first?.code == .shapeChanged)
+        #expect(!rejected.cacheDirectives.storeWeb)
+        web.responseChannel = nil
+        web.failure = .sessionExpired
+        let expired = await provider.fetch(for: input(.account(channelID: "UC_one")))
+        #expect(expired.failures.first?.code == .sessionExpired)
+        #expect(expired.webSnapshot == nil)
+        #expect(expired.baselineSnapshot.sections.isEmpty)
+    }
+
+    @Test("fresh account Web cache cold-loads independently of any baseline")
+    func coldAccountCacheDoesNotNeedBaseline() async throws {
+        let root = temporaryRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let web = AccountHomeStub()
+        let seed = HomeFeedCache(directory: root)
+        let account = input(.account(channelID: "UC_one"))
+        let snapshot = accountSnapshot(channelID: "UC_one")
+        try #require(seed.set(snapshot, for: account, layer: .web, mode: .youtubeMusic))
+        await seed.flushPendingWrites()
+        let cache = HomeFeedCache(directory: root)
+        let service = try service(web, cache: cache, channel: { "UC_one" })
+        service.load()
         #expect(service.sections.first?.source == .cached)
         #expect(service.sections.first?.cachedOrigin == .signedInWeb)
-        #expect(service.sections.first?.id == "web-success")
-        #expect(cache.get(
-            for: service.buildInput(),
-            layer: .web)?.value.sections.first?.id == "web-success")
-        if case .saved(let accountID, let stale, _) = service.webCapability {
-            #expect(accountID == "UC_one")
-            #expect(stale)
-        } else {
-            Issue.record("Expected the last successful Web snapshot to remain visible")
-        }
-        channelID = nil
+        #expect(service.sections.first?.accountChannelID == "UC_one")
+        #expect(service.lastUpdatedAt == snapshot.fetchedAt)
+        #expect(!service.isRefreshing)
+        #expect(web.inputs.isEmpty)
+        #expect(cache.get(for: account, layer: .baseline, mode: .youtubeMusic) == nil)
     }
 
-    @Test("async reload preserves the explicit account scope")
-    func asyncReloadUsesAccountScope() async throws {
-        let provider = ScopeRecordingHomeProvider()
-        var channelID: String? = "UC_one"
-        let service = HomeDiscoveryService(
-            provider: provider,
-            cache: temporaryCache(),
-            library: LibraryService(modelContainer: try makeModelContainer(inMemory: true)),
-            enabledProvider: { true },
-            accountChannelIDProvider: { channelID })
-
-        service.reload()
-        for _ in 0..<50 where provider.inputs.isEmpty {
-            try await Task.sleep(for: .milliseconds(20))
-        }
-
-        #expect(provider.inputs.last?.scope == .account(channelID: "UC_one"))
-        channelID = nil
-    }
-
-    @Test("cancelled input preparation cannot restart Home fetching")
-    func cancelledReloadDoesNotFetch() async throws {
-        let provider = ScopeRecordingHomeProvider()
-        let root = FileManager.default.temporaryDirectory
-            .appending(path: "muses-home-cancel-\(UUID().uuidString)")
+    @Test("failed account refresh retains only the same-account verified success")
+    func failedWebRefreshPreservesLastSuccess() async throws {
+        let root = temporaryRoot()
         defer { try? FileManager.default.removeItem(at: root) }
-        let service = HomeDiscoveryService(
-            provider: provider, cache: HomeFeedCache(directory: root),
-            library: LibraryService(modelContainer: try makeModelContainer(inMemory: true)),
-            enabledProvider: { true })
-
+        let cache = HomeFeedCache(directory: root)
+        let web = AccountHomeStub()
+        let service = try service(web, cache: cache, channel: { "UC_one" })
+        service.load()
+        try await settled(service)
+        #expect(service.sections.first?.source == .signedInWeb)
+        let fetchedAt = service.lastUpdatedAt
+        web.failure = .offline
         service.reload()
-        service.cancel()
-        try await Task.sleep(for: .milliseconds(150))
-        #expect(provider.inputs.isEmpty)
+        try await settled(service)
+        #expect(service.sections.first?.source == .cached)
+        #expect(service.sections.first?.cachedOrigin == .signedInWeb)
+        #expect(service.sections.first?.accountChannelID == "UC_one")
+        #expect(service.lastUpdatedAt == fetchedAt)
+        #expect(service.isShowingStale)
+        #expect(service.lastRefreshError == "offline")
+        await cache.flushPendingWrites()
+        let cold = HomeFeedCache(directory: root)
+        #expect(cold.get(for: service.buildInput(), layer: .web, mode: .youtubeMusic)?
+            .value.sections.first?.id == "web-success")
+    }
+
+    @Test("account failure without a saved success is truthful and never creates a fallback shelf")
+    func accountColdFailureHasNoFallback() async throws {
+        let root = temporaryRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let web = AccountHomeStub()
+        web.failure = .offline
+        let service = try service(web, cache: HomeFeedCache(directory: root), channel: { "UC_one" })
+        service.load()
+        try await settled(service)
         #expect(service.sections.isEmpty)
-        #expect(!service.isRefreshing)
-
+        #expect(service.lastUpdatedAt == nil)
+        #expect(!service.isShowingStale)
+        #expect(service.lastRefreshError == "offline")
+        #expect(service.webCapability == .unavailable(reason: "offline"))
+        web.failure = nil
         service.reload()
-        for _ in 0..<50 where service.isRefreshing {
-            try await Task.sleep(for: .milliseconds(20))
-        }
-        #expect(provider.inputs.count == 1)
-        #expect(!service.isRefreshing)
+        try await settled(service)
+        #expect(service.sections.first?.source == .signedInWeb)
+        #expect(service.lastRefreshError == nil)
+    }
+
+    @Test("disabled consent and build support cannot resurrect saved Web after a real reload",
+          arguments: [false, true])
+    func disabledWebDoesNotAppear(buildDisabled: Bool) async throws {
+        let root = temporaryRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let cache = HomeFeedCache(directory: root)
+        let account = input(.account(channelID: "UC_one"))
+        try #require(cache.set(accountSnapshot(channelID: "UC_one", age: 3600),
+                              for: account, layer: .web, mode: .youtubeMusic))
+        let web = AccountHomeStub()
+        web.enabled = false
+        let service = try service(buildDisabled ? nil : web, cache: cache, channel: { "UC_one" })
+        service.load()
+        try await settled(service)
+        service.reload()
+        try await settled(service)
+        #expect(service.sections.isEmpty)
+        #expect(service.lastUpdatedAt == nil)
+        #expect(!service.isShowingStale)
+        #expect(service.webCapability == .notConfigured)
+        #expect(web.inputs.isEmpty)
+        // Revocation hides the normalized cache without deleting other user data.
+        #expect(cache.get(for: account, layer: .web, mode: .youtubeMusic) != nil)
+    }
+
+    @Test("revoking consent while an uncooperative refresh is suspended rejects its late result")
+    func revokedPendingFetchDoesNotReturn() async throws {
+        let root = temporaryRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let cache = HomeFeedCache(directory: root)
+        let web = AccountHomeStub()
+        web.suspendChannel = "UC_one"
+        let service = try service(web, cache: cache, channel: { "UC_one" })
+        service.load()
+        try await web.awaitSuspension()
+        web.enabled = false
+        service.webConfigurationDidChange()
+        web.finishSuspended()
+        try await settled(service)
+        #expect(service.sections.isEmpty)
+        #expect(service.webCapability == .notConfigured)
+        #expect(cache.get(for: service.buildInput(), layer: .web, mode: .youtubeMusic) == nil)
     }
 
     @Test("logout and A-to-B switch discard a cancelled account result that arrives late")
     func scopeSwitchRejectsLateResult() async throws {
-        let provider = ScopeRecordingHomeProvider(delayedScope: .account(channelID: "UC_A"))
-        var channelID: String? = "UC_A"
-        let service = HomeDiscoveryService(
-            provider: provider,
-            cache: temporaryCache(),
-            library: LibraryService(modelContainer: try makeModelContainer(inMemory: true)),
-            enabledProvider: { true },
-            accountChannelIDProvider: { channelID })
-
+        let root = temporaryRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let cache = HomeFeedCache(directory: root)
+        let web = AccountHomeStub()
+        web.suspendChannel = "UC_A"
+        var channel: String? = "UC_A"
+        let service = try service(web, cache: cache, channel: { channel })
         service.load()
-        channelID = "UC_B"
+        try await web.awaitSuspension()
+        channel = "UC_B"
         service.accountScopeDidChange()
-        for _ in 0..<50 where service.sections.first?.accountChannelID != "UC_B" {
-            try await Task.sleep(for: .milliseconds(20))
-        }
-        try await Task.sleep(for: .milliseconds(220))
-
+        try await settled(service)
+        web.finishSuspended()
+        try await Task.sleep(for: .milliseconds(30))
         #expect(service.sections.map(\.accountChannelID) == ["UC_B"])
         #expect(service.activeScope == .account(channelID: "UC_B"))
-
-        channelID = nil
+        #expect(cache.get(for: input(.account(channelID: "UC_A")), layer: .web, mode: .youtubeMusic) == nil)
+        channel = nil
         service.accountScopeDidChange()
-        for _ in 0..<50 where service.sections.isEmpty {
-            try await Task.sleep(for: .milliseconds(20))
-        }
-
+        try await settled(service)
+        #expect(service.sections.isEmpty)
         #expect(service.activeScope == .guest)
-        #expect(service.sections.allSatisfy { $0.accountChannelID == nil })
+        #expect(service.webCapability == .signedOut)
     }
 
-    @Test("disabled Web Home neither presents its saved partition nor refreshes it")
-    func disabledWebDoesNotAppear() throws {
-        let cache = temporaryCache()
-        let provider = StubHomeProvider(sections: [baselineSection])
-        let service = HomeDiscoveryService(
-            provider: provider,
-            cache: cache,
+    @Test("changing account Home to Muses rejects a late account result and keeps local recommendations")
+    func modeSwitchKeepsLocalSource() async throws {
+        let root = temporaryRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let cache = HomeFeedCache(directory: root)
+        let web = AccountHomeStub()
+        web.suspendChannel = "UC_one"
+        let local = LocalHomeStub()
+        var mode = HomeRecommendationMode.youtubeMusic
+        let provider = ModeSwitchingHomeDiscoveryProvider(modeProvider: { mode }, muses: local,
+            youtubeMusic: YouTubeMusicHomeProvider(authenticated: web))
+        let service = HomeDiscoveryService(provider: provider, cache: cache,
             library: LibraryService(modelContainer: try makeModelContainer(inMemory: true)),
-            enabledProvider: { true },
-            accountChannelIDProvider: { "UC_one" })
-        let accountInput = service.buildInput()
-        let now = Date()
-        let baseline = HomeSnapshot(
-            scope: accountInput.scope,
-            sections: [baselineSection],
-            fetchedAt: now,
-            expiresAt: now.addingTimeInterval(HomeFeedCache.baselineFreshWindow))
-        let web = HomeSnapshot(
-            scope: accountInput.scope,
-            sections: [HomeSection(
-                id: "saved-web", title: "Saved Web", kind: .quickPicks,
-                items: [.youTube(YouTubeDiscoveryCard(id: "web-video", title: "Web"))],
-                source: .signedInWeb, accountChannelID: "UC_one")],
-            fetchedAt: now,
-            expiresAt: now.addingTimeInterval(HomeFeedCache.webFreshWindow))
-        #expect(cache.set(baseline, for: accountInput, layer: .baseline))
-        #expect(cache.set(web, for: accountInput, layer: .web))
-
+            enabledProvider: { true }, modeProvider: { mode }, accountChannelIDProvider: { "UC_one" })
         service.load()
-
-        #expect(service.sections.map(\.id) == ["baseline"])
+        try await web.awaitSuspension()
+        mode = .muses
+        service.recommendationModeDidChange()
+        try await settled(service)
+        web.finishSuspended()
+        try await Task.sleep(for: .milliseconds(30))
+        #expect(service.sections.map(\.source) == [.localLibrary])
+        #expect(service.sections.map(\.id) == ["muses-local"])
         #expect(service.webCapability == .notConfigured)
+        #expect(local.fetchCount == 1)
     }
 
-    @Test("live Web media wins over duplicate baseline media")
-    func liveWebDeduplicatesBaseline() async throws {
-        let provider = DeduplicatingHomeProvider()
-        let service = HomeDiscoveryService(
-            provider: provider,
-            cache: temporaryCache(),
-            library: LibraryService(modelContainer: try makeModelContainer(inMemory: true)),
-            enabledProvider: { true },
-            accountChannelIDProvider: { "UC_one" })
+    @Test("async reload preserves the explicit account scope")
+    func asyncReloadUsesAccountScope() async throws {
+        let root = temporaryRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let web = AccountHomeStub()
+        let service = try service(web, cache: HomeFeedCache(directory: root), channel: { "UC_one" })
+        service.reload()
+        try await settled(service)
+        #expect(web.inputs.last?.scope == .account(channelID: "UC_one"))
+    }
 
+    @Test("cancelled input preparation cannot restart Home fetching")
+    func cancelledReloadDoesNotFetch() async throws {
+        let root = temporaryRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let web = AccountHomeStub()
+        let service = try service(web, cache: HomeFeedCache(directory: root), channel: { "UC_one" })
+        service.reload()
+        service.cancel()
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(web.inputs.isEmpty)
+        #expect(service.sections.isEmpty)
+        #expect(!service.isRefreshing)
+        service.reload()
+        try await settled(service)
+        #expect(web.inputs.count == 1)
+    }
+
+    @Test("global account pages append shelves and deduplicate media; offline retry repeats the same page")
+    func globalContinuationMergesWithoutDuplicates() async throws {
+        let root = temporaryRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let web = AccountHomeStub()
+        web.globalPageAvailable = true
+        let service = try service(web, cache: HomeFeedCache(directory: root), channel: { "UC_one" })
         service.load()
-        for _ in 0..<50 where service.isRefreshing {
-            try await Task.sleep(for: .milliseconds(20))
+        try await settled(service)
+        web.failNextPage = true
+        service.loadMore()
+        try await settled(service)
+        #expect(service.globalContinuationError != nil)
+        #expect(service.hasGlobalContinuation)
+        service.loadMore()
+        try await settled(service)
+        #expect(web.requestedPages == [1, 1])
+        #expect(service.globalContinuationError == nil)
+        #expect(service.sections.map(\.id) == ["web-success", "web-second"])
+        #expect(service.sections[0].items.map(\.homeMediaIdentity) == ["video:one", "video:two"])
+        #expect(service.sections[1].items.map(\.homeMediaIdentity) == ["video:three"])
+        #expect(!service.hasGlobalContinuation)
+    }
+
+    @Test("shelf continuation is deduplicated and stays outside the durable first-page snapshot")
+    func shelfContinuationStaysVolatile() async throws {
+        let root = temporaryRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let cache = HomeFeedCache(directory: root)
+        let web = AccountHomeStub()
+        let service = try service(web, cache: cache, channel: { "UC_one" })
+        service.load()
+        try await settled(service)
+        service.loadMore(sectionID: "web-success")
+        try await settled(service)
+        #expect(service.sections.first?.items.map(\.homeMediaIdentity) == ["video:one", "video:two"])
+        await cache.flushPendingWrites()
+        let cold = HomeFeedCache(directory: root)
+        #expect(cold.get(for: service.buildInput(), layer: .web, mode: .youtubeMusic)?
+            .value.sections.first?.items.map(\.homeMediaIdentity) == ["video:one"])
+        web.enabled = false
+        service.webConfigurationDidChange()
+        service.loadMore(sectionID: "web-success")
+        service.loadMore()
+        try await settled(service)
+        #expect(web.shelfRequests == ["web-success"])
+        #expect(service.sections.isEmpty)
+    }
+
+    @Test("clearing the selected account's Web cache can persist a fresh cold-readable snapshot")
+    func clearSavedCacheRecovers() async throws {
+        let root = temporaryRoot()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let cache = HomeFeedCache(directory: root)
+        let web = AccountHomeStub()
+        let service = try service(web, cache: cache, channel: { "UC_one" })
+        service.load()
+        try await settled(service)
+        service.clearSavedWebHomeForCurrentAccount()
+        try await settled(service)
+        await cache.flushPendingWrites()
+        let cold = HomeFeedCache(directory: root)
+        #expect(cold.get(for: service.buildInput(), layer: .web, mode: .youtubeMusic)?
+            .value.sections.first?.id == "web-success")
+    }
+
+    private func input(_ scope: HomeFeedScope) -> HomeDiscoveryInput {
+        HomeDiscoveryInput(topArtistNames: [], recentlyPlayedArtistNames: [], likedArtistNames: [],
+                           timeBand: .morning, hour: 9, scope: scope)
+    }
+
+    private func service(_ web: AccountHomeStub?, cache: HomeFeedCache,
+                         channel: @escaping () -> String?) throws -> HomeDiscoveryService {
+        HomeDiscoveryService(provider: YouTubeMusicHomeProvider(authenticated: web), cache: cache,
+            library: LibraryService(modelContainer: try makeModelContainer(inMemory: true)),
+            enabledProvider: { true }, modeProvider: { .youtubeMusic },
+            accountChannelIDProvider: channel)
+    }
+
+    private func temporaryRoot() -> URL {
+        isolatedHomeTestDirectory("muses-home-trust-")
+    }
+
+    private func settled(_ service: HomeDiscoveryService) async throws {
+        for _ in 0..<100 where service.isRefreshing || service.isLoadingMore || !service.loadingSectionIDs.isEmpty {
+            try await Task.sleep(for: .milliseconds(10))
         }
-
-        #expect(service.sections.map(\.id) == ["web", "baseline"])
-        #expect(service.sections[0].items.map(\.homeMediaIdentity) == ["video:duplicate"])
-        #expect(service.sections[1].items.map(\.homeMediaIdentity) == ["video:baseline-only"])
-    }
-
-    private func input(scope: HomeFeedScope) -> HomeDiscoveryInput {
-        HomeDiscoveryInput(topArtistNames: [], recentlyPlayedArtistNames: [],
-                           likedArtistNames: [], timeBand: .morning, hour: 8,
-                           scope: scope)
-    }
-
-    private var baselineSection: HomeSection {
-        HomeSection(id: "baseline", title: "Baseline", kind: .youTubeCarousel,
-                    items: [], source: .publicDiscovery)
-    }
-
-    private func snapshot(channelID: String) -> YouTubeAccountSnapshot {
-        YouTubeAccountSnapshot(
-            channel: YouTubeChannel(id: channelID, title: "Account", thumbnailURL: nil),
-            playlists: [], subscriptions: [],
-            likedVideos: [YouTubeVideo(id: "liked", title: "Liked",
-                                       channelTitle: "Artist", thumbnailURL: nil)])
-    }
-
-    private func temporaryCache() -> HomeFeedCache {
-        HomeFeedCache(directory: FileManager.default.temporaryDirectory
-            .appendingPathComponent("muses-home-service-\(UUID().uuidString)", isDirectory: true))
+        #expect(!service.isRefreshing && !service.isLoadingMore && service.loadingSectionIDs.isEmpty)
     }
 }
 
 @MainActor
-private final class GlobalPageHomeProvider: HomeDiscoveryProvider {
-    private var pageLoaded = false
+private final class LocalHomeStub: HomeDiscoveryProvider {
+    private(set) var fetchCount = 0
+    func fetch(for input: HomeDiscoveryInput) async -> HomeFetchResult {
+        fetchCount += 1
+        return .baseline(scope: input.scope, sections: [HomeSection(
+            id: "muses-local", title: "Local", kind: .quickPicks,
+            items: [accountCard("local")], source: .localLibrary)])
+    }
+}
+
+@MainActor
+private final class PartialLocalHomeStub: HomeDiscoveryProvider {
+    var failSection = false
+    func fetch(for input: HomeDiscoveryInput) async -> HomeFetchResult {
+        let sections = failSection ? [
+            HomeSection(id: "local-a", title: "A", kind: .quickPicks, items: [],
+                        status: .failed("failed a"), source: .localLibrary),
+            HomeSection(id: "local-b", title: "B", kind: .quickPicks,
+                        items: [accountCard("new-b")], source: .localLibrary),
+            HomeSection(id: "local-c", title: "C", kind: .quickPicks, items: [],
+                        status: .failed("failed c"), source: .localLibrary)
+        ] : [
+            HomeSection(id: "local-a", title: "A", kind: .quickPicks,
+                        items: [accountCard("old-a")], source: .localLibrary),
+            HomeSection(id: "local-b", title: "B", kind: .quickPicks,
+                        items: [accountCard("old-b")], source: .localLibrary)
+        ]
+        return .baseline(scope: input.scope, sections: sections)
+    }
+}
+
+@MainActor
+private final class AccountHomeStub: HomeDiscoveryProvider {
+    var enabled = true
+    var failure: HomeFetchFailureCode?
+    var responseChannel: String?
+    var suspendChannel: String?
+    var globalPageAvailable = false
     var failNextPage = false
+    private var suspended: CheckedContinuation<Void, Never>?
+    private(set) var inputs: [HomeDiscoveryInput] = []
     private(set) var requestedPages: [Int] = []
-    var hasGlobalContinuation: Bool { !pageLoaded }
+    private(set) var shelfRequests: [String] = []
+    var hasWebEnhancement: Bool { enabled }
+    var hasGlobalContinuation: Bool { enabled && globalPageAvailable }
+    func hasContinuation(for sectionID: String) -> Bool { enabled && sectionID == "web-success" }
 
     func fetch(for input: HomeDiscoveryInput) async -> HomeFetchResult {
-        .baseline(scope: input.scope, sections: [shelf("shelf-a", ["one"])])
+        inputs.append(input)
+        guard case .account(let channelID) = input.scope else { return .baseline(scope: input.scope, sections: []) }
+        if channelID == suspendChannel {
+            // Intentionally ignores task cancellation to test publication guards.
+            await withCheckedContinuation { suspended = $0 }
+        }
+        let baseline = HomeFetchResult.baseline(scope: input.scope, sections: []).baselineSnapshot
+        if let failure {
+            return HomeFetchResult(baselineSnapshot: baseline, webSnapshot: nil,
+                webCapability: .unavailable(reason: failure.rawValue),
+                failures: [HomeFetchFailure(layer: .web, code: failure, message: failure.rawValue)],
+                cacheDirectives: .preserveAll)
+        }
+        return HomeFetchResult(baselineSnapshot: baseline,
+            webSnapshot: accountSnapshot(channelID: responseChannel ?? channelID),
+            webCapability: .available(accountChannelID: channelID), failures: [],
+            cacheDirectives: HomeCacheDirectives(storeBaseline: false, storeWeb: true))
     }
 
     func more(page: Int, input: HomeDiscoveryInput) async -> [HomeSection] {
         requestedPages.append(page)
-        if failNextPage {
-            failNextPage = false
-            return []
-        }
-        pageLoaded = true
-        return [shelf("shelf-a", ["one", "two"]),
-                shelf("shelf-b", ["three"])]
+        if failNextPage { failNextPage = false; return [] }
+        guard case .account(let channelID) = input.scope else { return [] }
+        globalPageAvailable = false
+        return [accountShelf("web-success", videos: ["one", "two"], channelID: channelID),
+                accountShelf("web-second", videos: ["three"], channelID: channelID)]
     }
 
-    private func shelf(_ id: String, _ videoIDs: [String]) -> HomeSection {
-        HomeSection(id: id, title: id, kind: .youTubeCarousel,
-                    items: videoIDs.map { videoID in
-                        .youTube(YouTubeDiscoveryCard(
-                            id: "video:\(videoID)", title: videoID,
-                            browseEndpoint: nil,
-                            playEndpoint: HomeCardEndpoint(
-                                kind: .video, identifier: videoID),
-                            availability: .available))
-                    }, source: .publicDiscovery)
-    }
-}
-
-@MainActor
-private final class EmptyFailureHomeProvider: HomeDiscoveryProvider {
-    var failed = true
-    func fetch(for input: HomeDiscoveryInput) async -> HomeFetchResult {
-        .baseline(scope: input.scope, sections: [], failures: failed
-                  ? [HomeFetchFailure(layer: .baseline, code: .offline, message: "Offline")]
-                  : [])
-    }
-    func more(page: Int, input: HomeDiscoveryInput) async -> [HomeSection] { [] }
-}
-
-@MainActor
-private final class StubHomeProvider: HomeDiscoveryProvider {
-    let result: [HomeSection]
-    let isWeb: Bool
-    let webFailure: HomeFetchFailure?
-    var hasWebEnhancement: Bool { isWeb }
-
-    init(sections: [HomeSection]) {
-        self.result = sections
-        self.isWeb = false
-        self.webFailure = nil
+    func more(sectionID: String, input: HomeDiscoveryInput) async -> [DiscoveryItem] {
+        shelfRequests.append(sectionID)
+        return [accountCard("one"), accountCard("two")]
     }
 
-    init(webSections: [HomeSection]) {
-        self.result = webSections
-        self.isWeb = true
-        self.webFailure = nil
+    func awaitSuspension() async throws {
+        for _ in 0..<100 where suspended == nil { try await Task.sleep(for: .milliseconds(10)) }
+        try #require(suspended != nil)
     }
 
-    init(webFailure: HomeFetchFailure) {
-        self.result = []
-        self.isWeb = true
-        self.webFailure = webFailure
-    }
-
-    func fetch(for input: HomeDiscoveryInput) async -> HomeFetchResult {
-        guard isWeb else {
-            return .baseline(scope: input.scope, sections: result)
-        }
-        let baseline = HomeFetchResult.baseline(scope: input.scope, sections: [])
-            .baselineSnapshot
-        if let webFailure {
-            return HomeFetchResult(
-                baselineSnapshot: baseline,
-                webSnapshot: nil,
-                webCapability: .unavailable(reason: webFailure.message),
-                failures: [webFailure],
-                cacheDirectives: .preserveAll)
-        }
-        let now = Date()
-        let webSnapshot = HomeSnapshot(
-            scope: input.scope,
-            sections: result,
-            fetchedAt: now,
-            expiresAt: now.addingTimeInterval(HomeFeedCache.webFreshWindow))
-        return HomeFetchResult(
-            baselineSnapshot: baseline,
-            webSnapshot: webSnapshot,
-            webCapability: .available(accountChannelID: input.scope.accountChannelID),
-            failures: [],
-            cacheDirectives: HomeCacheDirectives(storeBaseline: false, storeWeb: true))
+    func finishSuspended() {
+        let continuation = suspended
+        suspended = nil
+        suspendChannel = nil
+        continuation?.resume()
     }
 }
 
-@MainActor
-private final class ScopeRecordingHomeProvider: HomeDiscoveryProvider {
-    private(set) var inputs: [HomeDiscoveryInput] = []
-    let delayedScope: HomeFeedScope?
-
-    init(delayedScope: HomeFeedScope? = nil) {
-        self.delayedScope = delayedScope
-    }
-
-    func fetch(for input: HomeDiscoveryInput) async -> HomeFetchResult {
-        inputs.append(input)
-        if input.scope == delayedScope {
-            // Deliberately ignore cancellation to emulate an uncooperative
-            // transport whose old account payload arrives after a switch.
-            await Task.detached {
-                try? await Task.sleep(for: .milliseconds(150))
-            }.value
-        }
-        let accountID: String?
-        switch input.scope {
-        case .guest: accountID = nil
-        case .account(let value): accountID = value
-        }
-        return .baseline(scope: input.scope, sections: [HomeSection(
-            id: "scope", title: "Scope", kind: .youTubeCarousel, items: [],
-            source: accountID == nil ? .publicDiscovery : .officialAccount,
-            accountChannelID: accountID)])
-    }
+private func accountCard(_ id: String) -> DiscoveryItem {
+    .youTube(YouTubeDiscoveryCard(id: "video:\(id)", title: id, browseEndpoint: nil,
+        playEndpoint: HomeCardEndpoint(kind: .video, identifier: id), availability: .available))
 }
 
-@MainActor
-private final class SuccessfulThenFailedWebProvider: HomeDiscoveryProvider {
-    private(set) var fetchCount = 0
-    let hasWebEnhancement = true
-
-    func fetch(for input: HomeDiscoveryInput) async -> HomeFetchResult {
-        fetchCount += 1
-        let baseline = HomeFetchResult.baseline(
-            scope: input.scope,
-            sections: [HomeSection(
-                id: "baseline", title: "Baseline", kind: .youTubeCarousel,
-                items: [], source: .publicDiscovery)])
-        guard fetchCount == 1,
-              case .account(let channelID) = input.scope else {
-            return HomeFetchResult(
-                baselineSnapshot: baseline.baselineSnapshot,
-                webSnapshot: nil,
-                webCapability: .unavailable(reason: "offline"),
-                failures: [HomeFetchFailure(
-                    layer: .web, code: .offline, message: "offline")],
-                cacheDirectives: HomeCacheDirectives(
-                    storeBaseline: true, storeWeb: false))
-        }
-        let now = Date()
-        let web = HomeSnapshot(
-            scope: input.scope,
-            sections: [HomeSection(
-                id: "web-success", title: "Web", kind: .quickPicks,
-                items: [], source: .signedInWeb, accountChannelID: channelID)],
-            fetchedAt: now,
-            expiresAt: now.addingTimeInterval(HomeFeedCache.webFreshWindow))
-        return HomeFetchResult(
-            baselineSnapshot: baseline.baselineSnapshot,
-            webSnapshot: web,
-            webCapability: .available(accountChannelID: channelID),
-            failures: [],
-            cacheDirectives: HomeCacheDirectives(storeBaseline: true, storeWeb: true))
-    }
+private func accountShelf(_ id: String, videos: [String], channelID: String) -> HomeSection {
+    HomeSection(id: id, title: id, kind: .quickPicks, items: videos.map(accountCard),
+                source: .signedInWeb, accountChannelID: channelID)
 }
 
-@MainActor
-private final class DeduplicatingHomeProvider: HomeDiscoveryProvider {
-    let hasWebEnhancement = true
-
-    func fetch(for input: HomeDiscoveryInput) async -> HomeFetchResult {
-        let now = Date()
-        let baseline = HomeSnapshot(
-            scope: input.scope,
-            sections: [HomeSection(
-                id: "baseline", title: "Baseline", kind: .youTubeCarousel,
-                items: [
-                    .youTube(YouTubeDiscoveryCard(id: "duplicate", title: "Duplicate")),
-                    .youTube(YouTubeDiscoveryCard(id: "baseline-only", title: "Only"))
-                ], source: .publicDiscovery)],
-            fetchedAt: now,
-            expiresAt: now.addingTimeInterval(HomeFeedCache.baselineFreshWindow))
-        let web = HomeSnapshot(
-            scope: input.scope,
-            sections: [HomeSection(
-                id: "web", title: "Web", kind: .quickPicks,
-                items: [.youTube(YouTubeDiscoveryCard(
-                    id: "video:duplicate", title: "Duplicate Web",
-                    browseEndpoint: nil,
-                    playEndpoint: HomeCardEndpoint(kind: .video, identifier: "duplicate"),
-                    availability: .available))],
-                source: .signedInWeb,
-                accountChannelID: input.scope.accountChannelID)],
-            fetchedAt: now,
-            expiresAt: now.addingTimeInterval(HomeFeedCache.webFreshWindow))
-        return HomeFetchResult(
-            baselineSnapshot: baseline,
-            webSnapshot: web,
-            webCapability: .available(accountChannelID: input.scope.accountChannelID),
-            failures: [],
-            cacheDirectives: HomeCacheDirectives(storeBaseline: true, storeWeb: true))
-    }
-}
-
-private extension HomeFeedScope {
-    var accountChannelID: String {
-        if case .account(let channelID) = self { return channelID }
-        return ""
-    }
+private func accountSnapshot(channelID: String, age: TimeInterval = 0) -> HomeSnapshot {
+    let now = Date().addingTimeInterval(-age)
+    return HomeSnapshot(scope: .account(channelID: channelID),
+        sections: [accountShelf("web-success", videos: ["one"], channelID: channelID)],
+        fetchedAt: now, expiresAt: now.addingTimeInterval(HomeFeedCache.webFreshWindow))
 }

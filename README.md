@@ -10,6 +10,7 @@
 ## Listen your way
 
 - Browse Home, songs, albums, artists, music videos and playlists.
+- Choose Muses recommendations from your library, or recommendations from your own YouTube Music account with separate browser consent.
 - Keep favorites, pins and listening history together in your library.
 - Play from a queue that remembers your collection, with separate **Up Next**, repeat, shuffle and Smart Shuffle.
 - Open **Now Playing** for cover or vinyl artwork and available lyrics, or watch a video on demand.

@@ -7,7 +7,7 @@ title: Development
 
 Muses is a Swift 6 package with a standard SwiftPM layout, built with SwiftUI, SwiftData, AVFoundation, and Swift Testing. Target platform is macOS 26+, with the latest macOS release prioritized for UI validation.
 
-Home is a mode-switched product boundary. The default Muses provider ranks local library snapshots on-device. The YouTube Music provider uses anonymous Innertube as its baseline and may layer an explicitly authorized, account-matched Web response from the isolated helper. Neither network path receives Muses listening signals.
+Home has exactly two recommendation sources. The default Muses provider ranks YouTube-backed library snapshots on-device. Account mode presents genuine YouTube Music recommendations through the separately consented, channel-matched one-shot Web Home helper. Its network requests receive no Muses listening signals. A failed account request retains only that account's validated saved response or presents connection, consent or recovery state; switching to Muses is an explicit choice. Anonymous Home discovery and automatic subscription-title search/RD-mix recommendation rails are retired. Explicit YouTube Search, catalog browsing and Smart Shuffle remain supported.
 
 ## Project layout
 
@@ -23,7 +23,7 @@ Muses/
 │   └── MusesWebHomeProtocol/      # Versioned stdin/stdout IPC contract
 ├── Tests/MusesTests/              # Swift Testing suites (+ Fixtures/)
 ├── Scripts/                       # Packaging, DMG, icon, yt-dlp bootstrap
-└── docs/                          # User docs (also powers GitHub Pages)
+└── docs/                          # macOS user and engineering documentation
 ```
 
 ## Build & test
@@ -32,7 +32,7 @@ Muses/
 ./Scripts/copy-ytdlp.sh          # fetch yt-dlp into Sources/Muses/Resources (git-ignored)
 swift build                      # debug build
 make test                        # full suite: swift test --no-parallel
-swift test --filter InnertubeHome # focused parser/request/privacy suite
+swift test --filter Home          # recommendation/source/cache retirement suites
 swift test --filter WebHome       # focused signed-in helper suite
 make app                         # assemble build/Muses.app
 make app MUSES_SIGN_IDENTITY="Apple Development: you (TEAMID)"
@@ -53,8 +53,9 @@ They are never committed, never logged, and are not present unless you inject th
 - Source code, identifiers, and comments are English; user-visible strings go through `tr(_ en:, _ zhHans:)`.
 - Comments explain intent and invariants; no phase-number prefixes, no store-generation "V" labels in naming.
 - Engineering, UX, privacy, and verification rules live in [AGENTS.md](../AGENTS.md) — read it before changing playback, queue, persistence, packaging, or the signed-in Home boundary.
-- Keep Home providers behind `HomeDiscoveryProvider`. Muses and YouTube Music caches are mode-partitioned; guest and account scopes remain physically separate inside each mode.
-- The anonymous Innertube request must never contain cookies, authorization headers or locally derived recommendation signals. Continuation tokens stay in memory and are not encoded into saved snapshots.
+- Keep Home providers behind `HomeDiscoveryProvider`. Muses baseline caches and account Web caches are mode-partitioned; guest and account scopes remain physically separate. Account mode never reads a guest or anonymous baseline.
+- Reject retired anonymous, unknown or missing-source Home snapshots rather than relabeling them as Muses or account content. Cache retirement touches only app-owned anonymous Home cache paths and preserves account Web caches, library/import truth and existing consent.
+- The account helper requires dedicated browser consent and an exact connected OAuth channel match. Continuation tokens stay in memory and are not encoded into saved snapshots. Public Search/catalog metadata and Smart Shuffle use their separate existing boundaries.
 
 ## Release runbook
 
@@ -90,7 +91,8 @@ MUSES_VERSION="$release_version" ./Scripts/publish-update.sh
 - [ ] `make test` green
 - [ ] `codesign --verify --deep --strict` on the app and the bundled helper
 - [ ] Helper present at `Contents/Helpers/MusesWebHomeHelper`, mode 0700, same-signature chain
-- [ ] Fresh install defaults to Muses mode; helper never launches without signed-in Home consent
+- [ ] Home exposes only Muses and account sources; fresh install defaults to Muses, and the helper never launches without signed-in Home consent
+- [ ] Signed-out/disabled/failed account Home makes no anonymous request and never displays retired anonymous cache content
 - [ ] Sensitive-material audit: no cookies/SAPISIDHASH/continuation tokens in logs, SwiftData, or caches
 - [ ] App ZIP and DMG both accepted by Apple, stapled, and accepted by Gatekeeper after extraction or mounting
 
@@ -101,8 +103,6 @@ MUSES_VERSION="$release_version" ./Scripts/publish-update.sh
 - **Keychain prompts repeat** — re-signing with a *different* certificate invalidates keychain ACLs; keep the identity stable and click "Always Allow" once.
 
 ## GitHub Pages
-
-`docs/` doubles as the site source (Jekyll). Set the repository Pages source to *Deploy from branch → `main` → `/docs`* to publish it.
 
 The family landing page, shared styles, screenshots and Pages workflow now live in [Project-Muses](https://github.com/xiaotwu/Project-Muses). Only that repository deploys Pages. Keep the accessible screenshot tour aligned with the shipped Mac app. macOS source, tests, packaging and technical documentation remain here.
 
