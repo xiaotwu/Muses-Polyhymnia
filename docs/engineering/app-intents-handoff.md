@@ -1,5 +1,9 @@
 # In-process App Intent handoff
 
+October 13 post-release update: the user-authorized installed 0.6.0 inspection accepted the original four-step compound window/Quick Search/Now Playing keyboard path, real provider preview and floating-video sheet focus. Cold Play exposed XW-90 (audio starts without the main window); docked video exposed XW-92 (background key monitor consumes native sheet input). The older Remaining list is historical: these two repairs/retests, other unexamined states, manual Siri/Shortcuts, actual macOS 26 and full VoiceOver/device conditions remain. See [formal-app inspection](post-release-formal-inspection.md) for actual process/window, framework, restoration and data evidence.
+
+The subsequent source `7481961` signed isolated candidate accepts the XW-90 cold Play/main-window and XW-92 docked sheet keyboard repair cells. Passive metadata proves the new main window before Cua; actual playback/Pause and native sheet/video/chapter/comment close boundaries pass. The initial candidate indexing error is retained, followed by normal setup/quit and one successful stopped-target request. Other presentation, manual Siri/Shortcuts, actual macOS 26 and full VoiceOver/device cells remain unaccepted; current GitHub integration follows the status report.
+
 2026-10-10 source repair of XW-86 under XW-75. The two existing actions now submit to the running application's shared services instead of returning an `OpenURLIntent` containing a custom `muses://` URL. Apple's [initializer contract](https://developer.apple.com/documentation/appintents/openurlintent/init(_:)) requires a universal link. This repair removes that API mismatch without adopting a new website or URL scheme.
 
 ## Implementation

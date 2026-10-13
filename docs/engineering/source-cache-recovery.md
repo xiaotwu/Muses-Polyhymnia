@@ -1,5 +1,7 @@
 # Web cache recovery after privacy deletion
 
+> Superseded on 2026-10-13: the user retired anonymous Public Home discovery. Its loading/cache/Retry observations below are historical evidence and no longer define an active feature or remaining acceptance requirement. Home now offers Muses recommendations and genuine, separately consented account recommendations; explicit Search/catalog evidence remains separately scoped.
+
 2026-10-08 continuation of XW-73, tracked as XW-81. This is a source/cache follow-up to [the earlier CI repair](source-ci-regression.md), not an extension of [Personalized Home native acceptance](source-state-acceptance.md). No GUI, OAuth, browser cookies or helper fetch was used.
 
 ## Confirmed failure

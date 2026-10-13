@@ -1,5 +1,9 @@
 # Discovery and catalog source-state acceptance
 
+> Superseded on 2026-10-13: the user retired anonymous Public Home discovery. Its loading/cache/Retry observations below are historical evidence and no longer define an active feature or remaining acceptance requirement. Home now offers Muses recommendations and genuine, separately consented account recommendations; explicit Search/catalog evidence remains separately scoped.
+
+October 13 product retirement: anonymous public Home and automatic public recommendation rails are superseded by the user's Muses/account-only decision in XW-91. Their observations below remain historical evidence; public Home manual Retry is retired, not accepted. Explicit Search/catalog, existing cancellation repairs, genuine account/privacy boundaries and separately untested matrix cells remain. See [post-release formal inspection](post-release-formal-inspection.md).
+
 2026-10-08 execution of XW-73 under [feature acceptance](feature-acceptance.md) and [execution coordination](execution-coordination.md). Two confirmed defects were repaired as XW-76 and XW-77. The observations below complete the currently reachable native source-state scope; XW-73 remains In Review and XW-19 remains open for the explicitly unexecuted conditions.
 
 October 11 follow-up: [native library catalog acceptance](library-catalog-acceptance.md) now accepts one real 24-track import, nonempty Albums/detail/normal refresh/Back and Artists overview. The older empty-library observations and unexecuted conditions below retain their October 8 scope; the later report supplies the newly accepted nonempty cell without extending error-Retry, artist-detail, playback or platform coverage.
