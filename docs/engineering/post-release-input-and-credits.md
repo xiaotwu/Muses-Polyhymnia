@@ -16,7 +16,7 @@ runner 产品、注册和容器已清理；完整 result 归档及 SHA、前后�
 
 这十三个有限条件的稳定画面均未复现侧栏持续显示；真实歌词分栏也未显示侧栏。AX 在 opacity 为零时仍可列出导航控件，不能拿 AX 存在作为可见性证据。Focus Navigation 尝试未取得 activation-control 焦点，定点滚轮也未建立真实 hover，因此这两项不接受为焦点/hover 验收。尚未覆盖紧凑尺寸、其它外观、物理 hover 和 300ms 退出过渡内的快速重开，不能据此关闭用户的间歇报告。
 
-源码确认所有 PlayerBar 封面入口共用 `openNowPlaying`，没有某页保留侧栏的分支。独立审阅指出 hover/focus 重置依赖侧栏 `onAppear`，快速关闭/重开时的复用是后续假设，尚未证明根因。XW-96 Backlog 保留报告、阴性范围和这些具体排查条件。
+源码确认所有 PlayerBar 封面入口共用 `openNowPlaying`，没有某页保留侧栏的分支。独立审阅指出 hover/focus 重置依赖侧栏 `onAppear`，快速关闭/重开时的复用是后续假设，尚未证明根因。该检查点 XW-96 为 Backlog；后续已转 In Progress，新增 Dark 实际 840×804pt 后台侧栏检查、完整数据恢复及剩余前提见 [导航验收](now-playing-navigation-acceptance.md)。本页下表保留当时方案，最新范围以接续记录为准。
 
 后续 XW-96 单元按以下顺序执行；本表是待验方案，不新增通过结论。每个单元记录实际窗口尺寸、起始页面、指针/焦点位置及暂停上下文；菜单或输入未取得目标状态时记为条件未建立。
 
