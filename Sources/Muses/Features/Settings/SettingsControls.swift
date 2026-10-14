@@ -43,6 +43,14 @@ struct SettingsInfoButton: View {
         .buttonStyle(.fullAreaPlain)
         .help(message)
         .accessibilityLabel(tr("About \(title)", "关于\(title)"))
+        // Keyboard activation can leave focus on the originating button.
+        .onKeyPress(.escape, phases: .down) { keyPress in
+            guard presented,
+                  keyPress.modifiers.intersection([.command, .control, .option, .shift]).isEmpty
+            else { return .ignored }
+            presented = false
+            return .handled
+        }
         .popover(isPresented: $presented) {
             VStack(alignment: .leading, spacing: 8) {
                 Text(title).font(MusesTypography.headline)
@@ -50,6 +58,7 @@ struct SettingsInfoButton: View {
             }
             .padding(16)
             .frame(width: 310, alignment: .leading)
+            .onExitCommand(perform: presented ? { presented = false } : nil)
         }
     }
 }

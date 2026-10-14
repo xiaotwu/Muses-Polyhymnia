@@ -1,6 +1,8 @@
 # 技术工作索引与对话归并
 
-2026-10-14 新范围：[导入署名与封面呈现](credits-and-cover-followup.md)（XW-97/98）正在推进：修复失去旧 owner 来源后的错误艺人署名，调整歌曲/歌单焦点卡 3:4、多推荐 Muses 聚焦横栏和封面分辨率选档。实现与验证尚未完成，正式应用和资料尚未修改。
+2026-10-14，[导入署名与封面呈现](credits-and-cover-followup.md)（XW-97/98）已完成并为 **Done**：旧 owner 署名的显式预览/可恢复修复/撤销，歌曲与歌单 3:4 焦点卡、多张 Muses 聚焦横栏和封面分辨率选择均通过限定本机/隔离原生验收。[PR #6](https://github.com/xiaotwu/Muses-Polyhymnia/pull/6) 已合并，精确 PR 与 main CI 全阶段通过；正式 0.6.0 未替换，正常资料未应用修复。
+
+2026-10-14 最新验收：[未保存歌曲信息草稿与外部歌词 Intent 交接](edit-draft-intent-acceptance.md) 已接受限定小节；同一草稿保留、Cancel 后原 query、Tab/Escape、完整框架 Passed 1/0/exit0 及正常资料保护均按报告核对。XW-75 继续 In Review，其余系统/设备与未测呈现条件未关闭。XW-71 的四个 Help disclosure 已在本轮单独授权的临时 Keyboard navigation 2 下通过 Tab/Space。[XW-99 信息弹窗 Escape](settings-info-escape-acceptance.md) 的 `8560bab` 窄修复已本机 Release、独立源码审阅及限定原生复验通过，原焦点保留、继续 Tab、点击打开和人类文本选中 Escape 按实际范围接受；完整数据/偏好与自有清理独立复审通过，远端 CI/PR 集成仍待完成。系统已在 UI 恢复 0 并读回，自有候选和 System Settings 正常退出。最新本机检查点 25 项开放（19 In Review、6 In Progress），其中唯一 Bug 标签仍为 XW-99；XW-99 已转 In Review 待远端验证，XW-71 继续 In Review，详见 [当前状态](current-status.md)。
 
 2026-10-14 最新入口：[XW-96 导航验收](now-playing-navigation-acceptance.md) 按用户的人类实际操作判断收尾为 **Done**，转向其他主要问题。真实hover修复、普通重开、紧凑纯文本滚动及授权临时模式2的原生焦点路径按范围接受，系统已恢复0及General页面；严格小于300ms输入计时仍未验证，不再阻断后续工作，不扩展为完整设备/VoiceOver矩阵通过。
 
@@ -12,14 +14,14 @@
 
 2026-10-13历史检查点：释放桌面后的 [XW-96 输入诊断](now-playing-navigation-acceptance.md#接续释放桌面后的输入诊断) 已完成：driver 只 warp 光标，真实 hover 尚未成立；当前系统键盘导航关闭，按钮焦点未取得。人工指针/菜单核验已准备，自动化输入暂停，正常 Muses 留在 Now Playing；最终表面/指针/前台恢复待人工小节结束。当前资料/偏好检查点保持，未改源码，XW-96 仍 In Progress。
 
-最新结果和接续条件见 [当前状态](current-status.md)。XW-83/84/85/86/87/88/89 已完成；XW-84 的 [原生错误、草稿及 Apply 重试](pull-native-recovery.md)，以及 XW-75 歌词冷启动和 XW-89 [播放位置保护](cold-start-recovery.md) 均已接受。2026-10-12发布前检查点的执行源码为 `8877bee`。`8877bee` 的 [完整 macOS CI 38217251194](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38217251194) 全阶段通过：常规运行报告 901 项测试、123 个套件（51.299 秒，包含 opt-in 跳过项），独立磁盘恢复用例另以 1 项/1 套件通过（0.112 秒）；8 项发布配置检查、App Intents 元数据、预览打包和上传均通过。 该发布前检查点的 Linear 有24项开放（18项In Review、6项In Progress），包含父任务与协调项；Bug标签开放为零只属于该历史检查点，当前XW-96为In Progress / Bug。[0.6.0 已发布](https://github.com/xiaotwu/Muses-Polyhymnia/releases/tag/v0.6.0)：`ec6d0ec` 的完整 CI、正式签名公证、资产与自动更新源远端核验均通过，详见 [发布记录](release-0.6.0.md)。剩余 24 项安排到发布后，优先 XW-75 原串行键盘路径及其余具体呈现状态。完整产品矩阵尚未全部通过。
+最新结果和接续条件见 [当前状态](current-status.md)。XW-83/84/85/86/87/88/89 已完成；XW-84 的 [原生错误、草稿及 Apply 重试](pull-native-recovery.md)，以及 XW-75 歌词冷启动和 XW-89 [播放位置保护](cold-start-recovery.md) 均已接受。2026-10-12发布前检查点的执行源码为 `8877bee`。`8877bee` 的 [完整 macOS CI 38217251194](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38217251194) 全阶段通过：常规运行报告 901 项测试、123 个套件（51.299 秒，包含 opt-in 跳过项），独立磁盘恢复用例另以 1 项/1 套件通过（0.112 秒）；8 项发布配置检查、App Intents 元数据、预览打包和上传均通过。 该发布前检查点的 Linear 有24项开放（18项In Review、6项In Progress），包含父任务与协调项；Bug标签开放为零只属于该历史检查点；后来 XW-96 曾转为 In Progress / Bug，现已按用户验收决定 Done。[0.6.0 已发布](https://github.com/xiaotwu/Muses-Polyhymnia/releases/tag/v0.6.0)：`ec6d0ec` 的完整 CI、正式签名公证、资产与自动更新源远端核验均通过，详见 [发布记录](release-0.6.0.md)。剩余 24 项安排到发布后，优先 XW-75 原串行键盘路径及其余具体呈现状态。完整产品矩阵尚未全部通过。
 
 本目录将仍有效的结论分为三类，并由 Linear 管理执行状态：
 
 | 分类 | 技术文档 | 执行任务 |
 | --- | --- | --- |
-| 已证实的缺陷与修复 | [修复任务](repairs.md)、[来源修复](source-state-acceptance.md)、[CI 回归](source-ci-regression.md)、[缓存恢复](source-cache-recovery.md)、[重试/Pull/刷新/标签](remaining-review-fixes.md)、[App Intents](app-intents-handoff.md)、[图库歌词](gallery-lyrics-acceptance.md)、[普通歌单](ordinary-playlist-metadata.md)、[真实磁盘恢复](pull-disk-recovery.md)、[Pull 原生恢复](pull-native-recovery.md)、[冷启动与位置恢复](cold-start-recovery.md) | 新修复及证据以 [当前状态](current-status.md) 为准；XW-84/89 已完成 |
-| 功能实现与补充验收 | [功能及验收](feature-acceptance.md)、[草稿/历史跟进](playlist-flow-followup.md)、[非空目录验收](library-catalog-acceptance.md) | XW-79 已完成；XW-73 已补齐 24 首真实专辑的非空目录/正常刷新小节，XW-71、XW-72、XW-73、XW-75、XW-62 与既有阶段任务保留各自剩余条件 |
+| 已证实的缺陷与修复 | [修复任务](repairs.md)、[来源修复](source-state-acceptance.md)、[CI 回归](source-ci-regression.md)、[缓存恢复](source-cache-recovery.md)、[重试/Pull/刷新/标签](remaining-review-fixes.md)、[App Intents](app-intents-handoff.md)、[图库歌词](gallery-lyrics-acceptance.md)、[普通歌单](ordinary-playlist-metadata.md)、[真实磁盘恢复](pull-disk-recovery.md)、[Pull 原生恢复](pull-native-recovery.md)、[冷启动与位置恢复](cold-start-recovery.md)、[信息弹窗 Escape](settings-info-escape-acceptance.md) | 新修复及证据以 [当前状态](current-status.md) 为准；XW-84/89 已完成，XW-99 已本机修复/限定复验，最终保护与清理审查通过，待远端 CI/集成 |
+| 功能实现与补充验收 | [功能及验收](feature-acceptance.md)、[草稿/历史跟进](playlist-flow-followup.md)、[非空目录验收](library-catalog-acceptance.md)、[Edit Info 草稿与 Intent](edit-draft-intent-acceptance.md) | XW-79 已完成；XW-73 已补齐 24 首真实专辑的非空目录/正常刷新小节，XW-75 已接受本轮 Title 草稿交接；XW-71/99、XW-72、XW-73、XW-75、XW-62 与既有阶段任务保留各自剩余条件 |
 | 性能与优化调查 | [优化项](performance.md) | XW-74；无证据的排查候选不直接变成重构任务 |
 
 判断顺序：当前用户决定和批准规格 → 当前源码 → 实际运行 → 测试 → 历史记录。历史对话不能恢复已淘汰产品方向；测试通过不能替代原生界面验收。总体 UI 验收仍使用 [64 区域对照表](../ui-ux-acceptance-reconciliation.md)，具体操作使用 [验收记录](../ui-ux-redesign-acceptance.md)。
@@ -72,6 +74,6 @@
 
 ## 授权与验收边界
 
-早期验收使用隔离的 `com.muses.acceptance.*` 实例；2026-10-13 用户另行授权正式版实际操作，其范围、前后库审计和恢复见 [正式版检查](post-release-formal-inspection.md)。源码修复后的候选继续隔离验证；早期歌单操作限于 `test`，后续补验另行限定为自有可丢弃的普通 Playlist。阶段性测试配置不构成永久产品或用户限制，接续范围以当前用户授权和具体任务为准。保留生产数据、Keychain、普通应用与正常构建。旧隔离验收不操作 Liked；本次正式版浏览原有 Liked 导入歌单但不改写它。不执行远端写入、权限扩张、输出设备或 OS 辅助功能/显示设置变化，也不安装到正常应用。完整 VoiceOver/显示矩阵、实际 macOS 26 原生运行、非空订阅账号与评论权限限制仍分别记录，不能由 macOS CI runner 或模拟数据代替。
+早期验收使用隔离的 `com.muses.acceptance.*` 实例；2026-10-13 用户另行授权正式版实际操作，其范围、前后库审计和恢复见 [正式版检查](post-release-formal-inspection.md)。源码修复后的候选继续隔离验证；早期歌单操作限于 `test`，后续补验另行限定为自有可丢弃的普通 Playlist。阶段性测试配置不构成永久产品或用户限制，接续范围以当前用户授权和具体任务为准。保留生产数据、Keychain、普通应用与正常构建。旧隔离验收不操作 Liked；后续授权浏览原有 Liked 导入歌单但不改写它。不执行远端写入、权限扩张、输出设备变化，也不安装到正常应用。OS 辅助功能/显示设置保持原有范围；2026-10-14 用户单独授权的本轮 Settings Keyboard navigation 0→2→0 已在 UI 恢复，不扩展为其他系统设置授权。完整 VoiceOver/显示矩阵、实际 macOS 26 原生运行、非空订阅账号与评论权限限制仍分别记录，不能由 macOS CI runner 或模拟数据代替。
 
 每轮保存具体源码、系统、窗口、数据及操作条件；恢复临时偏好后正常退出，核对原始数据/偏好和精确进程所有权，再清理自建构建与缓存。2026-10-12 用户已明确授权本次 0.6.0 打包与 GitHub 发布；这不等于安装到当前正常应用，也不关闭发布后的未验收条件。
