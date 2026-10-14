@@ -12,8 +12,8 @@
 | --- | --- | --- |
 | XW-71，父 XW-25 | Help/按钮遍历、信息弹窗原按钮焦点返回，以及完整 OS/VoiceOver 矩阵；十类分类/历史、字体指针与 Up/Down/Return/取消、样本及语言/字号恢复已经接受 | 当前系统键盘模式 0；不通过修改 OS 设置或全局焦点机制制造通过结果 |
 | XW-72，父 XW-25 | 物理控件交接/完整焦点、真实未同步歌词、系统 Dark 菜单栏及其余外部矩阵；生命周期/Pin/快捷键、共享音量及真实同步桌面歌词已经接受 | 保持同一 PlaybackService。两首既有 test 录音的有界只读查找未找到真实未同步文档，不剥除时间戳或扩大整库查询 |
-| XW-73，父 XW-19 | 自然出现的真实公开来源失败后指针 Retry 恢复、当前候选成功身份匹配的 Web Home及其余来源/平台矩阵；非空 Library Albums/详情/正常刷新/Back 与 Artists 概览已补验 | [24 首真实来源导入与目录验收](library-catalog-acceptance.md) 保留稳定身份和原库真值；不把正常刷新当作错误 Retry 或完整 loading/外观矩阵 |
-| XW-75，父 XW-25，In Review | 已有 App Intents 包装元数据与现有授权下的原生调用；播放使用 `test` 项目，歌词使用真实搜索 | XW-86 已修复共享进程内交接；精确 bundle 的真实 AppIntentsTesting 证据见交接报告。停止目标的歌词 Intent 冷启动已通过；冷态 Play、手动 Siri 和其它系统矩阵分别记录 |
+| XW-73，父 XW-19 | 当前候选成功身份匹配的 Web Home及其余来源/平台矩阵；非空 Library Albums/详情/正常刷新/Back 与 Artists 概览已补验 | 公共 Home 与其错误 Retry 条件已退休。[24 首真实来源导入与目录验收](library-catalog-acceptance.md) 保留稳定身份和原库真值；不把正常刷新当作错误 Retry 或完整 loading/外观矩阵 |
+| XW-75，父 XW-25，In Review | 冷态歌词、完整串行窗口/键盘、真实歌词预览/浮窗弹窗、修复后的冷态 Play 和主窗视频弹窗已按限定范围通过；继续其它未测呈现状态、手动 Siri/Shortcuts 和系统/设备矩阵 | 精确 bundle 的真实 AppIntentsTesting 证据见 [交接报告](app-intents-handoff.md) 与 [正式版检查](post-release-formal-inspection.md)；不将框架调用当作手动 Siri 或 macOS 26 图形验收 |
 
 每个任务记录实际源码、系统、窗口、数据来源、指针/键盘/菜单结果和残留边界。新发现的可复现缺陷单列子任务，维持小范围修复。已有 XW-17/15/8/18 等阶段任务保持 In Review，协调任务保持未完成，直到对应验收门槛满足。
 
