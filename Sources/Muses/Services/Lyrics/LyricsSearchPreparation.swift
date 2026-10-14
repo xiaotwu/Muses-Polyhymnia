@@ -59,10 +59,10 @@ struct LyricsPreparedRecording: Sendable {
 @Observable
 final class LyricsSearchPreparation {
     var titleQuery = "" {
-        didSet { fieldEdited() }
+        didSet { if titleQuery != oldValue { fieldEdited() } }
     }
     var artistQuery = "" {
-        didSet { fieldEdited() }
+        didSet { if artistQuery != oldValue { fieldEdited() } }
     }
     private(set) var displayTitle = ""
     private(set) var displayArtist = ""

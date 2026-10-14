@@ -354,6 +354,81 @@ struct LyricsSearchPreparationTests {
         #expect(await fixture.cache.read(key: LyricsDocumentIdentity.key(for: query)) == nil)
     }
 
+    @Test("same-value field writebacks preserve default preparation and submitted search readiness",
+          arguments: LyricsWritebackPhase.allCases, LyricsWritebackField.allCases)
+    func sameValueWritebacksAreNotEdits(phase: LyricsWritebackPhase, field: LyricsWritebackField) async throws {
+        let bridge = LyricsPreparationBridge()
+        let fixture = try LyricsPreparationFixture(bridge: bridge)
+        defer { fixture.close() }
+        let track = fixture.track()
+        let preparation = LyricsSearchPreparation()
+        let initial = phase == .explicitPending ? "751013170405" : ""
+        let task = Task { await preparation.prepare(track: track, initialQuery: initial, using: fixture.lyrics) }
+        defer { task.cancel() }
+        try await bridge.waitForRequest(track.youTubeId)
+        if phase == .readyDefault || phase == .submittedDefault {
+            bridge.finish(track.youTubeId)
+            await task.value
+        }
+        if phase == .submittedDefault { #expect(preparation.submit()) }
+        let title = preparation.titleQuery
+        let artist = preparation.artistQuery
+        let wasReady = preparation.isReady
+        let revision = preparation.searchRevision
+        if field != .artist { preparation.titleQuery = title }
+        if field != .title { preparation.artistQuery = artist }
+        #expect(!preparation.hasUnsubmittedEdits)
+        #expect(preparation.isReady == wasReady)
+        #expect(preparation.searchRevision == revision)
+        if phase == .pendingDefault || phase == .explicitPending {
+            bridge.finish(track.youTubeId)
+            await task.value
+        }
+        #expect(preparation.isReady)
+        #expect(!preparation.hasUnsubmittedEdits)
+        #expect(preparation.titleQuery == (initial.isEmpty ? "Recording Song" : initial))
+        #expect(preparation.artistQuery == (initial.isEmpty ? "Performer" : ""))
+        let query = try #require(preparation.searchTrack(for: track))
+        let found = await fixture.lyrics.findCandidates(track: query, refresh: true, source: "lrclib")
+        if initial.isEmpty {
+            #expect(LyricsMatchPolicy.automatic(found, track: query)?.id == 901)
+            #expect(queryField("artist_name", in: try #require(LyricsPreparationProtocol.lyricRequests.first)) == "Performer")
+        } else {
+            #expect(queryField("track_name", in: try #require(LyricsPreparationProtocol.lyricRequests.first)) == initial)
+        }
+    }
+
+    @Test("editing a field and restoring its original text still protects an unsubmitted draft",
+          arguments: [false, true])
+    func realEditThenRevertStaysProtected(artistField: Bool) async throws {
+        let bridge = LyricsPreparationBridge()
+        let fixture = try LyricsPreparationFixture(bridge: bridge)
+        defer { fixture.close() }
+        let track = fixture.track()
+        let preparation = LyricsSearchPreparation()
+        let task = Task { await preparation.prepare(track: track, initialQuery: "", using: fixture.lyrics) }
+        defer { task.cancel() }
+        try await bridge.waitForRequest(track.youTubeId)
+        let title = preparation.titleQuery
+        let artist = preparation.artistQuery
+        if artistField {
+            preparation.artistQuery = "A real artist edit"
+            preparation.artistQuery = artist
+        } else {
+            preparation.titleQuery = "A real title edit"
+            preparation.titleQuery = title
+        }
+        bridge.finish(track.youTubeId)
+        await task.value
+        #expect(preparation.titleQuery == title && preparation.artistQuery == artist)
+        #expect(preparation.hasUnsubmittedEdits)
+        #expect(!preparation.isReady)
+        #expect(preparation.searchTrack(for: track) == nil)
+        #expect(LyricsPreparationProtocol.lyricRequests.isEmpty)
+        #expect(preparation.submit())
+        #expect(preparation.isReady && !preparation.hasUnsubmittedEdits)
+    }
+
     private var manualCandidate: LyricsCandidate {
         LyricsCandidate(id: 999, trackName: "Recording Song", artistName: "Performer", albumName: nil,
             duration: 180, instrumental: false, plainLyrics: "Manual choice", syncedLyrics: "[00:01]Manual choice")
@@ -362,6 +437,14 @@ struct LyricsSearchPreparationTests {
 
 enum LyricsDraftAction: String, CaseIterable, Sendable {
     case unsubmittedDraft, submitted, explicitIntent, sourceChange, restore
+}
+
+enum LyricsWritebackPhase: String, CaseIterable, Sendable {
+    case pendingDefault, readyDefault, submittedDefault, explicitPending
+}
+
+enum LyricsWritebackField: String, CaseIterable, Sendable {
+    case title, artist, both
 }
 
 @MainActor
