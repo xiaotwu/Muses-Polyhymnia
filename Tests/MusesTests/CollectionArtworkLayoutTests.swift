@@ -42,6 +42,7 @@ struct CollectionArtworkLayoutTests {
         for width: CGFloat in [320, 680, 980, 1_800] {
             let wall = CollectionDeckGeometry.wall(containerWidth: width)
             #expect(wall.columns >= 1)
+            #expect(wall.geometry.footerHeight == 86)
             let occupied = CGFloat(wall.columns) * wall.geometry.cardWidth + CGFloat(wall.columns - 1) * 24
             #expect(abs(occupied - width) < 0.01)
         }

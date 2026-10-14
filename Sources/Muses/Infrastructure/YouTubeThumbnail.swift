@@ -16,18 +16,33 @@ enum YouTubeThumbnail {
         URL(string: urlString(videoId: videoId))
     }
 
-    /// Upgrade display-only YouTube thumbnail requests; persisted artwork URLs stay stable.
+    /// Preserve maxres-first quality above 480 source pixels. Smaller requests
+    /// upgrade undersized default/MQ sources without changing stored URLs.
+    /// The caller accounts for display scale and fill cropping.
     static func displayCandidates(for url: URL, pixelSize: CGFloat) -> [URL] {
-        guard pixelSize > 480,
+        let tiers: [(name: String, width: CGFloat)] = [
+            ("default", 120), ("mqdefault", 320), ("hqdefault", 480),
+            ("sddefault", 640), ("maxresdefault", 1280)
+        ]
+        guard pixelSize.isFinite, pixelSize > 0,
               ["i.ytimg.com", "img.youtube.com"].contains(url.host?.lowercased() ?? ""),
               url.pathComponents.count == 4,
               ["vi", "vi_webp"].contains(url.pathComponents[1]),
-              ["default", "mqdefault", "hqdefault", "sddefault"].contains(url.deletingPathExtension().lastPathComponent)
+              let original = tiers.firstIndex(where: {
+                  $0.name == url.deletingPathExtension().lastPathComponent
+              })
         else { return [url] }
+        let preferred = pixelSize > 480 ? tiers.count - 1
+            : (tiers.firstIndex(where: { pixelSize <= $0.width }) ?? (tiers.count - 1))
+        guard preferred > original else { return [url] }
         let directory = url.deletingLastPathComponent()
         let ext = url.pathExtension
-        return [directory.appendingPathComponent("maxresdefault.\(ext)"),
-                directory.appendingPathComponent("sddefault.\(ext)"), url]
+        // Missing SD/maxres images fall back through available lower variants,
+        // ending at the exact original URL without changing the video identity.
+        let upgrades = stride(from: preferred, to: original, by: -1).map {
+            directory.appendingPathComponent("\(tiers[$0].name).\(ext)")
+        }
+        return (upgrades + [url])
             .reduce(into: [URL]()) { if !$0.contains($1) { $0.append($1) } }
     }
 

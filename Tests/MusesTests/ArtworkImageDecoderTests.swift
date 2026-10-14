@@ -90,6 +90,74 @@ struct ArtworkImageDecoderTests {
         #expect(YouTubeThumbnail.displayCandidates(for: catalog, pixelSize: 1240) == [catalog])
     }
 
+    @Test("Small thumbnail upgrades meet demand while larger requests preserve maxres-first quality")
+    func thumbnailResolutionTiersFollowPixelDemand() throws {
+        let cases: [(original: String, pixels: CGFloat, expected: [String])] = [
+            ("default", 80, ["default"]),
+            ("default", 120, ["default"]),
+            ("default", 121, ["mqdefault", "default"]),
+            ("default", 320, ["mqdefault", "default"]),
+            ("default", 321, ["hqdefault", "mqdefault", "default"]),
+            ("mqdefault", 320, ["mqdefault"]),
+            ("mqdefault", 480, ["hqdefault", "mqdefault"]),
+            ("mqdefault", 481, ["maxresdefault", "sddefault", "hqdefault", "mqdefault"]),
+            ("hqdefault", 480, ["hqdefault"]),
+            ("hqdefault", 481, ["maxresdefault", "sddefault", "hqdefault"]),
+            ("hqdefault", 640, ["maxresdefault", "sddefault", "hqdefault"]),
+            ("hqdefault", 641, ["maxresdefault", "sddefault", "hqdefault"]),
+            ("sddefault", 480, ["sddefault"]),
+            ("sddefault", 481, ["maxresdefault", "sddefault"]),
+            ("sddefault", 640, ["maxresdefault", "sddefault"]),
+            ("sddefault", 641, ["maxresdefault", "sddefault"]),
+            ("maxresdefault", 2400, ["maxresdefault"])
+        ]
+        for item in cases {
+            let url = try #require(URL(string: "https://i.ytimg.com/vi/example/\(item.original).jpg"))
+            let candidates = YouTubeThumbnail.displayCandidates(for: url, pixelSize: item.pixels)
+            #expect(candidates.map { $0.deletingPathExtension().lastPathComponent } == item.expected)
+            #expect(candidates.last == url)
+            #expect(Set(candidates).count == candidates.count)
+        }
+    }
+
+    @Test("160pt Retina square HQ covers preserve maxres-first quality and its fallback")
+    func thumbnailDemandIncludesRetinaFillCrop() throws {
+        let url = try #require(URL(string: "https://i.ytimg.com/vi/example/hqdefault.jpg"))
+        let cardSourceWidth: CGFloat = 160.0 * 16.0 / 9.0
+        #expect(YouTubeThumbnail.displayCandidates(for: url, pixelSize: cardSourceWidth) == [url])
+        #expect(cardSourceWidth * 2 > 480 && cardSourceWidth * 2 < 640)
+        #expect(YouTubeThumbnail.displayCandidates(for: url, pixelSize: cardSourceWidth * 2)
+            .map(\.lastPathComponent) == ["maxresdefault.jpg", "sddefault.jpg", "hqdefault.jpg"])
+        #expect(YouTubeThumbnail.displayCandidates(for: url, pixelSize: 620.0 * 16.0 / 9.0 * 2)
+            .map(\.lastPathComponent) == ["maxresdefault.jpg", "sddefault.jpg", "hqdefault.jpg"])
+    }
+
+    @Test("Display upgrades preserve YouTube identity and leave unrelated artwork untouched")
+    func thumbnailUpgradeScopeAndInvalidDemands() throws {
+        let webp = try #require(URL(string: "https://img.youtube.com/vi_webp/other-video/default.webp"))
+        let candidates = YouTubeThumbnail.displayCandidates(for: webp, pixelSize: 1200)
+        #expect(candidates.map(\.lastPathComponent) == [
+            "maxresdefault.webp", "sddefault.webp", "hqdefault.webp", "mqdefault.webp", "default.webp"
+        ])
+        #expect(candidates.allSatisfy {
+            $0.host == webp.host && $0.pathComponents.dropLast() == webp.pathComponents.dropLast()
+        })
+        let untouched = [
+            "https://example.com/vi/example/default.jpg",
+            "https://i.ytimg.com.evil.example/vi/example/hqdefault.jpg",
+            "https://i.ytimg.com/channel/example/hqdefault.jpg",
+            "https://i.ytimg.com/vi/example/unrecognized.jpg"
+        ]
+        for raw in untouched {
+            let url = try #require(URL(string: raw))
+            #expect(YouTubeThumbnail.displayCandidates(for: url, pixelSize: 1200) == [url])
+        }
+        let url = try #require(URL(string: "https://i.ytimg.com/vi/example/default.jpg"))
+        for pixels in [CGFloat.zero, -1, .nan, .infinity] {
+            #expect(YouTubeThumbnail.displayCandidates(for: url, pixelSize: pixels) == [url])
+        }
+    }
+
     @MainActor
     @Test func missingHighResolutionArtworkNeverCachesAnErrorOrTinyPlaceholder() async throws {
         ArtworkResolutionStub.reset()
