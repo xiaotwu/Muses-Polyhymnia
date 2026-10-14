@@ -133,6 +133,12 @@ final class LibraryService {
         }
     }
 
+    /// A reviewed repair committed through its own single-context transaction.
+    /// Refresh existing collection and local-search snapshots without another save.
+    func artistCreditRepairDidCommit() {
+        metadataRevision &+= 1
+    }
+
     func isLiked(id: UUID) -> Bool {
         let context = ModelContext(modelContainer)
         return ((try? context.fetch(FetchDescriptor<Track>(

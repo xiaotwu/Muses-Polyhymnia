@@ -15,6 +15,12 @@ struct SongDisplayInformation: Equatable {
             return
         }
         title = row.title == metadata.title ? (metadata.track ?? row.title) : row.title
+        if let confirmed = SongCreditCache.shared.confirmedArtist(
+            storedArtist: row.snapshot.artist, videoID: row.snapshot.youTubeId, metadata: metadata) {
+            artist = Self.nonEmpty(confirmed) ?? tr("Artist unavailable", "艺人信息暂缺")
+            album = row.album.isEmpty ? (metadata.album ?? "") : row.album
+            return
+        }
         let publisherDerived = Self.isMissingCredit(row.snapshot.artist)
             || row.snapshot.artist == metadata.uploader
             || row.snapshot.artist == row.collectionOwner
