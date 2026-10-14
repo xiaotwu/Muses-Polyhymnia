@@ -19,7 +19,9 @@
 - B 先失败并发起重试，迟到 A 不清掉新错误和重试 marker。
 - cancel、同意撤销和当前 operation 能力丢失的清理/拒绝边界。
 
-`swift test --no-parallel --filter 'HomeContinuationOwnershipTests|HomeDiscoveryTrustTests|HomeRecommendationTests|HomeFeedRetirementTests|HomeSourceSelectionTests'` 通过 39 项报告定义 / 5 套件（2.476 秒）。参数调度不重复计入报告定义数。扩充期间的 Swift Testing 三组 arguments 声明编译错误已修正，原始失败日志保留，未计作产品行为失败。最终源码/测试指纹经独立只读复审，无阻塞项；完整 PR CI 在集成时记录。
+`swift test --no-parallel --filter 'HomeContinuationOwnershipTests|HomeDiscoveryTrustTests|HomeRecommendationTests|HomeFeedRetirementTests|HomeSourceSelectionTests'` 通过 39 项报告定义 / 5 套件（2.476 秒）。参数调度不重复计入报告定义数。扩充期间的 Swift Testing 三组 arguments 声明编译错误已修正，原始失败日志保留，未计作产品行为失败。最终源码/测试指纹经独立只读复审，无阻塞项。
+
+精确 head `d1ab806` 的 [完整 CI 38487746201](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38487746201) 全阶段通过：14 项发布检查（4.459 秒）、917 项 / 127 套件 Swift 报告（62.262 秒，含 opt-in 跳过项）、独立磁盘恢复 1 项 / 1 套件（0.224 秒）、App Intents 元数据、预览打包与上传。[PR #3](https://github.com/xiaotwu/Muses-Polyhymnia/pull/3) 合并为 `bc7d24e`，XW-93 Done。main 的重复 CI 由当前状态接续；源码修复与已验 head 一致。
 
 本次没有真实已同意且身份匹配的账号 shelf 候选，因此不把受控 provider 当作原生或网络验收。XW-73 的真实 Web Home 条件继续开放。正式版 0.6.0 未替换，资料、偏好及 Keychain 保留。
 

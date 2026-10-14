@@ -1,6 +1,6 @@
 # 技术工作索引与对话归并
 
-发布后新小节见 [正式版检查与修复](post-release-formal-inspection.md)：XW-90/92 的正式版缺陷和 XW-91 公共发现退休已通过候选复验、独立审阅与完整 CI，[PR #2](https://github.com/xiaotwu/Muses-Polyhymnia/pull/2) 已合并，三项 Done，重复 main CI 已确认成功。本轮 [XW-93 分页状态归属](home-continuation-ownership.md) 已受控复现并窄修复，39 项回归通过，待最终复审/完整 CI 集成；当前 25 项开放（19 In Review、6 In Progress）。XW-75 仍有系统/设备条件，XW-73 仍有真实账号/目录条件；下文发布前检查点保留历史范围。
+发布后新小节见 [正式版检查与修复](post-release-formal-inspection.md)：XW-90/92 的正式版缺陷和 XW-91 公共发现退休已通过候选复验、独立审阅与完整 CI，[PR #2](https://github.com/xiaotwu/Muses-Polyhymnia/pull/2) 已合并，三项 Done，重复 main CI 已确认成功。本轮 [XW-93 分页状态归属](home-continuation-ownership.md) 通过受控复现、窄修复、独立复审及完整 CI，[PR #3](https://github.com/xiaotwu/Muses-Polyhymnia/pull/3) 已合并。随后新增 [Queue/封面输入与署名检查](post-release-input-and-credits.md)，XW-94/95 正在修复，XW-96 保留间歇侧栏报告；当前 27 项开放（18 In Review、8 In Progress、1 Backlog）。XW-75 仍有系统/设备条件，XW-73 仍有真实账号/目录条件；下文发布前检查点保留历史范围。
 
 更新时间：2026-10-13。当前工作入口是 Codex 对话「整理并执行Linear剩余任务」。近期列表之外，已补查旧项目路径的十四个较早对话；二十二个历史对话及一个已完成的执行对话均已归并，可恢复归档，共二十三个。归档不表示其中提及的所有验收都通过，也不删除历史证据。
 
