@@ -1,5 +1,13 @@
 # 当前修复与验收状态
 
+2026-10-14，XW-99 的 `8560bab` 窄修复已完成本机 Release 编译、独立源码审阅和限定原生复验：临时键盘模式 2 下 Tab 到原信息按钮→Space 打开→Escape 关闭，原焦点/轮廓保留；关闭后 Escape 未破坏继续 Tab 到相邻 Off toggle，Shift-Tab 可返回。原生点击打开后 Escape 也关闭。工具未建立文本选中，用户明确补验“文字已选中，Escape后关闭”；协调方随后回读弹窗缺席、焦点在原按钮，将人类补验与后来回读分开记录。首次 modifier guard 选错 API 重载的 Release 失败（17.516 秒）完整保留，显式 `phases: .down` 的最终编译成功（66.958 秒）。General 已恢复，候选与自有 System Settings 正常退出，系统模式在 UI 恢复 0 并读回 0。独立复核业务期 27 表同值、停止后的七项队列 JSON/用户真值、正常 27 表/45 项偏好及安装摘要均保留，自有 bundle/注册/data/cache/偏好已精确清理，原 0400 seed 保留；远端 CI/PR 集成尚未完成；XW-99 已转 In Review，不提前写成 merged、CI 全通过或 Done。最新本机 Linear 检查点为 25 项开放：19 In Review、6 In Progress，唯一开放 Bug 标签仍为 XW-99。XW-71 仍 In Review，不增加完整 VoiceOver、macOS 26 或设备矩阵通过结论。详见 [信息弹窗 Escape 修复验收](settings-info-escape-acceptance.md)。
+
+2026-10-14，XW-75 的未保存歌曲信息 Title 草稿交接小节已接受：当前源码 `f73a673`（执行源码与 `e6ae129` 一致）的新签名隔离候选中，一次真实 SearchLyricsIntent 保留同一 Edit Info 和精确草稿；Cancel 后原录音标题 query 无需重发即呈现，Tab 到 Artist、Escape 仅关闭歌词面板。完整框架 XCTest Passed 1/0/exit0，38 文件结果归档核验通过；Intent 前后 27 表同值，停止后的生命周期/JSON 序列化变化单独记录，7 个 decoded queue JSON、会话真值、673 Tracks/82 Events 和两处 60,074.648526 ms 保存位置保留。正常应用 27 表、45 项偏好及安装摘要同值，自有候选/runner/偏好/注册/data/cache 已清理，原 seed 0400 保留。未保存 metadata、Apply 歌词或播放；不增加 provider 匹配、性能、手动 Siri/Shortcuts、macOS 26 或完整 VoiceOver/设备矩阵结论。XW-75 继续 In Review，见 [草稿 Intent 交接](edit-draft-intent-acceptance.md)。
+
+2026-10-14 修复前检查点：XW-71 在用户单独授权的临时 Keyboard navigation 2 下完成四个 Help disclosure 的实际 Tab 焦点与 Space 展开/收起。信息按钮已有实际焦点与可见轮廓，Space 打开说明；AX Cancel 关闭且保留原按钮焦点。但原按钮持焦点时后台 Escape 未关闭说明，移到相邻 toggle 后 Escape 才关闭，toggle 未改。用户报告实际前台 Escape 后说明仍在，协调方后来回读已消失；中间未执行关闭，其关闭时间/原因未归因，不把后来消失写成捕获的物理通过或失败。窄修复由 [XW-99](https://linear.app/xiaotwu/issue/XW-99/muses-dismiss-settings-info-popovers-with-escape-from-the-originating) 跟踪，当时 In Progress / Bug，尚未完成实现或修复后验收；后续本机复验与当前状态见本文顶部。系统已在 UI 恢复 0，候选与自有 System Settings 已退出清理；XW-71 继续 In Review。
+
+XW-99 修复前的实时 Linear 检查点为 25 项开放：18 In Review、7 In Progress，唯一开放 Bug 标签为 XW-99；包含阶段验收和协调父项，不能将开放数量解释为独立未修缺陷。旧公共 Home Retry 已退休；已完成的 XW-90–98 仍按原限定范围保留，不删除原失败证据，也不重启 XW-96 的严格 300ms 计时专项。后续任务状态须结合当前修复与远端验证门槛回读。
+
 2026-10-14 新用户范围：[导入署名与封面呈现](credits-and-cover-followup.md)。XW-97 已实现旧 owner 署名的显式预览、来源/元数据核对、原子修复、恢复记录和撤销；XW-98 已实现歌曲/歌单 3:4 焦点卡、多张 Muses 聚焦横栏及低档封面升级且保留 HQ/maxres 优先。本机 968 项 / 130 套件、14 项发布配置、独立磁盘恢复、Release 与隔离原生修复/冷启/撤销及多尺寸视觉验收通过。两项均为 **Done**；[PR #6](https://github.com/xiaotwu/Muses-Polyhymnia/pull/6) 已合并为 `e6ae129`，精确 PR head 的 [CI 38641107802](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38641107802) 全阶段成功，合并 main 的 [CI 38643452573](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38643452573) 亦全阶段成功：968 项 / 130 套件（58.424 秒）、14 项发布配置（8.946 秒）、独立磁盘恢复 1 项 / 1 套件（0.149 秒）、App Intents 元数据、预览打包和上传。合并源码与已验 PR 无差异，收尾仅修改文档。正式 27 表、45 项偏好以及应用 Info.plist/主可执行文件摘要完全保留，现有 0.6.0 尚未获得本节源码；旧署名须在新版本显式预览并应用修复。
 
 2026-10-14 用户验收决定：按人类实际操作接受 XW-96 当前功能，结束本小节并转向其他主要问题，XW-96 **Done**。实际小于300ms的精确输入计时仍未验证，不再阻断后续工作。授权临时系统模式2下的Focus Navigation按钮焦点、Tab移出隐藏、Shift-Tab返回展开与Space激活History均按范围通过；系统已恢复0及General页面，既有真实hover、普通重开与紧凑纯文本滚动结论继续有效。不扩展为模式0按钮焦点或完整设备/VoiceOver矩阵通过。本轮无生产源码变更，详见 [导航验收](now-playing-navigation-acceptance.md)。
@@ -82,9 +90,10 @@ XW-75 的唯一名称 Shortcuts 候选已完成注册、独立 setup 启动/退�
 | --- | --- |
 | XW-97 旧导入署名 | Done；显式、可恢复修复已完成，本机完整回归、隔离 655 项 Apply/冷启/Undo 通过；PR #6 已合并，PR 与 main CI 均成功，正式资料未写入，待新版本显式应用。 |
 | XW-98 封面呈现 | Done；焦点卡比例/宽度、多推荐聚焦横栏和低档封面升级已完成；实际三尺寸及 Large 深色、原生横栏滚动通过，PR #6 已合并，PR 与 main CI 均成功。 |
-| XW-75 App Intents | 冷态歌词、完整串行键盘路径、真实来源预览/浮窗弹窗、修复后的冷 Play 和主窗口视频弹窗键盘均按记录范围通过。下一小节核对未保存歌曲信息草稿上的外部歌词 Intent 交接；私有 runner 与当前源码兼容，但仅已准备，未构建或执行。其他未测呈现状态、手动 Siri/Shortcuts、实际 macOS 26 及完整 VoiceOver/设备矩阵仍保留。 |
+| XW-75 App Intents | 冷态歌词、完整串行键盘、真实来源预览/浮窗弹窗、修复后的冷 Play 与主窗视频弹窗，以及本轮未保存 Edit Info Title 草稿→一次外部请求→Cancel→原 query→Tab→Escape 已按记录范围接受。完整 Passed 1/0/exit0 及恢复清理见 [草稿交接](edit-draft-intent-acceptance.md)。其他未测呈现状态、手动 Siri/Shortcuts、实际 macOS 26 与完整 VoiceOver/设备矩阵仍保留；XW-75 继续 In Review。 |
 | XW-26 Pull/播放父项 | XW-84 的原生错误与同草稿重试已关闭，见 [原生恢复](pull-native-recovery.md)。父项保留真实评论/回复、其它来源/视频和未测持久化分支；自然远端冲突、Push/manage 与破坏性历史/group 保持原排除范围。 |
-| XW-71 Settings | 十类设置/历史、字体指针/键盘、语言/字号恢复和 Dark 840×804 三项检查已接受。剩余 Help 的 Tab/Space 与原按钮焦点、完整 VoiceOver、实际 macOS 26。 |
+| XW-71 Settings | 十类设置/历史、字体指针/键盘、语言/字号恢复和 Dark 840×804 三项检查已接受。本轮临时模式 2 下四个 Help disclosure Tab/Space、信息 AX Cancel/原焦点，以及修复后的原按钮 Escape、继续 Tab、点击打开与人类文本选中 Escape 按范围通过；系统恢复 0。XW-99 本机保护/清理复审通过，仍待远端 CI/集成；完整 VoiceOver、实际 macOS 26 与其他设备/焦点条件仍保留，XW-71 继续 In Review。 |
+| XW-99 信息弹窗 Escape | In Review；`8560bab` 本机 Release、独立源码审阅及限定原生复验通过，数据/偏好/清理独立复审亦通过，待远端 CI/PR 集成。原始人类前台失败报告、后台路径和后来无归因消失、首次编译失败均保留；见 [验收报告](settings-info-escape-acceptance.md)。 |
 | XW-72 辅助窗口 | MiniPlayer 生命周期/Pin/共享播放、真实同步桌面歌词和菜单栏 Escape/音量已接受。剩余物理控件交接/完整焦点、真实未同步歌词、系统 Dark 菜单栏。 |
 | XW-73 来源、XW-62 评论 | XW-91 公共 Home 与自动公开推荐退休已 Done，两来源、缓存来源与取消/禁用边界通过本轮记录范围。旧公共 Home Retry 条件退休。非空 Library Albums/详情/正常刷新/Back 与 Artists 概览仍已接受。剩余身份匹配且专门同意的真实 Web Home、其他目录/平台矩阵及非空评论回复；现有评论权限返回 insufficientPermissions。 |
 | XW-93 加载标记归属 | Done；两条受控状态缺陷已修复，39 项 / 5 套件回归、独立复审和完整 CI 通过，PR #3 已集成。不增加原生、真实 Web 来源或旧内容泄漏结论。 |

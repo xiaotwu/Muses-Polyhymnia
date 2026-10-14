@@ -1,6 +1,8 @@
 # Settings keyboard and focus follow-up
 
-2026-10-08, round 2 of XW-71. This supplements [the first Settings acceptance](settings-acceptance.md); the accepted category, route, pointer, playback and language-restoration cells were not repeated. XW-75 remains Backlog and its metadata and external routes were not retested.
+October 14 current continuation: the user separately authorized temporary Keyboard navigation 0 → 2 → 0. Four Help disclosure controls passed actual Tab focus and Space expand/collapse. The originating information button's Escape path exposed XW-99; its original background-key observations, human foreground failure report and later unattributed root disappearance are preserved in [the information-popover report](settings-info-escape-acceptance.md). Final source `8560bab` now passes local Release, independent source review and the specific origin-Escape/focus, continued-Tab, pointer-open and human selected-text cancellation cells. The system setting was restored through native UI and read back as 0. XW-99 is In Review pending remote CI/PR integration and complete final protection/cleanup review; XW-71 stays In Review for full VoiceOver, actual macOS 26 and other device/system cells. The October 8/10 observations below retain their original conditions and are not relabelled.
+
+2026-10-08 historical round 2 of XW-71. This supplements [the first Settings acceptance](settings-acceptance.md); the accepted category, route, pointer, playback and language-restoration cells were not repeated. XW-75 was Backlog at that checkpoint and its metadata and external routes were not retested in that round; its current In Review state and later accepted Intent cells are recorded in [current status](current-status.md).
 
 ## Scope and native conditions
 
