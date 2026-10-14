@@ -181,8 +181,10 @@ final class HomeDiscoveryService {
         Task { [weak self] in
             guard let self else { return }
             let items = await self.provider.more(sectionID: sectionID, input: input)
+            // A replacement feed may already be loading the same shelf ID.
+            // The old operation owns neither its loading marker nor its errors.
+            guard operation == self.operationID else { return }
             guard !Task.isCancelled,
-                  operation == self.operationID,
                   self.provider.hasWebEnhancement,
                   input.scope == self.buildInput().scope,
                   mode == self.recommendationMode else {
@@ -261,6 +263,8 @@ final class HomeDiscoveryService {
         moreTask = nil
         isLoadingMore = false
         globalContinuationError = nil
+        loadingSectionIDs.removeAll(keepingCapacity: false)
+        continuationErrors.removeAll(keepingCapacity: false)
         morePage = 0
         isRefreshing = true
         let operation = operationID
