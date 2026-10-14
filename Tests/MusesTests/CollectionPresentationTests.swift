@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 @testable import Muses
@@ -151,6 +152,12 @@ struct CollectionPresentationTests {
         #expect(CollectionDeckProjection.visibleIndices(count: 100, position: 50, radius: roomy.radius).count <= 13)
         #expect(CollectionDeckProjection.visibleIndices(count: 100, position: 50, radius: compact.radius).count == 5)
         #expect(roomy.cardHeight > roomy.cardWidth)
+        #expect(abs(roomy.cardWidth / roomy.cardHeight - 0.75) < 0.001)
+        #expect(abs(compact.cardWidth / compact.cardHeight - 0.75) < 0.001)
+        #expect(abs(compactHeight.cardWidth / compactHeight.cardHeight - 0.75) < 0.001)
+        #expect(abs(roomy.footerHeight * 3 - roomy.cardWidth) < 0.001)
+        #expect(roomy.cardWidth > 180)
+        #expect(compactHeight.cardWidth > 136)
         #expect(roomy.lowerFanClearance == 24)
         #expect(compact.lowerFanClearance == 24)
         #expect(roomy.viewportHeight >= roomy.cardHeight + CollectionDeckScrubberMetrics.thumbHeight)
@@ -158,6 +165,75 @@ struct CollectionPresentationTests {
         #expect(wide.cardWidth > roomy.cardWidth)
         #expect(wide.radius > compact.radius)
         #expect(wide.spread < wide.cardWidth)
+        #expect(abs(wide.cardWidth / wide.cardHeight - 0.75) < 0.001)
+        #expect(wide.cardWidth > 260)
+        let widthsAndGeometry: [(CGFloat, CollectionDeckGeometry)] = [(980, roomy), (1_800, wide)]
+        for (width, geometry) in widthsAndGeometry {
+            #expect(CGFloat(geometry.radius) * geometry.spread + geometry.cardWidth / 2
+                    >= (width - 96) / 2)
+            #expect(geometry.radius <= 6)
+        }
+    }
+
+    @Test("Proportional card footers keep song credits within compact and roomy cards")
+    func proportionalFooterGeometry() {
+        let compact = CollectionDeckFooterMetrics.resolve(height: 56, usesProportionalFooter: true)
+        #expect(compact.titleLineLimit == 1)
+        #expect(!compact.showsAlbum)
+        #expect(compact.verticalPadding >= 2 && compact.verticalPadding <= 8)
+
+        let regular = CollectionDeckFooterMetrics.resolve(height: 75, usesProportionalFooter: true)
+        #expect(regular.titleLineLimit == 2)
+        #expect(!regular.showsAlbum)
+
+        let roomy = CollectionDeckFooterMetrics.resolve(height: 100, usesProportionalFooter: true)
+        #expect(roomy.titleLineLimit == 2)
+        #expect(roomy.showsAlbum)
+
+        let wall = CollectionDeckFooterMetrics.resolve(height: 86, usesProportionalFooter: false)
+        #expect(wall.titleLineLimit == 2)
+        #expect(wall.showsAlbum)
+        #expect(wall.verticalPadding == 10)
+    }
+
+    @Test("Scaled proportional footers keep native title and artist line boxes inside the card")
+    func scaledFooterGeometry() throws {
+        let layoutManager = NSLayoutManager()
+        for scale: CGFloat in [1, 1.15] {
+            for height: CGFloat in [56, 75, 100] {
+                let footer = CollectionDeckFooterMetrics.resolve(
+                    height: height, usesProportionalFooter: true, textScale: scale
+                )
+                #expect(footer.verticalPadding >= 2 && footer.verticalPadding <= 10)
+                for (titleName, creditName) in [
+                    ("AvenirNext-DemiBold", "AvenirNext-Regular"),
+                    ("PingFangSC-Medium", "PingFangSC-Regular")
+                ] {
+                    let title = try #require(NSFont(name: titleName, size: 14 * scale))
+                    let artist = try #require(NSFont(name: creditName, size: 12 * scale))
+                    let album = try #require(NSFont(name: creditName, size: 11 * scale))
+                    let titleHeight = layoutManager.defaultLineHeight(for: title) * CGFloat(footer.titleLineLimit)
+                    let artistHeight = layoutManager.defaultLineHeight(for: artist)
+                    let albumHeight = footer.showsAlbum ? layoutManager.defaultLineHeight(for: album) + 4 : 0
+                    #expect(titleHeight + artistHeight + albumHeight + 4 + footer.verticalPadding * 2 <= height)
+                }
+            }
+        }
+
+        let compact = CollectionDeckFooterMetrics.resolve(height: 56, usesProportionalFooter: true)
+        let compactLarge = CollectionDeckFooterMetrics.resolve(
+            height: 56, usesProportionalFooter: true, textScale: 1.15
+        )
+        #expect(compactLarge.titleLineLimit == 1)
+        #expect(!compactLarge.showsAlbum)
+        #expect(compactLarge.verticalPadding < compact.verticalPadding)
+        let regularLarge = CollectionDeckFooterMetrics.resolve(
+            height: 75, usesProportionalFooter: true, textScale: 1.15
+        )
+        #expect(regularLarge.titleLineLimit == 1)
+        #expect(!regularLarge.showsAlbum)
+        #expect(CollectionDeckFooterMetrics.resolve(height: 86, usesProportionalFooter: false, textScale: 1.15)
+                == CollectionDeckFooterMetrics.resolve(height: 86, usesProportionalFooter: false))
     }
 
     @Test("Deck projection clamps first and last collection boundaries")

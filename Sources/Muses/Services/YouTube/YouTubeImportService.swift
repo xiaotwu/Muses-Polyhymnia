@@ -217,6 +217,10 @@ final class YouTubeImportService {
         self.session = session
         self.catalog = catalog
         self.saveLocalEdit = saveLocalEdit
+        do { try ImportedArtistCreditRepair.restoreConfirmedCredits(in: modelContainer) }
+        catch {
+            log.warning("Imported artist credit recovery needs review: \(error.localizedDescription)")
+        }
     }
 
     // MARK: - Import

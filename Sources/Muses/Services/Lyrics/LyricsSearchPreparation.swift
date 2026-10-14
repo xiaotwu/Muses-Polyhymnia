@@ -21,10 +21,13 @@ struct LyricsPreparedRecording: Sendable {
         let originalArtist = track.artist.trimmingCharacters(in: .whitespacesAndNewlines)
         let ownerDerived = originalArtist == row.collectionOwner
             || credits.isCollectionOwner(originalArtist, videoID: track.youTubeId)
+            || credits.isConfirmedImportedSourceCredit(originalArtist, videoID: track.youTubeId)
         let publisherDerived = originalArtist == metadata?.uploader
         if SongDisplayInformation.isMissingCredit(originalArtist) || ownerDerived || publisherDerived {
             artist = metadata?.artist.flatMap {
-                SongDisplayInformation.isMissingCredit($0) ? nil : LyricsMatchPolicy.queryArtist($0)
+                SongDisplayInformation.isMissingCredit($0)
+                    || credits.isConfirmedIncorrectArtist($0, videoID: track.youTubeId)
+                    ? nil : LyricsMatchPolicy.queryArtist($0)
             } ?? ""
         } else {
             artist = LyricsMatchPolicy.queryArtist(originalArtist)

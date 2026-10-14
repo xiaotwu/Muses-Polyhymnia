@@ -21,6 +21,7 @@ struct CatalogIdentityReviewView: View {
     @State private var migrationNotice: String?
     @State private var confirmMigration = false
     @State private var undoRequested = false
+    @State private var showArtistCreditRepair = false
 
     private var visibleRows: [CatalogIdentityPreview.Row] {
         guard let preview else { return [] }
@@ -48,6 +49,9 @@ struct CatalogIdentityReviewView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .task { await refresh() }
+        .sheet(isPresented: $showArtistCreditRepair) {
+            ImportedArtistCreditRepairSheet()
+        }
         .confirmationDialog(
             undoRequested
                 ? tr("Roll back the last identity migration?", "回滚上次身份迁移？", zhHant: "回復上次身分移轉？")
@@ -96,6 +100,10 @@ struct CatalogIdentityReviewView: View {
                 .frame(width: 120)
             }
             migrationControls
+            Button(tr("Repair imported artist credits…", "修复旧导入署名…")) {
+                showArtistCreditRepair = true
+            }
+            .settingsAction()
             if loading {
                 ProgressView(tr("Reading library…", "正在读取资料库…", zhHant: "正在讀取資料庫…"))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)

@@ -51,8 +51,10 @@ struct TrackArtistDraft {
         wasEdited = true
     }
 
-    mutating func refresh(metadata: YTDlpBridge.YTDlpPlaylistEntry?, isKnownOwner: Bool) {
+    mutating func refresh(metadata: YTDlpBridge.YTDlpPlaylistEntry?, isKnownOwner: Bool,
+                          confirmedArtist: String? = nil) {
         guard !wasEdited else { return }
+        if let confirmedArtist { value = confirmedArtist; return }
         let verified = metadata.flatMap { $0.id == videoID ? $0 : nil }
         let derived = isKnownOwner || SongDisplayInformation.isMissingCredit(originalArtist)
             || originalArtist == verified?.uploader
@@ -150,7 +152,9 @@ struct EditTrackSheet: View {
         guard fieldsLoaded else { return }
         let cache = SongCreditCache.shared
         artistDraft.refresh(metadata: cache.entry(videoID: artistDraft.videoID),
-                            isKnownOwner: cache.isCollectionOwner(artistDraft.originalArtist, videoID: artistDraft.videoID))
+                            isKnownOwner: cache.isCollectionOwner(artistDraft.originalArtist, videoID: artistDraft.videoID),
+                            confirmedArtist: cache.confirmedArtist(storedArtist: artistDraft.originalArtist,
+                                                                   videoID: artistDraft.videoID))
     }
 
     private func save() {

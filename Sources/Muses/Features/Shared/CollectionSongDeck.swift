@@ -84,13 +84,13 @@ struct CollectionDeckGeometry: Equatable, Sendable {
     var viewportHeight: CGFloat { cardHeight + lowerFanClearance }
 
     static func resolve(containerWidth: CGFloat, containerHeight: CGFloat) -> Self {
-        let side = min(260, max(136, min(containerWidth * 0.27, containerHeight - 580)))
+        let side = min(300, max(168, min(containerWidth * 0.30, (containerHeight - 460) * 0.75)))
         let spread = side * 0.66
         // Only nearby cards are mounted; overlap makes room for more covers.
-        let radius = min(6, max(2, Int((containerWidth - side - 96) / (2 * spread))))
+        let radius = min(6, max(2, Int(ceil((containerWidth - side - 96) / (2 * spread)))))
         return Self(
             cardWidth: side,
-            footerHeight: 86,
+            footerHeight: side / 3,
             spread: spread,
             radius: radius
         )
@@ -100,6 +100,34 @@ struct CollectionDeckGeometry: Equatable, Sendable {
         let columns = max(1, Int((containerWidth + 24) / 204))
         let side = max(80, (containerWidth - CGFloat(columns - 1) * 24) / CGFloat(columns))
         return (columns, Self(cardWidth: side, footerHeight: 86, spread: side, radius: 0))
+    }
+}
+
+struct CollectionDeckFooterMetrics: Equatable, Sendable {
+    let titleLineLimit: Int
+    let showsAlbum: Bool
+    let verticalPadding: CGFloat
+
+    static func resolve(height: CGFloat, usesProportionalFooter: Bool, textScale: CGFloat = 1) -> Self {
+        guard usesProportionalFooter else {
+            return Self(titleLineLimit: 2, showsAlbum: true, verticalPadding: 10)
+        }
+        // Reserve native line boxes before padding; larger user text keeps its
+        // font size while optional credits and extra title lines yield space.
+        let titleLineHeight = 20 * textScale
+        let artistLineHeight = 18 * textScale
+        let albumLineHeight = 17 * textScale
+        let twoLineTitleHeight = titleLineHeight * 2 + artistLineHeight + 4
+        let titleLineLimit = twoLineTitleHeight + 12 <= height ? 2 : 1
+        let primaryTextHeight = titleLineHeight * CGFloat(titleLineLimit) + artistLineHeight + 4
+        let showsAlbum = primaryTextHeight + albumLineHeight + 4 + 16 <= height
+        let textHeight = primaryTextHeight + (showsAlbum ? albumLineHeight + 4 : 0)
+        let preferredPadding: CGFloat = showsAlbum ? 10 : 8
+        return Self(
+            titleLineLimit: titleLineLimit,
+            showsAlbum: showsAlbum,
+            verticalPadding: max(2, min(preferredPadding, (height - textHeight) / 2))
+        )
     }
 }
 
@@ -723,6 +751,7 @@ struct CollectionDeckStage: View {
                 information: SongDisplayInformation(row: row, metadata: songMetadata[row.snapshot.youTubeId]),
                 cardWidth: geometry.cardWidth,
                 footerHeight: geometry.footerHeight,
+                usesProportionalFooter: !wall,
                 isFocused: index == focusedIndex,
                 isPlaying: playing,
                 isHovered: hovered,
@@ -958,6 +987,7 @@ struct CollectionDeckCardSurface: View, Equatable {
     var information: SongDisplayInformation? = nil
     let cardWidth: CGFloat
     let footerHeight: CGFloat
+    let usesProportionalFooter: Bool
     let isFocused: Bool
     let isPlaying: Bool
     let isHovered: Bool
@@ -970,6 +1000,7 @@ struct CollectionDeckCardSurface: View, Equatable {
     nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.row == rhs.row && lhs.information == rhs.information && lhs.cardWidth == rhs.cardWidth
             && lhs.footerHeight == rhs.footerHeight && lhs.isFocused == rhs.isFocused
+            && lhs.usesProportionalFooter == rhs.usesProportionalFooter
             && lhs.isPlaying == rhs.isPlaying && lhs.isHovered == rhs.isHovered
             && lhs.primaryAction == rhs.primaryAction
             && lhs.showsKeyboardFocus == rhs.showsKeyboardFocus
@@ -987,6 +1018,10 @@ struct CollectionDeckCardSurface: View, Equatable {
         let totalHeight = cardWidth + footerHeight
         let cardShape = RoundedRectangle(cornerRadius: 22, style: .continuous)
         let information = information ?? SongDisplayInformation(row: row)
+        let footer = CollectionDeckFooterMetrics.resolve(
+            height: footerHeight, usesProportionalFooter: usesProportionalFooter,
+            textScale: TypographyPreferences.shared.size.scale
+        )
 
         ZStack(alignment: .bottomLeading) {
             ArtworkView(
@@ -1005,12 +1040,12 @@ struct CollectionDeckCardSurface: View, Equatable {
                     Text(information.title)
                         .font(MusesTypography.song(size: 14, emphasized: true, text: information.title))
                         .foregroundStyle(BrandColors.textPrimary)
-                        .lineLimit(2)
+                        .lineLimit(footer.titleLineLimit)
                     Text(information.artist)
                         .font(MusesTypography.song(size: 12, text: information.artist))
                         .foregroundStyle(BrandColors.textSecondary)
                         .lineLimit(1)
-                    if !information.album.isEmpty {
+                    if footer.showsAlbum, !information.album.isEmpty {
                         Text(information.album)
                             .font(MusesTypography.song(size: 11, text: information.album))
                             .foregroundStyle(BrandColors.textSecondary.opacity(0.75))
@@ -1026,7 +1061,7 @@ struct CollectionDeckCardSurface: View, Equatable {
                     .accessibilityHidden(true)
             }
             .padding(.horizontal, 12)
-            .padding(.vertical, 10)
+            .padding(.vertical, footer.verticalPadding)
             .frame(width: cardWidth, height: footerHeight, alignment: .leading)
             .background(BrandColors.surface)
 

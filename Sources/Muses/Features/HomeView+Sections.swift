@@ -2,60 +2,75 @@ import AppKit
 import SwiftUI
 
 extension HomeView {
-    /// An application editorial role using the first playable item in source order.
-    /// No release-date or external editorial classification is inferred.
-    var spotlightSelection: (item: DiscoveryItem, provenance: String)? {
-        for section in visibleDiscoverySections {
-            if let item = section.items.first(where: isPlayableDiscoveryItem) {
-                return (item, sourceAwareSubtitle(section))
-            }
-        }
-        if homeSourceSelection == .recommended, let snapshot = supportedRecent.first {
-            return (.track(snapshot), tr("Your library · recently played", "你的资料库 · 最近播放"))
-        }
-        return nil
+    /// Spotlight keeps source-qualified recommendation identities in one lazy rail.
+    var spotlightItems: [DiscoveryItem] {
+        TopPicksResolver.picks(
+            hero: nil,
+            mixed: visibleDiscoverySections.flatMap(\.items).filter(isPlayableDiscoveryItem),
+            recent: homeSourceSelection == .recommended ? supportedRecent.map(DiscoveryItem.track) : [],
+            max: 6
+        )
     }
 
     @ViewBuilder
     var homeSpotlight: some View {
-        if let selection = spotlightSelection {
+        let items = spotlightItems
+        if !items.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
-                SectionHeader(title: tr("Muses Spotlight", "Muses 聚焦"), subtitle: selection.provenance)
+                SectionHeader(title: tr("Muses Spotlight", "Muses 聚焦"),
+                              subtitle: homeSourceSelection == .recommended
+                                ? tr("Recommended on this Mac · your library", "由这台 Mac 推荐 · 你的资料库")
+                                : tr("From your connected account", "来自已连接的账号"))
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(alignment: .top) {
-                        switch selection.item {
-                        case .youTube(let card):
-                            EditorialCard(eyebrow: tr("Muses Spotlight", "Muses 聚焦"),
-                                          title: card.title,
-                                          subtitle: webCardSubtitle(card),
-                                          artwork: .resolve(remoteURL: card.thumbnailURL, youTubeId: card.playableVideoID),
-                                          informationStyle: .bottomGradient,
-                                          onOpen: { openWebCard(card) },
-                                          onPlay: { Task { await play(card) } })
-                                .youTubeEntryContextMenu(card: card, videoContext: remoteCards(in: itemsContaining(card)), showsMenuButton: true,
-                                                        menuButtonAlignment: .topTrailing, menuButtonTrailingInset: 0) {
-                                    Task { await play(card) }
-                                }
-                        case .track(let snapshot):
-                            let context = visibleDiscoverySections.flatMap(\.items).compactMap { item -> TrackSnapshot? in
-                                if case .track(let track) = item { return track }
-                                return nil
-                            }
-                            EditorialCard(eyebrow: tr("Muses Spotlight", "Muses 聚焦"),
-                                          title: snapshot.title,
-                                          subtitle: SongCreditCache.shared.artist(snapshot: snapshot),
-                                          artwork: .resolve(for: snapshot),
-                                          informationStyle: .bottomGradient,
-                                          onOpen: { openPreview(snapshot, context: context.isEmpty ? supportedRecent : context) },
-                                          onPlay: { play(snapshot, context: context.isEmpty ? supportedRecent : context) })
-                                .trackContextMenu(snapshot: snapshot,
-                                                  onPlay: { play(snapshot, context: context.isEmpty ? supportedRecent : context) },
-                                                  videoContext: context.isEmpty ? supportedRecent : context,
-                                                  showsMenuButton: true, menuButtonAlignment: .topTrailing, menuButtonTrailingInset: 0)
+                    LazyHStack(alignment: .top, spacing: 20) {
+                        ForEach(items) { item in
+                            spotlightCard(item)
                         }
-                    }.padding(.horizontal, AppleMusicTokens.contentPaddingX)
+                    }
+                    .padding(.horizontal, AppleMusicTokens.contentPaddingX)
                 }
+                .accessibilityLabel(tr("Spotlight recommendations", "聚焦推荐"))
             }
+        }
+    }
+
+    @ViewBuilder
+    private func spotlightCard(_ item: DiscoveryItem) -> some View {
+        let sourceSection = visibleDiscoverySections.first { section in
+            section.items.contains { $0.id == item.id }
+        }
+        let provenance = sourceSection.map(sourceAwareSubtitle)
+            ?? tr("Your library · recently played", "你的资料库 · 最近播放")
+        switch item {
+        case .youTube(let card):
+            EditorialCard(eyebrow: provenance,
+                          title: card.title,
+                          subtitle: webCardSubtitle(card),
+                          artwork: .resolve(remoteURL: card.thumbnailURL, youTubeId: card.playableVideoID),
+                          informationStyle: .bottomGradient,
+                          onOpen: { openWebCard(card) },
+                          onPlay: { Task { await play(card) } })
+                .youTubeEntryContextMenu(card: card, videoContext: remoteCards(in: itemsContaining(card)), showsMenuButton: true,
+                                        menuButtonAlignment: .topTrailing, menuButtonTrailingInset: 0) {
+                    Task { await play(card) }
+                }
+        case .track(let snapshot):
+            let context = sourceSection == nil ? supportedRecent
+                : visibleDiscoverySections.flatMap(\.items).compactMap { item -> TrackSnapshot? in
+                    if case .track(let track) = item { return track }
+                    return nil
+                }
+            EditorialCard(eyebrow: provenance,
+                          title: snapshot.title,
+                          subtitle: SongCreditCache.shared.artist(snapshot: snapshot),
+                          artwork: .resolve(for: snapshot),
+                          informationStyle: .bottomGradient,
+                          onOpen: { openPreview(snapshot, context: context.isEmpty ? supportedRecent : context) },
+                          onPlay: { play(snapshot, context: context.isEmpty ? supportedRecent : context) })
+                .trackContextMenu(snapshot: snapshot,
+                                  onPlay: { play(snapshot, context: context.isEmpty ? supportedRecent : context) },
+                                  videoContext: context.isEmpty ? supportedRecent : context,
+                                  showsMenuButton: true, menuButtonAlignment: .topTrailing, menuButtonTrailingInset: 0)
         }
     }
 

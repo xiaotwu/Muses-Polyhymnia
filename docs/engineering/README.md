@@ -1,5 +1,7 @@
 # 技术工作索引与对话归并
 
+2026-10-14 新范围：[导入署名与封面呈现](credits-and-cover-followup.md)（XW-97/98）正在推进：修复失去旧 owner 来源后的错误艺人署名，调整歌曲/歌单焦点卡 3:4、多推荐 Muses 聚焦横栏和封面分辨率选档。实现与验证尚未完成，正式应用和资料尚未修改。
+
 2026-10-14 最新入口：[XW-96 导航验收](now-playing-navigation-acceptance.md) 按用户的人类实际操作判断收尾为 **Done**，转向其他主要问题。真实hover修复、普通重开、紧凑纯文本滚动及授权临时模式2的原生焦点路径按范围接受，系统已恢复0及General页面；严格小于300ms输入计时仍未验证，不再阻断后续工作，不扩展为完整设备/VoiceOver矩阵通过。
 
 [PR #5](https://github.com/xiaotwu/Muses-Polyhymnia/pull/5) 已合并为 `ceb2e295571b89d3bc6a6da11571d0eb526383cf`；精确head `1e377954` 的 [CI 38514615922](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38514615922) 与合并 main [CI 38517976309](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38517976309) 全阶段通过，源码与已验 head 一致。正式0.6.0未替换，修复在下一版生效。自有候选/录制/观察会话结束，测试bundle、独立data/cache/偏好域和临时编译产品已清理，私有证据保留；正式后来状态未回滚。时序拒绝、退出方式和数据边界以 [当前状态](current-status.md) 及导航报告最新小节为准。
