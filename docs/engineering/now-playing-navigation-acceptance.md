@@ -1,6 +1,6 @@
 # Now Playing 导航剩余验收
 
-2026-10-13，接续 XW-96：用户报告点击 PlayerBar 封面时偶发侧栏与封面重叠，要求补齐悬停、紧凑窗口及快速重开。用户已授权使用安装的 cua-driver；另一个桌面工作流持续切换前台后，用户选择先完成后台检查。本页记录后台窗口及随后紧凑纯文本歌词滚动小节，XW-96 保持 In Progress。
+2026-10-13，接续 XW-96：用户报告点击 PlayerBar 封面时偶发侧栏与封面重叠，要求补齐悬停、紧凑窗口及快速重开。后台窗口与紧凑纯文本歌词滚动小节之后，用户已释放窗口控制和 Computer Use。本轮继续前台诊断，确认了安装工具的悬停事件限制；原生悬停和按钮焦点仍待人工核验，XW-96 保持 In Progress。
 
 ## 对象与已完成范围
 
@@ -58,9 +58,23 @@ Dark 环境的底层渐变是实色；整体打开过渡仍经过 opacity 动画
 
 | 剩余单元 | 前提与接受标准 |
 | --- | --- |
-| 悬停进入/离开 | 有一段不被其他 GUI 工作流争用的前台时间。以实际桌面鼠标进入 88pt 导航区域及展开标签，再移出；关联画面、焦点和指针位置，确认允许显示及正确淡出。 |
-| 键盘所有权 | 使用已有 Focus Navigation 入口取得可核实的导航按钮焦点，再移到导航外。未取得焦点时记录前提失败，不改变 OS 键盘设置，不用 AX 存在替代焦点。 |
+| 悬停进入/离开 | 前台时间已获授权，但安装 driver 的移动只 warp 光标，不生成悬停事件。需真实硬件输入或经核实能交付 mouseMoved 的接口进入 88pt 导航区域及展开标签，再移出；关联画面、焦点和指针位置。当前已准备人工核验，不把读回位置当作 hover。 |
+| 键盘所有权 | 使用已有 Focus Navigation 入口取得可核实的导航按钮焦点，再移到导航外。当前系统键盘导航关闭，菜单/Tab 仅回读主窗口焦点；尚未取得按钮焦点，不判为通过或已确认故障，不改变 OS 设置。 |
 | 快速关闭/重开 | 指针/焦点先离开导航，关闭后点击 PlayerBar 封面重开。须有实际输入间隔小于 300ms 的证据；当前串行 driver 调用没有原子输入或交付事件时间保证，调用耗时与迟到截图不计为通过。 |
 | 紧凑歌词阅读 | 本份 Dark 840×804pt 纯文本的首末段可达、往返与恢复已接受。其它歌词/同步跟随、实际尺寸、外观和辅助功能矩阵分别记录，不能扩展为完整布局验收。 |
 
 发现可复现故障后才实施窄修复，并补有意义的受控回归、隔离原生复验和独立审阅。当前没有已确认的新根因；用户间歇报告保留，完整矩阵尚未关闭。其余任务以 [当前状态](current-status.md) 和 Linear 为准。
+
+## 接续：释放桌面后的输入诊断
+
+同一正式 PID/主窗口和 1280×804pt，重新将 Muses 置前后，实际桌面画面仍为稳定 Now Playing，导航隐藏。桌面移动读回 312/602pt 与 304/620pt，后者落在导航按钮的读取范围；从导航外重新进入仍未显示导航。独立审阅实际安装的 cua-driver 0.28.1 二进制，确认这条 desktop MoveCursor 路径只调用 `CGWarpMouseCursorPosition` 和 `CGAssociateMouseAndMouseCursorPosition(true)`，没有发送 mouseMoved。SDK 的 CGRemoteOperation.h 也说明 warp 不生成事件。因此这些输入仅证明指针位置改变，不能接受悬停，也不能据此确认导航显示故障。首次尝试后出现 ChatGPT 前台的那段记录另行排除。
+
+driver 的 View → 聚焦导航调用因无法确认稳定 key window 被拒绝；全局 Command-Control-S 被 QQ 拦截，打开的迷你窗口随后仅用自身关闭按钮清理，没有修改快捷键。精确窗口的 Computer Use 可打开原生菜单并 AX 点击该命令，但两轮 Now Playing 菜单、一次 Tab 及浏览页对照均回读主窗口本身为 focused UI element，没有取得导航按钮焦点；未确认命令处理器实际执行。同一应用绑定的 Command-[ 确实返回原 Liked122/530，随后用 PlayerBar 入口重新打开 Now Playing，仍暂停 26.6666 秒。
+
+只读检查 `AppleKeyboardUIMode` 为 0，未改动它。Apple 的 [SwiftUI focus 文档](https://developer.apple.com/documentation/swiftui/view/focusable(_:interactions:)) 与 [WWDC23 focus 说明](https://developer.apple.com/videos/play/wwdc2023/10162/)指出，button-like 控件通常依赖系统键盘导航才能取得键盘焦点。这与当前观察相容，但没有证明本应用的具体根因；双 Sidebar 的 Focus Navigation 订阅仍只是候选，不据此添加 focusable 或改写所有权。
+
+已请求用户亲自完成指针进入/展开标签/离开，以及原生菜单/Tab 的核验，随后暂停 GUI 输入。Muses **有意保留在 Now Playing 供人工操作**，原 1280×804pt 未改变；正常浏览表面、原指针及前台的最终恢复须在人工小节后核对。本轮没有宣称最终恢复已完成。
+
+当前实际在线只读库检查点与起点的全部 27 表 schema/完整行（含 ORM）、45 项偏好及应用摘要一致，673 首歌曲、78 条事件保持。自有 driver 两项会话已结束，客户端 exit 0；正式应用和预先运行的 driver 保留。没有录制、构建、源码或测试变更。最新 main 完整 CI 38498051238 仍为 success；文档检查点不增加源码测试结论。
+
+私有证据在 `~/.muses/tmp/engineering-oct13/sidebar-uncontended/`：输入/画面、`readonly-review.json`、`checkpoint-audit.json`、`handoff-receipt.json` 和客户端退出标记。自动化工具诊断小节完成，人工原生核验与整体 XW-96 未完成；检查点审计不替代最终恢复审计。

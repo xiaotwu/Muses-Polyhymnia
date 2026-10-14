@@ -12,6 +12,8 @@ XW-96 保持 In Progress：正式版 Dark 实际 840×804pt 的稳定封面与�
 
 Linear 当前 25 项开放：18 项 In Review、7 项 In Progress、0 项 Backlog，包含父任务及协调项。Bug 标签的开放任务为零，但用户间歇侧栏报告 XW-96 仍待排查，完整产品矩阵没有全部完成。XW-75 仍 In Review；真实 macOS 26、手动 Siri/Shortcuts 和完整 VoiceOver 矩阵没有新增通过结论。旧公共 Home Retry 要求退休，不计为通过。
 
+用户随后已释放桌面控制。本轮前台诊断确认：安装 cua-driver 0.28.1 的 desktop move 只 warp 指针，不生成悬停事件，故未显示导航不能归因于应用 hover 故障。原生 Computer Use 菜单与 Tab 没有取得导航按钮焦点，系统键盘导航只读值为 0；Command-[ 确实返回原 Liked 详情。全局焦点快捷键被 QQ 拦截，新迷你窗口已关闭。已经请求真实指针和菜单/Tab 人工核验，并暂停 GUI 输入；正常 Muses 有意保留在 Now Playing，原尺寸和暂停上下文保留，最终浏览/指针/前台恢复待人工小节结束。检查点的全部 27 表、45 项偏好与应用摘要一致；自有 driver 会话/客户端结束，没有源码、测试、录制或构建变更。工具诊断小节完成，XW-96 仍未完成，细节见 [导航验收](now-playing-navigation-acceptance.md)。最新完整 main CI 38498051238 本轮回读仍为 success。
+
 最终本机验证：912 项 / 126 套件 Swift 报告通过（27.877 秒，包含 opt-in 跳过项），14 项发布配置检查、独立磁盘恢复 1 项 / 1 套件、Release 编译与新 App Intents 元数据通过。候选冷 Play 在 Cua 读取前已记录到主窗口，新进程正确曲目推进/Pause；视频歌词 Tab/Escape、视频/章节/评论自身关闭以及 Home/New 两来源空态均通过。正式版、资料与凭据保留，全部自有候选已清理。
 
 精确 PR head `7da9e4e` 的 [完整 macOS CI 38481575596](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38481575596) 全阶段成功：14 项发布检查、912 项 / 126 套件 Swift 报告（56.844 秒）、独立磁盘恢复 1 项 / 1 套件（0.130 秒）、元数据、预览打包和上传。合并源码与已验证源码无差异；2026-10-13 接续已确认 `main` 源码 `9f482a5` 的重复 [CI 38483286321](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38483286321) 全阶段成功：14 项发布检查（7.745 秒）、912 项 / 126 套件 Swift 报告（54.189 秒）、独立磁盘恢复 1 项 / 1 套件（0.128 秒）、元数据、预览打包和上传。文档提交 `ce061b1` 未改变该源码。当前安装的 0.6.0 保留，这些源码改动将在下一次正式发版后生效。
