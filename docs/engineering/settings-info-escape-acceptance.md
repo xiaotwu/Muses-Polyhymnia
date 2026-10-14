@@ -1,6 +1,6 @@
 # Settings information-popover Escape acceptance — October 14
 
-XW-99 fixes Escape dismissal when a Settings information popover leaves keyboard focus on its originating button. Source `8560bab7af7312628526bde5be0f00e2eda7742f` passed local Release compilation, independent source review and the specific native keyboard/pointer/text-selection cells below. XW-99 is In Review pending remote CI and PR integration; neither gate has yet been accepted. XW-71 remains In Review for its separate system, VoiceOver and device conditions.
+XW-99 fixes Escape dismissal when a Settings information popover leaves keyboard focus on its originating button. Source `8560bab7af7312628526bde5be0f00e2eda7742f` passed local Release compilation, independent source review and the specific native keyboard/pointer/text-selection cells below. [PR #7](https://github.com/xiaotwu/Muses-Polyhymnia/pull/7) merged as `fc339c8`. Exact PR head `639a277` passed [PR CI 38653245594](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38653245594) and exact merge commit `fc339c8` passed [main CI 38654810970](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38654810970) in every stage; execution source matches the locally accepted source. XW-99 is Done. Actual CI counts and skip boundaries are retained in [current status](current-status.md). XW-71 and XW-75 remain In Review for their separate presentation, system, VoiceOver and device conditions.
 
 ## Original observations and narrow repair
 
@@ -30,4 +30,4 @@ Pre-repair evidence remains in `~/.muses/tmp/engineering-oct14/settings-auxiliar
 
 Final independent review also found zero-key physical preference plists from the earlier Edit Info and pre-repair Settings candidates. Only those two verified owned empty files were removed, with their original cleanup receipts retained and follow-up receipts added. `final-empty-preference-cleanup.json` records the exact paths and checks; no deleted candidate domain was re-exported.
 
-This accepts the recorded local origin-focus, continued-Tab, pointer-open and human selected-text dismissal cells. It does not establish all modified-Escape combinations, full VoiceOver/device/appearance coverage or actual macOS 26 interaction. Remote CI/PR integration remains the separate gate. The installed formal 0.6.0 was not replaced.
+This accepts the recorded local origin-focus, continued-Tab, pointer-open and human selected-text dismissal cells. It does not establish all modified-Escape combinations, full VoiceOver/device/appearance coverage or actual macOS 26 interaction. PR #7 is merged and its exact PR/main CI passed; XW-99 is Done. XW-71 and XW-75 retain their separate unaccepted conditions. The installed formal 0.6.0 was not replaced.

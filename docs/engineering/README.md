@@ -2,7 +2,7 @@
 
 2026-10-14，[导入署名与封面呈现](credits-and-cover-followup.md)（XW-97/98）已完成并为 **Done**：旧 owner 署名的显式预览/可恢复修复/撤销，歌曲与歌单 3:4 焦点卡、多张 Muses 聚焦横栏和封面分辨率选择均通过限定本机/隔离原生验收。[PR #6](https://github.com/xiaotwu/Muses-Polyhymnia/pull/6) 已合并，精确 PR 与 main CI 全阶段通过；正式 0.6.0 未替换，正常资料未应用修复。
 
-2026-10-14 最新验收：[未保存歌曲信息草稿与外部歌词 Intent 交接](edit-draft-intent-acceptance.md) 已接受限定小节；同一草稿保留、Cancel 后原 query、Tab/Escape、完整框架 Passed 1/0/exit0 及正常资料保护均按报告核对。XW-75 继续 In Review，其余系统/设备与未测呈现条件未关闭。XW-71 的四个 Help disclosure 已在本轮单独授权的临时 Keyboard navigation 2 下通过 Tab/Space。[XW-99 信息弹窗 Escape](settings-info-escape-acceptance.md) 的 `8560bab` 窄修复已本机 Release、独立源码审阅及限定原生复验通过，原焦点保留、继续 Tab、点击打开和人类文本选中 Escape 按实际范围接受；完整数据/偏好与自有清理独立复审通过，远端 CI/PR 集成仍待完成。系统已在 UI 恢复 0 并读回，自有候选和 System Settings 正常退出。最新本机检查点 25 项开放（19 In Review、6 In Progress），其中唯一 Bug 标签仍为 XW-99；XW-99 已转 In Review 待远端验证，XW-71 继续 In Review，详见 [当前状态](current-status.md)。
+2026-10-14 最新验收：[未保存歌曲信息草稿与外部歌词 Intent 交接](edit-draft-intent-acceptance.md) 已接受同一 Title 草稿保留、Cancel 后原 query、Tab/Escape 小节，完整框架 Passed 1/0/exit0 和正常资料保护通过。XW-71 的四个 Help disclosure 在本轮单独授权的临时 Keyboard navigation 2 下通过 Tab/Space；[XW-99 信息弹窗 Escape](settings-info-escape-acceptance.md) 的窄修复通过本机 Release、独立审阅及限定原生复验，原焦点保留、继续 Tab、点击打开和人类文本选中 Escape 按范围接受。[PR #7](https://github.com/xiaotwu/Muses-Polyhymnia/pull/7) 已合并 `fc339c8`，[PR CI 38653245594](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38653245594) 与 [main CI 38654810970](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38654810970) 全阶段成功，合并源码与已验源码一致，XW-99 为 **Done**。完整数据/偏好与清理独立复核通过；系统恢复 0，自有资源已清理，正式 0.6.0 未替换。XW-71 与 XW-75 继续 In Review，其他系统、设备与未测条件保留。最新实时 Linear 核对为 24 项开放（18 In Review、6 In Progress），开放 Bug 标签为零；父任务与协调项仍包含在计数中。详见 [当前状态](current-status.md)。
 
 2026-10-14 最新入口：[XW-96 导航验收](now-playing-navigation-acceptance.md) 按用户的人类实际操作判断收尾为 **Done**，转向其他主要问题。真实hover修复、普通重开、紧凑纯文本滚动及授权临时模式2的原生焦点路径按范围接受，系统已恢复0及General页面；严格小于300ms输入计时仍未验证，不再阻断后续工作，不扩展为完整设备/VoiceOver矩阵通过。
 
@@ -20,8 +20,8 @@
 
 | 分类 | 技术文档 | 执行任务 |
 | --- | --- | --- |
-| 已证实的缺陷与修复 | [修复任务](repairs.md)、[来源修复](source-state-acceptance.md)、[CI 回归](source-ci-regression.md)、[缓存恢复](source-cache-recovery.md)、[重试/Pull/刷新/标签](remaining-review-fixes.md)、[App Intents](app-intents-handoff.md)、[图库歌词](gallery-lyrics-acceptance.md)、[普通歌单](ordinary-playlist-metadata.md)、[真实磁盘恢复](pull-disk-recovery.md)、[Pull 原生恢复](pull-native-recovery.md)、[冷启动与位置恢复](cold-start-recovery.md)、[信息弹窗 Escape](settings-info-escape-acceptance.md) | 新修复及证据以 [当前状态](current-status.md) 为准；XW-84/89 已完成，XW-99 已本机修复/限定复验，最终保护与清理审查通过，待远端 CI/集成 |
-| 功能实现与补充验收 | [功能及验收](feature-acceptance.md)、[草稿/历史跟进](playlist-flow-followup.md)、[非空目录验收](library-catalog-acceptance.md)、[Edit Info 草稿与 Intent](edit-draft-intent-acceptance.md) | XW-79 已完成；XW-73 已补齐 24 首真实专辑的非空目录/正常刷新小节，XW-75 已接受本轮 Title 草稿交接；XW-71/99、XW-72、XW-73、XW-75、XW-62 与既有阶段任务保留各自剩余条件 |
+| 已证实的缺陷与修复 | [修复任务](repairs.md)、[来源修复](source-state-acceptance.md)、[CI 回归](source-ci-regression.md)、[缓存恢复](source-cache-recovery.md)、[重试/Pull/刷新/标签](remaining-review-fixes.md)、[App Intents](app-intents-handoff.md)、[图库歌词](gallery-lyrics-acceptance.md)、[普通歌单](ordinary-playlist-metadata.md)、[真实磁盘恢复](pull-disk-recovery.md)、[Pull 原生恢复](pull-native-recovery.md)、[冷启动与位置恢复](cold-start-recovery.md)、[信息弹窗 Escape](settings-info-escape-acceptance.md) | 新修复及证据以 [当前状态](current-status.md) 为准；XW-84/89/99 已 Done；XW-99 本机/保护复验、PR #7 合并及精确 PR/main CI 均通过，原失败与计时边界保留 |
+| 功能实现与补充验收 | [功能及验收](feature-acceptance.md)、[草稿/历史跟进](playlist-flow-followup.md)、[非空目录验收](library-catalog-acceptance.md)、[Edit Info 草稿与 Intent](edit-draft-intent-acceptance.md) | XW-79 已完成；XW-73 已补齐 24 首真实专辑的非空目录/正常刷新小节，XW-75 已接受本轮 Title 草稿交接；XW-71、XW-72、XW-73、XW-75、XW-62 与既有阶段任务保留各自剩余条件 |
 | 性能与优化调查 | [优化项](performance.md) | XW-74；无证据的排查候选不直接变成重构任务 |
 
 判断顺序：当前用户决定和批准规格 → 当前源码 → 实际运行 → 测试 → 历史记录。历史对话不能恢复已淘汰产品方向；测试通过不能替代原生界面验收。总体 UI 验收仍使用 [64 区域对照表](../ui-ux-acceptance-reconciliation.md)，具体操作使用 [验收记录](../ui-ux-redesign-acceptance.md)。
