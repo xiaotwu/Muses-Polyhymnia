@@ -14,7 +14,7 @@
 | 普通返回与重开 | Back 返回原 Liked122/530，随后从 PlayerBar 重开，稳定画面中导航隐藏。没有实际输入间隔小于 300ms 的记录，不接受为快速重开。 |
 | 按钮焦点 | Focus Navigation 菜单与 Tab 之后，焦点回读仍为主窗口；`AppleKeyboardUIMode=0` 未改动，未取得导航按钮焦点，不增加键盘验收通过结论。 |
 
-精确 head `1e377954` 的 [CI 38514615922](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38514615922) 全阶段通过：944 项 / 129 套件 Swift（60.259 秒）、14 项发布检查（5.954 秒）、独立磁盘恢复 1 项 / 1 套件（0.137 秒）、Release 编译、App Intents 元数据、预览打包及上传。CI 预览采用 ad-hoc 签名并验证；正式发行仍走既有签名公证流程。合并 main 的 [CI 38517976309](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38517976309) 在本次文档检查点仍进行中。本段不替代其最终结果。
+精确 head `1e377954` 的 [CI 38514615922](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38514615922) 全阶段通过：944 项 / 129 套件 Swift（60.259 秒）、14 项发布检查（5.954 秒）、独立磁盘恢复 1 项 / 1 套件（0.137 秒）、Release 编译、App Intents 元数据、预览打包及上传。CI 预览采用 ad-hoc 签名并验证；正式发行仍走既有签名公证流程。合并 main 的 [CI 38517976309](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38517976309) 也全阶段成功：944 项 / 129 套件（56.394 秒）、14 项发布检查（5.834 秒）、独立磁盘恢复 1 项 / 1 套件（0.126 秒）、Release 元数据、预览打包、签名验证及上传。合并源码与已验 head 一致，文档收尾不改变源码、测试或构建配置。
 
 候选已通过 Command-Q 正常退出，进程及窗口结束；32 项 seed 偏好逐项匹配，4 个运行时键保留实际值。当前候选应用和隔离数据继续保留供剩余焦点/快速重开验收，本轮不声称所有候选已清理。候选 673 首 Track 整行与 seed 一致，ListeningEvent 仍为 78 条；仅有自身 4 次检查点事务，其 namespace 与 `com.muses.app` 分离，候选新增事务没有出现在正式库。
 
