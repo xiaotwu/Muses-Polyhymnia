@@ -3,6 +3,7 @@ import SwiftData
 
 /// Persistent navigation islands; expanded labels never resize browsing content.
 struct SidebarView: View {
+    var hidesWhenInactive = false
     var onSettingsCategoryChange: () -> Void = {}
     var onKeyboardFocusChange: (Bool) -> Void = { _ in }
     var onPointerHoverChange: (Bool) -> Void = { _ in }
@@ -15,6 +16,7 @@ struct SidebarView: View {
     @Binding var selectedYouTubeImport: YouTubeImport?
     @AppStorage(PrefKey.settingsLastPane) private var settingsPane = SettingsCategory.general.rawValue
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.isEnabled) private var isEnabled
     @State private var hoveredIsland: String?
     @State private var railHovered = false
     @State private var islandBounds: [String: CGRect] = [:]
@@ -57,6 +59,12 @@ struct SidebarView: View {
             .scrollIndicators(.hidden)
             // Music and Settings have different rail lengths and must not share scroll offsets.
             .id(selection == .settings)
+            // Fade only the drawing. The outer host must keep observing the
+            // pointer so an invisible immersive rail can reveal itself.
+            .opacity(hidesWhenInactive && !railHovered && hoveredIsland == nil && focusedItem == nil ? 0 : 1)
+            .animation(MusesMotion.hoverAnimation(reduceMotion: reduceMotion), value: railHovered)
+            .animation(MusesMotion.hoverAnimation(reduceMotion: reduceMotion), value: hoveredIsland)
+            .animation(MusesMotion.hoverAnimation(reduceMotion: reduceMotion), value: focusedItem)
             // Expanded capsules fit the host width; retain native clipping so
             // vertically scrolled islands cannot cover the titlebar or footer.
         }
@@ -67,6 +75,7 @@ struct SidebarView: View {
         .contentShape(SidebarNavigationHitShape(islandBounds: Array(islandBounds.values)))
         .onPreferenceChange(SidebarIslandBoundsKey.self) { islandBounds = $0 }
         .onHover { inside in
+            guard isEnabled else { return }
             railHovered = inside
             onPointerHoverChange(inside || hoveredIsland != nil)
         }
@@ -74,6 +83,7 @@ struct SidebarView: View {
             onPointerHoverChange(railHovered || island != nil)
         }
         .onReceive(NotificationCenter.default.publisher(for: .musesFocusNavigation)) { _ in
+            guard isEnabled else { return }
             if selection == .settings {
                 focusedItem = (SettingsCategory(rawValue: settingsPane) ?? .general).destination.rawValue
             } else {
@@ -84,6 +94,13 @@ struct SidebarView: View {
         }
         .onChange(of: focusedItem) { _, item in
             onKeyboardFocusChange(item != nil)
+        }
+        .onChange(of: isEnabled) { _, enabled in
+            if !enabled {
+                railHovered = false
+                hoveredIsland = nil
+                focusedItem = nil
+            }
         }
         .onChange(of: selection) { old, new in
             if (old == .settings) != (new == .settings) {
@@ -160,6 +177,7 @@ struct SidebarView: View {
                 .musesGlass(in: RoundedRectangle(cornerRadius: 28), role: .navigationIsland)
                 .contentShape(RoundedRectangle(cornerRadius: 28))
                 .onHover { inside in
+                    guard isEnabled else { return }
                     if inside { hoveredIsland = key }
                     else if hoveredIsland == key { hoveredIsland = nil }
                 }

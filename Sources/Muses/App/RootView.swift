@@ -32,8 +32,6 @@ struct RootView: View {
     @State private var showYouTubeLink = false
     @State private var droppedYouTubeLink = ""
     @State private var showNowPlaying = false
-    @State private var immersiveNavigationHovered = false
-    @State private var immersiveNavigationFocused = false
     @State private var immersiveToolbarRevealed = false
     @State private var lyricsSearchRequest: LyricsSearchRequest?
     private struct LyricsSearchRequest: Identifiable {
@@ -793,12 +791,11 @@ struct RootView: View {
             .overlay(alignment: .leading) {
                 if showNowPlaying {
                     SidebarView(
+                        hidesWhenInactive: true,
                         onSettingsCategoryChange: {
                             settingsPath = []
                             returnFromNowPlaying()
                         },
-                        onKeyboardFocusChange: { immersiveNavigationFocused = $0 },
-                        onPointerHoverChange: { immersiveNavigationHovered = $0 },
                         canGoBack: windowBrowseNavigationCommands.canGoBack,
                         canGoForward: windowBrowseNavigationCommands.canGoForward,
                         onBack: windowBrowseNavigationCommands.back,
@@ -807,14 +804,7 @@ struct RootView: View {
                         selectedPlaylist: $selectedPlaylist,
                         selectedYouTubeImport: $selectedYouTubeImport
                     )
-                    .opacity(immersiveNavigationHovered || immersiveNavigationFocused ? 1 : 0)
                     .onChange(of: section) { _, _ in returnFromNowPlaying() }
-                    .onAppear {
-                        immersiveNavigationHovered = false
-                        immersiveNavigationFocused = false
-                    }
-                    .animation(MusesMotion.hoverAnimation(reduceMotion: reduceMotion), value: immersiveNavigationHovered)
-                    .animation(MusesMotion.hoverAnimation(reduceMotion: reduceMotion), value: immersiveNavigationFocused)
                 }
             }
             .overlayPreferenceValue(CoverSlotPreferenceKey.self) { anchor in
