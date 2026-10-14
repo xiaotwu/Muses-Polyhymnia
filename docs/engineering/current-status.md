@@ -2,7 +2,7 @@
 
 2026-10-13 发布后接续：用户授权实际操作已安装的正式版 0.6.0，并决定彻底移除公共发现，只保留 Muses 与真实账号推荐。XW-75 原含最小化、闭窗、Quick Search、framework 请求与 Now Playing Back 的完整连续路径已通过；真实歌词服务预览及浮窗上方原生弹窗也已接受。正式操作复现的 **XW-90 冷态 Play 无主窗口** 和 **XW-92 主窗口视频截获歌词弹窗键盘** 分别在 `f2ef10f`、`7481961` 修复；**XW-91 公共发现退休** 在 `a30cebd` 实现。三个修复已通过候选原生小节、受控回归和独立复审，[PR #2](https://github.com/xiaotwu/Muses-Polyhymnia/pull/2) 合并为 `9f482a5`，XW-90/91/92 均 Done。详细操作、数据恢复和限定范围见 [正式版检查](post-release-formal-inspection.md)。
 
-本轮 XW-93 已受控确认并窄修复：旧分页不再清掉新同名请求的 loading 标记，完整刷新同步释放旧 loading/error。原始 15 个失败断言和修复后通过均保留，39 项 / 5 套件相关回归及最终独立复审通过；详见 [分页状态归属](home-continuation-ownership.md)。[PR #3](https://github.com/xiaotwu/Muses-Polyhymnia/pull/3) 的完整 [CI 38487746201](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38487746201) 全阶段成功（917 项 / 127 套件、独立磁盘恢复、14 项发布检查、元数据与打包/上传），合并为 `bc7d24e`，XW-93 Done。新 main 重复 [CI 38489943090](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38489943090) 待接续核实。
+本轮 XW-93 已受控确认并窄修复：旧分页不再清掉新同名请求的 loading 标记，完整刷新同步释放旧 loading/error。原始 15 个失败断言和修复后通过均保留，39 项 / 5 套件相关回归及最终独立复审通过；详见 [分页状态归属](home-continuation-ownership.md)。[PR #3](https://github.com/xiaotwu/Muses-Polyhymnia/pull/3) 的完整 [CI 38487746201](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38487746201) 全阶段成功（917 项 / 127 套件、独立磁盘恢复、14 项发布检查、元数据与打包/上传），合并为 `bc7d24e`，XW-93 Done。精确 main `bc7d24e` 的重复 [CI 38489943090](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38489943090) 亦全阶段成功：917 项 / 127 套件（57.108 秒）、独立磁盘恢复 1 项（0.157 秒）、14 项发布检查、元数据与打包/上传。
 
 正式版新增 Queue 上方歌词 Intent 的 Tab/Escape 小节已接受。用户新报告的侧栏问题已按十二个浏览目的地和导入详情的指针封面入口检查，当前宽窗未复现稳定故障；普通歌词默认值这次是真实视频标题，但艺人仍是发布者。详细范围及资料恢复见 [输入与署名检查](post-release-input-and-credits.md)。新增 XW-94 旧账号署名、XW-95 默认歌词查询正在受控修复；XW-96 保留间歇侧栏报告及快速重开/hover/compact 条件。
 
