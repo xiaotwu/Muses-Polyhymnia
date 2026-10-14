@@ -27,3 +27,25 @@ XW-94 追查删除/换账号/重导入后的旧署名：现有相同 video ID �
 XW-95 追查默认歌词输入：初始化不会等待或跟随后到的 verified metadata，自动/桌面查词仍可能拿原始 publisher/旧标题。先验证迟到 metadata、明确 placeholder/标题恰为视频身份、仅 owner/publisher 的艺人，再准备真实默认输入；显式 Intent query、用户编辑和真实数字歌名必须保留。不能把本轮验收数字值当作已证实的普通入口缺陷。
 
 逐页检查结束后，13 张保护表和所有表计数、完整偏好仍一致。正式版恢复导入 Liked122/530、暂停26.6666秒、50%音量、单曲循环/关闭随机；歌词、Queue 和视频关闭。证据在 `~/.muses/tmp/engineering-oct13/formal-sidebar-oct13/`。剩余具体修复与验收继续由 [当前状态](current-status.md) 和 Linear 管理。
+
+
+## XW-94 受控修复
+
+真实 SQLite 种子包含已删除 A 导入、旧 owner artist 的共享 Track、喜欢、手工字段和历史；新 ModelContainer 中导入 B 再获取精确视频 metadata，证明旧 owner 缺失使署名错误。完全本地 HTTP harness 的原源码七项定义 / 十四次调用有 36 个失败；另保留早期测试桩问题和修正记录，不能把它们当作产品故障。补测首个 metadata 请求等待期间才写入 owner 关系，初修复仍有两个失败，随后在 await 返回后同样刷新关系。
+
+最终实现从保留的导入项目关系读取精确视频 owner 事实，在缓存/共享请求返回前及等待完成后登记；当前活动集合优先提供展示标题，已删除集合只提供可证实的署名来源。真实 artist 优先、缺失时使用视频 publisher；没有保留来源依据的旧字符串不猜测、不批量改写。
+
+显式重导入不再返回 tombstone，读取新来源并建立新 occurrence，保留旧修订和共用 Track 的 UUID、手工标题/艺人/时长、喜欢与历史。已知 LL/WL 的账号范围分别判断；公共 playlist ID 保持全局来源身份，未知账号范围采取保守判断。恢复已删除记录时若同来源已有活动导入，会先拒绝并提示恢复为副本，未创建修订或 Push；不同已知 LL 账号的恢复不受误阻。
+
+最终定向回归 144 项 / 14 套件通过（15.059 秒），专项九项定义 / 十六次调用；所有副本和 HTTP 都由本地 fixture 控制，未改正式资料库、账号或远端歌单。证据与精确源码摘要见 `~/.muses/tmp/engineering-oct13/recording-credits-source/`。这是受控数据/服务验收，不新增真实换账号或删除正式歌单的原生结论；集成状态以当前状态文档为准。
+
+
+## XW-95 受控修复
+
+同一录音已具备 verified `Recording Song / Performer` 时，原 `fetch/load` 的真实本地 HTTP 请求仍发送视频标题 / publisher，两次调用有六个失败断言。现在 LyricsService 从 app-lifetime 的唯一 importer 获取元数据，自动/桌面歌词共用准备路径；歌曲占位值与 exact video-ID 标题仅在真实来源可用时替换。仅 owner/publisher 的默认艺人查询留空，手工字段、显式 Intent query、1999/505 等数字歌名保留。查询用准备后的 snapshot，选择、文档缓存及 Track 写入仍绑定原录音。
+
+picker 的准备与提交分别管理：后到的元数据不覆盖编辑，也不把半输入草稿自动提交；Submit/source/mode/Restore 仍能明确搜索。关闭、取消和新 UUID 会拒绝旧结果，Apple Intelligence 也核对录音身份；准备中显示进度，未提交草稿显示搜索提示。已保存同步歌词和手工选择先返回；纯文本 timing upgrade 使用已经可用的字段，不额外等待详细 metadata。
+
+独立复审发现初修可能在 pipe 后缀清理时丢失 Live/Cover/Acoustic，实际 HTTP 三次调用有六个失败断言；现有广搜索保留，自动匹配的查询 snapshot 则保留原版本集合。不同搜索字段本就参与候选缓存 digest，补测确认旧 custom/raw miss 不阻止新 verified 查询，没有重写缓存架构。编译桩错误与所有失败日志保留。
+
+最终定向回归 105 项 / 14 套件通过（3.131 秒），专项十六项定义 / 二十九次调用，含 XW-94 的原测试和真实 SwiftData retained-owner 联动。自动结果仅按原 Track 写入歌词，标题/艺人/喜欢/播放次数/genre 保留。证据在 `~/.muses/tmp/engineering-oct13/lyrics-query-source/`。本轮普通数字默认输入仍未真实复现；数字验收参数是显式输入，不能把它们称作已复现故障。后续原生候选与完整 CI 结果另行记录。

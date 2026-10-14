@@ -96,6 +96,7 @@ final class LyricsService {
     private let modelContainer: ModelContainer?
     private let documentCache: LyricsDocumentCache
     private let offsetDefaults: UserDefaults
+    private let importService: YouTubeImportService?
     private let offsetsKey = "muses.lyrics.videoOffsetsMs"
     private let log = AppLog.for("LyricsService")
 
@@ -138,7 +139,7 @@ final class LyricsService {
         let preference = offsetDefaults.string(forKey: PrefKey.lyricsSource) ?? "auto"
         let configuration = preference + ":" + String(offsetDefaults.object(forKey: PrefKey.lyricsIntelligence) as? Bool ?? true)
         if loadedSourcePreference != configuration {
-            selectedCache.removeAll()
+            if !loadedSourcePreference.isEmpty { selectedCache.removeAll() }
             candidateCache.removeAll()
             searchQueries.removeAll()
             syncRefreshAttempts.removeAll()
@@ -169,10 +170,14 @@ final class LyricsService {
         guard cached.syncedLyrics?.isEmpty != false,
               cached.plainLyrics?.isEmpty == false,
               !syncRefreshAttempts.contains(key) else { return cached }
+        // Saved text must not wait for a new metadata extraction. Use the
+        // exact recording fields already available for this timing upgrade.
+        let lookup = cachedSearchPreparation(for: track).query.applying(to: track)
+        guard !lookup.title.isEmpty, !lookup.artist.isEmpty else { return cached }
         if syncRefreshAttempts.count >= 100 { syncRefreshAttempts.removeAll() }
         syncRefreshAttempts.insert(key)
         let revision = selectionRevision
-        let candidates = await findCandidates(track: track)
+        let candidates = await findCandidates(track: lookup)
         guard !Task.isCancelled else {
             // Closing the surface before lookup completes must allow a later retry.
             syncRefreshAttempts.remove(key)
@@ -181,7 +186,7 @@ final class LyricsService {
         guard revision == selectionRevision else {
             return selectedCache[key] ?? cached
         }
-        guard let candidate = LyricsSyncUpgrade.match(cached, candidates: candidates, track: track) else { return cached }
+        guard let candidate = LyricsSyncUpgrade.match(cached, candidates: candidates, track: lookup) else { return cached }
         let upgraded = result(for: candidate)
         selectedCache[key] = upgraded
         persistLyrics(upgraded, for: track.id)
@@ -211,11 +216,26 @@ final class LyricsService {
 
 
     init(session: URLSession = .shared, modelContainer: ModelContainer? = nil,
-         documentCache: LyricsDocumentCache = LyricsDocumentCache(), offsetDefaults: UserDefaults = .standard) {
+         documentCache: LyricsDocumentCache = LyricsDocumentCache(), offsetDefaults: UserDefaults = .standard,
+         importService: YouTubeImportService? = nil) {
         self.documentCache = documentCache
         self.offsetDefaults = offsetDefaults
         self.session = session
         self.modelContainer = modelContainer
+        self.importService = importService
+    }
+
+    func cachedSearchPreparation(for track: TrackSnapshot) -> LyricsPreparedRecording {
+        let row = importService?.songPresentationRow(for: track)
+            ?? CollectionTrackRow(snapshot: track, canonicalIndex: 0)
+        return LyricsPreparedRecording(row: row,
+            metadata: SongCreditCache.shared.entry(videoID: track.youTubeId))
+    }
+
+    func prepareSearch(for track: TrackSnapshot) async -> LyricsPreparedRecording? {
+        if let importService { _ = await importService.songMetadata(videoID: track.youTubeId) }
+        guard !Task.isCancelled else { return nil }
+        return cachedSearchPreparation(for: track)
     }
 
     // MARK: - Public
@@ -292,22 +312,26 @@ final class LyricsService {
     /// Returns on the first successful source; nil when all fail.
     func fetch(track: TrackSnapshot) async -> LyricsResult? {
         let revision = selectionRevision
+        guard let prepared = await prepareSearch(for: track), !Task.isCancelled else { return nil }
+        guard revision == selectionRevision else { return selectedCache[cacheKey(track)] }
+        guard !prepared.title.isEmpty else { return nil }
+        let lookup = prepared.query.applying(to: track)
         let pref = offsetDefaults.string(forKey: PrefKey.lyricsSource) ?? "auto"
         var result: LyricsResult?
         if pref == "musixmatch" {
-            result = await fetchMusixmatch(track: track)
+            result = await fetchMusixmatch(track: lookup)
         }
         if pref == "lyricsOVH" {
-            result = await fetchLyricsOVH(track: track)
+            result = await fetchLyricsOVH(track: lookup)
         }
         if result == nil, !Task.isCancelled, revision == selectionRevision {
-            result = await fetchLrclib(track: track)
+            result = await fetchLrclib(track: lookup)
         }
         if result == nil, pref != "musixmatch", !Task.isCancelled, revision == selectionRevision {
-            result = await fetchMusixmatch(track: track)
+            result = await fetchMusixmatch(track: lookup)
         }
         if result == nil, pref != "lyricsOVH", !Task.isCancelled, revision == selectionRevision {
-            result = await fetchLyricsOVH(track: track)
+            result = await fetchLyricsOVH(track: lookup)
         }
         guard !Task.isCancelled else { return nil }
         // A pending automatic lookup cannot replace a subsequent manual choice.

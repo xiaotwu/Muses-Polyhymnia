@@ -166,7 +166,7 @@ struct MusesApp: App {
         self.globalSearchService = GlobalSearchService(
             library: library, catalog: catalogService,
             youTubeSearch: searchService, notes: notesService)
-        self.lyricsService = LyricsService(modelContainer: container)
+        self.lyricsService = LyricsService(modelContainer: container, importService: importService)
         self.nowPlayingManager = NowPlayingManager(playbackService, library: library, queue: queue)
         // Contextual listening: ffContext is on by default, best-effort capturing local time,
         // output device, and headphone heuristics. The frontmost app bundle id still requires
