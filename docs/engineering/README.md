@@ -20,7 +20,7 @@
 
 | 分类 | 技术文档 | 执行任务 |
 | --- | --- | --- |
-| 已证实的缺陷与修复 | [修复任务](repairs.md)、[来源修复](source-state-acceptance.md)、[CI 回归](source-ci-regression.md)、[缓存恢复](source-cache-recovery.md)、[重试/Pull/刷新/标签](remaining-review-fixes.md)、[App Intents](app-intents-handoff.md)、[图库歌词](gallery-lyrics-acceptance.md)、[普通歌单](ordinary-playlist-metadata.md)、[真实磁盘恢复](pull-disk-recovery.md)、[Pull 原生恢复](pull-native-recovery.md)、[冷启动与位置恢复](cold-start-recovery.md)、[信息弹窗 Escape](settings-info-escape-acceptance.md) | 新修复及证据以 [当前状态](current-status.md) 为准；XW-84/89 已完成，XW-99 已本机修复/限定复验，待远端 CI/集成与最终保护审查 |
+| 已证实的缺陷与修复 | [修复任务](repairs.md)、[来源修复](source-state-acceptance.md)、[CI 回归](source-ci-regression.md)、[缓存恢复](source-cache-recovery.md)、[重试/Pull/刷新/标签](remaining-review-fixes.md)、[App Intents](app-intents-handoff.md)、[图库歌词](gallery-lyrics-acceptance.md)、[普通歌单](ordinary-playlist-metadata.md)、[真实磁盘恢复](pull-disk-recovery.md)、[Pull 原生恢复](pull-native-recovery.md)、[冷启动与位置恢复](cold-start-recovery.md)、[信息弹窗 Escape](settings-info-escape-acceptance.md) | 新修复及证据以 [当前状态](current-status.md) 为准；XW-84/89 已完成，XW-99 已本机修复/限定复验，最终保护与清理审查通过，待远端 CI/集成 |
 | 功能实现与补充验收 | [功能及验收](feature-acceptance.md)、[草稿/历史跟进](playlist-flow-followup.md)、[非空目录验收](library-catalog-acceptance.md)、[Edit Info 草稿与 Intent](edit-draft-intent-acceptance.md) | XW-79 已完成；XW-73 已补齐 24 首真实专辑的非空目录/正常刷新小节，XW-75 已接受本轮 Title 草稿交接；XW-71/99、XW-72、XW-73、XW-75、XW-62 与既有阶段任务保留各自剩余条件 |
 | 性能与优化调查 | [优化项](performance.md) | XW-74；无证据的排查候选不直接变成重构任务 |
 

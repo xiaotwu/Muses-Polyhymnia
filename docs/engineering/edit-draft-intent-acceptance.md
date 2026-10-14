@@ -26,6 +26,8 @@ Normal candidate shutdown changed lifecycle ORM/timestamps and JSON serializatio
 
 Temporary candidate preferences were restored, then its disposable domain was removed. The exact candidate and runner processes were absent; owned registration, candidate bundle, data/cache namespace, runner build/container and expanded result directory were removed after the complete result archive was verified. The original seed hash and 0400 mode, normal application, data/preferences and credentials were preserved. Source and other retained evidence remain available.
 
+Final independent review found a remaining zero-key physical candidate preference plist after domain deletion. Its exact ownership, empty contents and absent candidate process/namespace were verified before removing only that file. The earlier cleanup receipt is preserved; `cleanup-empty-preference-followup.json` records this correction without re-exporting the deleted domain.
+
 ## Remaining scope
 
 This accepts only the exercised unsaved Title draft → one external lyrics request → Cancel → original query → Tab → Escape cell. It adds no manual Siri/Shortcuts, actual macOS 26, full VoiceOver/device/appearance matrix, provider matching, playback or performance result. Earlier accepted cold/window/serial/video cells and their original failures retain their documented scope. The installed 0.6.0 was not replaced, and no production source repair was needed for this cell.

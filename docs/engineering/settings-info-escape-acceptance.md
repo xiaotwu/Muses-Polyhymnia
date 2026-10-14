@@ -28,4 +28,6 @@ General was restored. The candidate and task-started System Settings processes q
 
 Pre-repair evidence remains in `~/.muses/tmp/engineering-oct14/settings-auxiliary-oct14/`. Final-source build logs, qualification, native observations, actual SQLite checkpoints and restoration records remain in `~/.muses/tmp/engineering-oct14/settings-info-escape-oct14/`, including `attempt-1-release-build.log`, `release-build-evidence.json`, `source-review.json`, `native-final-result.json`, `keyboard-restored.json`, `independent-native-review.json` and `cleanup.json`.
 
+Final independent review also found zero-key physical preference plists from the earlier Edit Info and pre-repair Settings candidates. Only those two verified owned empty files were removed, with their original cleanup receipts retained and follow-up receipts added. `final-empty-preference-cleanup.json` records the exact paths and checks; no deleted candidate domain was re-exported.
+
 This accepts the recorded local origin-focus, continued-Tab, pointer-open and human selected-text dismissal cells. It does not establish all modified-Escape combinations, full VoiceOver/device/appearance coverage or actual macOS 26 interaction. Remote CI/PR integration remains the separate gate. The installed formal 0.6.0 was not replaced.
