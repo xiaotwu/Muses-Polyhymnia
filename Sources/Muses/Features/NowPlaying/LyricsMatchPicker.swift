@@ -4,18 +4,13 @@ struct LyricsMatchPicker: View {
     let track: TrackSnapshot
     var initialQuery = ""
     @Environment(LyricsService.self) private var lyrics
-    @Environment(YouTubeImportService.self) private var importService
     @Environment(\.dismiss) private var dismiss
     @State private var candidates: [LyricsCandidate] = []
     @State private var loading = true
-    @State private var titleQuery = ""
-    @State private var artistQuery = ""
+    @State private var preparation = LyricsSearchPreparation()
     @State private var source = "auto"
-    @State private var searchRevision = 0
-    @State private var initializedQuery = false
     @FocusState private var focusedField: QueryField?
     private enum QueryField: Hashable { case title, artist }
-    @State private var songInformation: SongDisplayInformation?
     @State private var intelligenceTask: Task<Void, Never>?
     @State private var preparingQuery = false
     @State private var intelligenceMessage: String?
@@ -43,29 +38,33 @@ struct LyricsMatchPicker: View {
         .foregroundStyle(BrandColors.textPrimary)
         .tint(BrandColors.accent)
         .frame(minWidth: 760, idealWidth: 900, minHeight: 620, idealHeight: 680)
-        .task {
-            initializeQuery()
+        .task(id: track.id) {
             focusedField = .title
+            await preparation.prepare(track: track, initialQuery: initialQuery, using: lyrics)
         }
-        .task(id: source + ":" + searchMode + ":" + String(searchRevision)) {
-            initializeQuery()
+        .task(id: track.id.uuidString + ":" + track.youTubeId + ":" + source + ":" + searchMode
+            + ":" + String(preparation.searchRevision) + ":" + String(preparation.isReady)) {
+            guard let query = preparation.searchTrack(for: track) else { loading = false; return }
             loading = true
             candidates = []
             selectedCandidateID = nil
             previewLines = []
-            let query = LyricsSearchQuery(title: titleQuery, artist: artistQuery).applying(to: track)
             let found = await lyrics.findCandidates(track: query, refresh: true, source: source,
-                keywords: searchMode == "keywords" ? [titleQuery, artistQuery].filter { !$0.isEmpty }.joined(separator: " ") : nil)
-            guard !Task.isCancelled else { return }
+                keywords: searchMode == "keywords" ? [preparation.titleQuery, preparation.artistQuery].filter { !$0.isEmpty }.joined(separator: " ") : nil)
+            guard !Task.isCancelled, preparation.recordingID == track.id else { return }
             candidates = found
-            selectedCandidateID = LyricsMatchPolicy.automatic(found, track: track)?.id
+            selectedCandidateID = LyricsMatchPolicy.automatic(found, track: query)?.id
             updatePreview()
             loading = false
         }
         .onChange(of: selectedCandidateID) { _, _ in updatePreview() }
-        .onDisappear { intelligenceTask?.cancel() }
+        .onDisappear { intelligenceTask?.cancel(); preparation.invalidate() }
+        .onChange(of: source) { _, _ in
+            preparation.submit()
+        }
         .onChange(of: searchMode) { _, mode in
             if mode == "keywords", source != "auto", source != "lrclib" { source = "lrclib" }
+            preparation.submit()
         }
     }
 
@@ -94,11 +93,11 @@ struct LyricsMatchPicker: View {
             ArtworkView(source: ArtworkSource.resolve(for: track), cornerRadius: 6, glyphSize: 20, targetSize: 44)
                 .frame(width: 44, height: 44)
             VStack(alignment: .leading, spacing: 4) {
-                Text(songInformation?.title ?? track.title)
-                    .font(MusesTypography.song(size: 14, emphasized: true, text: songInformation?.title ?? track.title))
+                Text(preparation.recordingID == track.id ? preparation.displayTitle : track.title)
+                    .font(MusesTypography.song(size: 14, emphasized: true, text: preparation.recordingID == track.id ? preparation.displayTitle : track.title))
                     .lineLimit(2)
-                Text(songInformation?.artist ?? track.artist)
-                    .font(MusesTypography.song(size: 12, text: songInformation?.artist ?? track.artist))
+                Text(preparation.recordingID == track.id ? preparation.displayArtist : track.artist)
+                    .font(MusesTypography.song(size: 12, text: preparation.recordingID == track.id ? preparation.displayArtist : track.artist))
                     .foregroundStyle(BrandColors.textSecondary).lineLimit(1)
             }
             Spacer(minLength: 12)
@@ -114,17 +113,17 @@ struct LyricsMatchPicker: View {
     private var compactQuery: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
-                TextField(tr("Song title or keywords", "歌名或关键词"), text: $titleQuery)
+                TextField(tr("Song title or keywords", "歌名或关键词"), text: $preparation.titleQuery)
                     .textFieldStyle(.roundedBorder).focused($focusedField, equals: .title)
                     .accessibilityLabel(tr("Song title or keywords", "歌名或关键词"))
-                TextField(tr("Artist (optional)", "艺人（可留空）"), text: $artistQuery)
+                TextField(tr("Artist (optional)", "艺人（可留空）"), text: $preparation.artistQuery)
                     .textFieldStyle(.roundedBorder).focused($focusedField, equals: .artist)
                     .frame(maxWidth: 240)
                 Button(action: submitSearch) {
                     Label(tr("Search", "搜索"), systemImage: "magnifyingglass")
                 }.buttonStyle(.borderedProminent).tint(BrandColors.playback)
                     .keyboardShortcut(.return, modifiers: .command)
-                    .disabled(titleQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(preparation.titleQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
             HStack(spacing: 16) {
                 Picker(tr("Source", "来源"), selection: $source) {
@@ -139,8 +138,7 @@ struct LyricsMatchPicker: View {
                 }.pickerStyle(.menu).fixedSize()
                 Spacer()
                 Button {
-                    initializedQuery = false
-                    initializeQuery(useInitialQuery: false)
+                    preparation.restoreDefaults(for: track, using: lyrics)
                 } label: { Image(systemName: "arrow.counterclockwise") }
                     .help(tr("Restore song information", "恢复歌曲信息"))
                     .accessibilityLabel(tr("Restore song information", "恢复歌曲信息"))
@@ -164,13 +162,18 @@ struct LyricsMatchPicker: View {
     }
 
     @ViewBuilder private var resultsPane: some View {
-        if loading {
-            ProgressView(tr("Finding matching recordings…", "正在查找匹配的录音版本…"))
+        if loading || (preparation.isPreparing && !preparation.isReady) {
+            ProgressView(preparation.isPreparing && !preparation.isReady
+                ? tr("Preparing song information…", "正在准备歌曲信息…")
+                : tr("Finding matching recordings…", "正在查找匹配的录音版本…"))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if candidates.isEmpty {
-            ContentUnavailableView(tr("No lyric matches", "未找到歌词匹配"), systemImage: "text.magnifyingglass",
-                description: Text(tr("Try the original song title or leave artist blank. A source may also be temporarily unavailable.",
-                    "可尝试原始歌名或留空艺人字段；歌词来源也可能暂不可用。")))
+            ContentUnavailableView(preparation.hasUnsubmittedEdits
+                ? tr("Search lyrics", "搜索歌词") : tr("No lyric matches", "未找到歌词匹配"), systemImage: "text.magnifyingglass",
+                description: Text(preparation.hasUnsubmittedEdits
+                    ? tr("Choose Search when your search terms are ready.", "搜索词准备好后，请选择搜索。")
+                    : tr("Try the original song title or leave artist blank. A source may also be temporarily unavailable.",
+                        "可尝试原始歌名或留空艺人字段；歌词来源也可能暂不可用。")))
         } else {
             HSplitView {
                 VStack(alignment: .leading, spacing: 8) {
@@ -242,7 +245,7 @@ struct LyricsMatchPicker: View {
                 lyrics.choose(selectedCandidate, for: track)
                 dismiss()
             }
-            .musesAction(prominent: true).disabled(loading || selectedCandidate?.hasLyrics != true)
+            .musesAction(prominent: true).disabled(loading || !preparation.isReady || selectedCandidate?.hasLyrics != true)
         }.padding(.horizontal, 24).padding(.vertical, 16)
     }
 
@@ -255,45 +258,28 @@ struct LyricsMatchPicker: View {
         }
     }
 
-    private func initializeQuery(useInitialQuery: Bool = true) {
-        guard !initializedQuery else { return }
-        let information = SongDisplayInformation(row: importService.songPresentationRow(for: track))
-        songInformation = information
-        titleQuery = LyricsService.sanitizedTitle(information.title)
-        artistQuery = queryArtist(information)
-        if useInitialQuery, !initialQuery.isEmpty {
-            titleQuery = initialQuery
-            artistQuery = ""
-        }
-        initializedQuery = true
-    }
-
-    private func queryArtist(_ information: SongDisplayInformation) -> String {
-        information.artist == tr("Artist unavailable", "艺人信息暂缺")
-            ? "" : LyricsMatchPolicy.queryArtist(information.artist)
-    }
-
     private func submitSearch() {
-        guard !titleQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        searchRevision += 1
+        preparation.submit()
     }
 
     private func prepareIntelligentQuery() {
         intelligenceTask?.cancel()
         preparingQuery = true
         intelligenceMessage = nil
-        let originalTitle = titleQuery
-        let originalArtist = artistQuery
+        let originalTitle = preparation.titleQuery
+        let originalArtist = preparation.artistQuery
+        let recordingID = track.id
         intelligenceTask = Task { @MainActor in
-            let proposal = await LyricsIntelligence.searchQuery(track: track)
-            guard !Task.isCancelled else { return }
+            let edited = LyricsSearchQuery(title: originalTitle, artist: originalArtist).applying(to: track)
+            let proposal = await LyricsIntelligence.searchQuery(track: edited)
+            guard !Task.isCancelled, preparation.recordingID == recordingID else { return }
             preparingQuery = false
             // Never overwrite edits or an active input-method composition made
             // while Apple's model was working. The user submits the proposal.
-            guard titleQuery == originalTitle, artistQuery == originalArtist else { return }
+            guard preparation.titleQuery == originalTitle, preparation.artistQuery == originalArtist else { return }
             if let proposal {
-                titleQuery = proposal.title
-                artistQuery = proposal.artist
+                preparation.titleQuery = proposal.title
+                preparation.artistQuery = proposal.artist
                 intelligenceMessage = tr("Search terms prepared on this Mac. Edit them before searching.",
                     "搜索词已在此 Mac 上整理，可继续修改后搜索。")
             } else {
