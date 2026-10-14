@@ -1,5 +1,7 @@
 # 当前修复与验收状态
 
+2026-10-14 新用户范围：[导入署名与封面呈现](credits-and-cover-followup.md)。XW-97 已实现旧 owner 署名的显式预览、来源/元数据核对、原子修复、恢复记录和撤销；XW-98 已实现歌曲/歌单 3:4 焦点卡、多张 Muses 聚焦横栏及低档封面升级且保留 HQ/maxres 优先。本机 968 项 / 130 套件、14 项发布配置、独立磁盘恢复、Release 与隔离原生修复/冷启/撤销及多尺寸视觉验收通过。两项 **In Review**，待本节 PR/CI；正式 27 表、45 项偏好及应用摘要完全保留，现有 0.6.0 尚未获得本节源码。
+
 2026-10-14 用户验收决定：按人类实际操作接受 XW-96 当前功能，结束本小节并转向其他主要问题，XW-96 **Done**。实际小于300ms的精确输入计时仍未验证，不再阻断后续工作。授权临时系统模式2下的Focus Navigation按钮焦点、Tab移出隐藏、Shift-Tab返回展开与Space激活History均按范围通过；系统已恢复0及General页面，既有真实hover、普通重开与紧凑纯文本滚动结论继续有效。不扩展为模式0按钮焦点或完整设备/VoiceOver矩阵通过。本轮无生产源码变更，详见 [导航验收](now-playing-navigation-acceptance.md)。
 
 [PR #5](https://github.com/xiaotwu/Muses-Polyhymnia/pull/5) 已合并为 `ceb2e295571b89d3bc6a6da11571d0eb526383cf`。精确 head `1e377954` 的 [CI 38514615922](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38514615922) 全阶段成功：944 项 / 129 套件（60.259 秒）、14 项发布检查（5.954 秒）、独立磁盘恢复 1 项 / 1 套件（0.137 秒）、Release、App Intents 元数据和 ad-hoc 签名预览打包/上传。合并 main [CI 38517976309](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38517976309) 也全阶段成功：944 项 / 129 套件（56.394 秒）、14 项发布检查（5.834 秒）、独立磁盘恢复 1 项 / 1 套件（0.126 秒）、Release 元数据、预览打包、签名验证及上传；其源码与已验 head 一致。文档收尾不改变源码、测试或构建配置。已安装的正式 0.6.0 未替换，修复将在下一次正式发版生效。
@@ -78,6 +80,8 @@ XW-75 的唯一名称 Shortcuts 候选已完成注册、独立 setup 启动/退�
 
 | 范围 | 下一步与实际前提 |
 | --- | --- |
+| XW-97 旧导入署名 | In Review；显式、可恢复修复已完成，本机完整回归、隔离 655 项 Apply/冷启/Undo 通过；待 PR/CI，正式资料未写入。 |
+| XW-98 封面呈现 | In Review；焦点卡比例/宽度、多推荐聚焦横栏和低档封面升级已完成；实际三尺寸及 Large 深色、横栏滚动通过，待 PR/CI。 |
 | XW-75 App Intents | 冷态歌词、完整串行键盘路径、真实来源预览/浮窗弹窗、修复后的冷 Play 和主窗口视频弹窗键盘均按记录范围通过。剩余其他未测呈现状态、手动 Siri/Shortcuts、实际 macOS 26 及完整 VoiceOver/设备矩阵。 |
 | XW-26 Pull/播放父项 | XW-84 的原生错误与同草稿重试已关闭，见 [原生恢复](pull-native-recovery.md)。父项保留真实评论/回复、其它来源/视频和未测持久化分支；自然远端冲突、Push/manage 与破坏性历史/group 保持原排除范围。 |
 | XW-71 Settings | 十类设置/历史、字体指针/键盘、语言/字号恢复和 Dark 840×804 三项检查已接受。剩余 Help 的 Tab/Space 与原按钮焦点、完整 VoiceOver、实际 macOS 26。 |
