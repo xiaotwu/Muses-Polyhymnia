@@ -44,7 +44,7 @@ struct SettingsInfoButton: View {
         .help(message)
         .accessibilityLabel(tr("About \(title)", "关于\(title)"))
         // Keyboard activation can leave focus on the originating button.
-        .onKeyPress(.escape) { keyPress in
+        .onKeyPress(.escape, phases: .down) { keyPress in
             guard presented,
                   keyPress.modifiers.intersection([.command, .control, .option, .shift]).isEmpty
             else { return .ignored }
