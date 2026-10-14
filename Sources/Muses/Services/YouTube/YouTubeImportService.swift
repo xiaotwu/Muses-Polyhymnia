@@ -80,21 +80,19 @@ final class YouTubeImportService {
 
     /// Presentation-only enrichment; persisted user edits and sync truth are untouched.
     func songMetadata(videoID: String) async -> YTDlpBridge.YTDlpPlaylistEntry? {
+        guard YTDlpBridge.YTDlpPlaylistEntry(id: videoID, title: "").resourceKind == .video else { return nil }
+        // Relationships can change while exact-video metadata remains valid.
+        // Refresh retained owner facts before cache hits and shared requests too.
+        _ = songOwnerContexts(videoID: videoID)
         if let cached = songMetadataCache[videoID], Date().timeIntervalSince(cached.date) < 300 {
             return cached.entry
         }
-        if let request = songMetadataRequests[videoID] { return await request.value }
-        guard YTDlpBridge.YTDlpPlaylistEntry(id: videoID, title: "").resourceKind == .video,
-              songMetadataRequests.count < 64 else { return nil }
-        let presentationContext = ModelContext(modelContainer)
-        let items = (try? presentationContext.fetch(FetchDescriptor<YouTubeImportItem>(
-            predicate: #Predicate { $0.youTubeId == videoID }
-        ))) ?? []
-        for item in items {
-            if let owner = item.import_, owner.deletedAt == nil {
-                SongCreditCache.shared.recordOwner(owner.channel, videoID: videoID)
-            }
+        if let request = songMetadataRequests[videoID] {
+            let entry = await request.value
+            _ = songOwnerContexts(videoID: videoID)
+            return entry
         }
+        guard songMetadataRequests.count < 64 else { return nil }
         let bridge = self.bridge
         let session = self.session
         let request = Task<YTDlpBridge.YTDlpPlaylistEntry?, Never> {
@@ -113,6 +111,7 @@ final class YouTubeImportService {
         }
         songMetadataRequests[videoID] = request
         let entry = await request.value
+        _ = songOwnerContexts(videoID: videoID)
         songMetadataRequests[videoID] = nil
         if songMetadataCache.count >= 96 { songMetadataCache.removeAll() }
         songMetadataCache[videoID] = (Date(), entry)
@@ -149,19 +148,27 @@ final class YouTubeImportService {
 
     /// Resolve collection presentation context in a fresh context, without retaining models.
     func songPresentationRow(for snapshot: TrackSnapshot) -> CollectionTrackRow {
+        let contexts = songOwnerContexts(videoID: snapshot.youTubeId)
+        let owner = contexts.first { $0.owner == snapshot.artist && $0.isActive }
+            ?? contexts.first { $0.owner == snapshot.artist }
+        return CollectionTrackRow(snapshot: snapshot, canonicalIndex: 0,
+            collectionOwner: owner?.owner, collectionTitle: owner?.title)
+    }
+
+    /// Retained deleted imports still prove an exact video's old owner-derived
+    /// credit. They never supply current membership or a visible collection title.
+    private func songOwnerContexts(videoID: String) -> [(owner: String, title: String?, isActive: Bool)] {
         let context = ModelContext(modelContainer)
-        let videoID = snapshot.youTubeId
         let descriptor = FetchDescriptor<YouTubeImportItem>(
             predicate: #Predicate { $0.youTubeId == videoID }
         )
-        let owner = (try? context.fetch(descriptor))?.compactMap { item -> YouTubeImport? in
-            guard let imported = item.import_, imported.deletedAt == nil,
-                  imported.channel == snapshot.artist else { return nil }
-            return imported
-        }.first
-        return CollectionTrackRow(snapshot: snapshot, canonicalIndex: 0,
-            collectionOwner: owner?.channel,
-            collectionTitle: owner.flatMap { YouTubePlaylistID.isMusicAlbum($0.playlistId) ? nil : $0.title })
+        return ((try? context.fetch(descriptor)) ?? []).compactMap { item in
+            guard let imported = item.import_ else { return nil }
+            SongCreditCache.shared.recordOwner(imported.channel, videoID: videoID)
+            let title = imported.deletedAt == nil && !YouTubePlaylistID.isMusicAlbum(imported.playlistId)
+                ? imported.title : nil
+            return (owner: imported.channel, title: title, isActive: imported.deletedAt == nil)
+        }
     }
 
     /// Re-fetch by owner UUID on the main actor and release all model objects
@@ -303,6 +310,9 @@ final class YouTubeImportService {
         // 5. Create a fresh ModelContext.
         let ctx = ModelContext(modelContainer)
         ctx.autosaveEnabled = false
+        let deletedSource = FetchDescriptor<YouTubeImport>(
+            predicate: #Predicate { $0.playlistId == playlistId && $0.deletedAt != nil })
+        let isReimport = try ctx.fetchCount(deletedSource) > 0
 
         // 6. Create the import.
         let imp = YouTubeImport(
@@ -330,7 +340,8 @@ final class YouTubeImportService {
             )
             ctx.insert(item)
 
-            let track = track(for: entry, artist: artist, durationMs: durationMs, context: ctx)
+            let track = track(for: entry, artist: artist, durationMs: durationMs,
+                              preserveExistingMetadata: isReimport, context: ctx)
             item.track = track
             items.append(item)
         }
@@ -548,9 +559,13 @@ final class YouTubeImportService {
     private func track(for entry: YTDlpBridge.YTDlpPlaylistEntry,
                        artist: String,
                        durationMs: Int,
+                       preserveExistingMetadata: Bool = false,
                        context ctx: ModelContext) -> Track {
         if let existing = existingYouTubeTrack(videoId: entry.id, context: ctx) {
             existing.libraryMember = true
+            // A fresh import occurrence owns its fresh source fields. Reimport
+            // must not overwrite edits/history on the shared recording row.
+            if preserveExistingMetadata { return existing }
             if existing.title != entry.title { existing.title = entry.title }
             if existing.artist != artist { existing.artist = artist }
             if durationMs > 0, existing.durationMs != durationMs {
@@ -678,7 +693,7 @@ final class YouTubeImportService {
 
     private func fetchImportByPlaylistId(_ playlistId: String, context ctx: ModelContext) -> YouTubeImport? {
         let descriptor = FetchDescriptor<YouTubeImport>(
-            predicate: #Predicate { $0.playlistId == playlistId }
+            predicate: #Predicate { $0.playlistId == playlistId && $0.deletedAt == nil }
         )
         return try? ctx.fetch(descriptor).first
     }

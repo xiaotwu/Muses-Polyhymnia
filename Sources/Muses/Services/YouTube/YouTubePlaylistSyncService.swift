@@ -8,6 +8,7 @@ enum YouTubePlaylistSyncError: LocalizedError, Sendable, Equatable {
     case notOwned
     case importNotFound
     case revisionNotFound
+    case restoreWouldDuplicateActiveImport
     case conflictsRequireResolution(Int)
     case writePermissionRequired
     case remoteWritesDisabled
@@ -32,6 +33,11 @@ enum YouTubePlaylistSyncError: LocalizedError, Sendable, Equatable {
             return tr("YouTube playlist not found", "未找到 YouTube 歌单")
         case .revisionNotFound:
             return tr("Playlist revision not found", "未找到歌单修订")
+        case .restoreWouldDuplicateActiveImport:
+            return tr(
+                "This playlist has already been imported. Restore the revision as a copy instead.",
+                "此歌单已有新的导入记录，请将该修订恢复为副本。",
+                zhHant: "此歌單已有新的匯入記錄，請將該修訂恢復為副本。")
         case .conflictsRequireResolution(let count):
             return tr("Resolve \(count) playlist conflicts before continuing", "继续前请先解决 \(count) 个歌单冲突", zhHant: "繼續前請先解決 \(count) 個歌單衝突")
         case .writePermissionRequired:
@@ -278,7 +284,7 @@ final class YouTubePlaylistSyncService {
                   account.activeChannelID == channel.id else { return }
             do {
                 let context = ModelContext(modelContainer)
-                if try fetchImport(playlistID: playlist.id, context: context) == nil {
+                if try fetchImport(playlistID: playlist.id, accountChannelID: channel.id, context: context) == nil {
                     let result = await client.playlistItemsPaginated(playlistId: playlist.id)
                     try Task.checkCancellation()
                     guard account.isConnected, account.activeChannelID == channel.id else { return }
@@ -318,7 +324,7 @@ final class YouTubePlaylistSyncService {
             throw YouTubePlaylistSyncError.invalidSnapshot("Incomplete or mismatched account import")
         }
         let context = ModelContext(modelContainer)
-        guard try fetchImport(playlistID: playlist.id, context: context) == nil else { return }
+        guard try fetchImport(playlistID: playlist.id, accountChannelID: channel.id, context: context) == nil else { return }
         let imported = YouTubeImport(
             playlistId: playlist.id,
             url: "https://music.youtube.com/playlist?list=\(playlist.id)",
@@ -909,7 +915,7 @@ final class YouTubePlaylistSyncService {
         try context.save()
 
         let importID: UUID
-        if let existing = try fetchImport(playlistID: playlistID, context: context) {
+        if let existing = try fetchImport(playlistID: playlistID, accountChannelID: channelID, context: context) {
             importID = existing.id
         } else {
             let imported = YouTubeImport(
@@ -1279,6 +1285,11 @@ final class YouTubePlaylistSyncService {
         }
         guard let imported = try fetchImport(revision.importID, context: context) else {
             throw YouTubePlaylistSyncError.importNotFound
+        }
+        if imported.deletedAt != nil,
+           try fetchImport(playlistID: imported.playlistId,
+                           accountChannelID: imported.accountChannelID, context: context) != nil {
+            throw YouTubePlaylistSyncError.restoreWouldDuplicateActiveImport
         }
         let snapshot = try revision.decodeSnapshot()
         _ = try insertRevision(importID: imported.id,
@@ -2148,11 +2159,19 @@ final class YouTubePlaylistSyncService {
     }
 
     private func fetchImport(playlistID: String,
+                             accountChannelID: String?,
                              context: ModelContext) throws -> YouTubeImport? {
         let target = playlistID
         let descriptor = FetchDescriptor<YouTubeImport>(
-            predicate: #Predicate { $0.playlistId == target })
-        return try context.fetch(descriptor).first
+            predicate: #Predicate { $0.playlistId == target && $0.deletedAt == nil })
+        return try context.fetch(descriptor).first { imported in
+            // Public playlist IDs identify one source across accounts. LL/WL
+            // are account-local aliases only when both channel scopes are known.
+            guard target == "LL" || target == "WL",
+                  let requested = accountChannelID, !requested.isEmpty,
+                  let stored = imported.accountChannelID, !stored.isEmpty else { return true }
+            return requested == stored
+        }
     }
 
     private func fetchResourceOperation(
