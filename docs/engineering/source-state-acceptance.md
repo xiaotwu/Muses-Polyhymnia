@@ -1,5 +1,7 @@
 # Discovery and catalog source-state acceptance
 
+October 14 artist follow-up: [artist catalog acceptance](artist-catalog-acceptance.md) adds scoped detail, genuine online re-read, human shelf-tail observation and Back/normal exit. The separate AX-action crash remains XW-100; this does not extend provider continuation, account-success, source-error, playback or full accessibility coverage.
+
 > Superseded on 2026-10-13: the user retired anonymous Public Home discovery. Its loading/cache/Retry observations below are historical evidence and no longer define an active feature or remaining acceptance requirement. Home now offers Muses recommendations and genuine, separately consented account recommendations; explicit Search/catalog evidence remains separately scoped.
 
 October 13 product retirement: anonymous public Home and automatic public recommendation rails are superseded by the user's Muses/account-only decision in XW-91. Their observations below remain historical evidence; public Home manual Retry is retired, not accepted. Explicit Search/catalog, existing cancellation repairs, genuine account/privacy boundaries and separately untested matrix cells remain. See [post-release formal inspection](post-release-formal-inspection.md).

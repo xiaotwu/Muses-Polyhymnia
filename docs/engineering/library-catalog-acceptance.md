@@ -1,5 +1,7 @@
 # Native library catalog import and refresh
 
+The October 14 [artist-detail follow-up](artist-catalog-acceptance.md) separately records the later genuine online re-read, human horizontal shelf-tail observation, Back and an accessibility-action crash. The October 11 boundaries below remain historical.
+
 On 2026-10-11, XW-73 completed one real YouTube Music album import, nonempty Library Albums/detail/refresh/Back route and Artists overview on macOS 27.0.1. Executable source was `3b44632`; the later `8a58f7b` changes only tests, CI and documentation. This accepts the exercised library projection, while XW-73 and its parent XW-19 retain their other source and platform conditions.
 
 The isolated English main window measured 1280 × 804pt. Rendered observations cover this regular window; they do not establish another appearance, compact layout or macOS 26 runtime.
