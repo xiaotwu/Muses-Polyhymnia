@@ -1301,13 +1301,13 @@ struct CatalogArtistDetailView: View {
                                 .font(MusesTypography.system(size: 15, weight: .semibold))
                                 .foregroundStyle(BrandColors.textPrimary)
 
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                LazyHStack(spacing: 16) {
-                                    ForEach(disco.albums) { release in
-                                        onlineReleaseCard(release)
-                                    }
-                                }
-                            }
+                            ArtistOnlineReleaseShelf(
+                                releases: disco.albums, artist: currentArtist,
+                                onOpen: openOnlineRelease,
+                                onPlay: { playOnlineRelease($0) },
+                                onShuffle: { playOnlineRelease($0, shuffled: true) },
+                                onImport: importOnlineAlbum
+                            )
                         }
                     }
 
@@ -1318,13 +1318,13 @@ struct CatalogArtistDetailView: View {
                                 .font(MusesTypography.system(size: 15, weight: .semibold))
                                 .foregroundStyle(BrandColors.textPrimary)
 
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                LazyHStack(spacing: 16) {
-                                    ForEach(disco.singlesAndEPs) { release in
-                                        onlineReleaseCard(release)
-                                    }
-                                }
-                            }
+                            ArtistOnlineReleaseShelf(
+                                releases: disco.singlesAndEPs, artist: currentArtist,
+                                onOpen: openOnlineRelease,
+                                onPlay: { playOnlineRelease($0) },
+                                onShuffle: { playOnlineRelease($0, shuffled: true) },
+                                onImport: importOnlineAlbum
+                            )
                         }
                     }
                 }
@@ -1381,52 +1381,13 @@ struct CatalogArtistDetailView: View {
         .youTubeEntryContextMenu(entry: entry, videoContext: discography?.topTracks ?? [], videoSource: .artist) { playOnlineTrack(entry) }
     }
 
-    private func onlineReleaseCard(_ release: OnlineReleaseItem) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            AlbumObjectView(title: release.title,
-                subtitle: release.year.map(String.init) ?? currentArtist.name,
-                artwork: .resolve(remoteURL: release.artworkURL), size: 140,
-                showsHoverPlay: true,
-                onSelect: { openOnlineRelease(release) },
-                onPlay: { playOnlineRelease(release) })
-                .catalogReleaseContextMenu(release: onlineReleaseProjection(release), showsMenuButton: true,
-                    canResolvePlayback: true,
-                    onOpen: { openOnlineRelease(release) },
-                    onPlay: { playOnlineRelease(release) },
-                    onShuffle: { playOnlineRelease(release, shuffled: true) })
-
-            Button {
-                importOnlineAlbum(release)
-            } label: {
-                HStack(spacing: 3) {
-                    Image(systemName: "plus")
-                    Text(tr("Import", "导入"))
-                }
-                .font(MusesTypography.system(size: 10, weight: .bold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
-                .background(BrandColors.accent, in: Capsule())
-            }
-            .buttonStyle(.fullAreaPlain)
-        }
-        .frame(width: 140)
-    }
-
-    private func onlineReleaseProjection(_ release: OnlineReleaseItem) -> CatalogReleaseProjection {
-        .init(stableID: release.stableID, title: release.title,
-              artistName: currentArtist.name, artistStableID: currentArtist.stableID,
-              artworkURL: release.artworkURL, year: release.year, kind: release.kind,
-              cacheState: .fresh, tracks: [])
-    }
-
     private func openOnlineRelease(_ release: OnlineReleaseItem) {
-        NotificationCenter.default.post(name: .musesNavigateToRelease, object: onlineReleaseProjection(release))
+        NotificationCenter.default.post(name: .musesNavigateToRelease, object: ArtistOnlineReleaseShelf.projection(for: release, artist: currentArtist))
     }
 
     private func playOnlineRelease(_ release: OnlineReleaseItem, shuffled: Bool = false) {
         onlineReleasePlayTask?.cancel()
-        let projection = onlineReleaseProjection(release)
+        let projection = ArtistOnlineReleaseShelf.projection(for: release, artist: currentArtist)
         onlineReleasePlayTask = Task {
             do {
                 let fetched = try await catalog.fetchAlbumOnlineTracks(release: projection)
