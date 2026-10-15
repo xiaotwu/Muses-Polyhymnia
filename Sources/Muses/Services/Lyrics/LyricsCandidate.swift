@@ -17,6 +17,33 @@ struct LyricsCandidate: Decodable, Sendable, Identifiable {
     }
 }
 
+/// Manual search breadth is independent of conservative automatic selection.
+enum LyricsSearchMode: String, CaseIterable, Sendable {
+    case fuzzy
+    case exact
+
+    func supports(source: String) -> Bool {
+        // This source returns lyric text without recording metadata to compare.
+        self != .exact || source != "lyricsOVH"
+    }
+
+    func includes(_ candidate: LyricsCandidate, for track: TrackSnapshot) -> Bool {
+        guard candidate.hasLyrics else { return false }
+        guard self == .exact else { return true }
+        let title = Self.exactText(track.title)
+        let artist = Self.exactText(track.artist)
+        return !title.isEmpty && Self.exactText(candidate.trackName) == title
+            && (artist.isEmpty || Self.exactText(candidate.artistName) == artist)
+    }
+
+    private static func exactText(_ text: String) -> String {
+        // Preserve punctuation, word order and all recording-version words.
+        text.precomposedStringWithCanonicalMapping
+            .folding(options: [.caseInsensitive, .widthInsensitive], locale: Locale(identifier: "en_US_POSIX"))
+            .split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    }
+}
+
 /// Conservative recording matching. A plausible title alone is insufficient:
 /// live, cover, remix, instrumental and speed variants must agree as well.
 enum LyricsMatchPolicy {

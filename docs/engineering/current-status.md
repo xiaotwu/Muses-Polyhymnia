@@ -1,5 +1,11 @@
 # 当前修复与验收状态
 
+2026-10-15，已确认前次文档同步提交 `03f7328` 的 [CI 38694351482](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38694351482) 全阶段通过。用户明确说明已主动清除旧正式版、资料和私有证据，并授权重新安装官方 0.6.0；本次校验下载、签名、公证评估及完整 207 项安装清单后建立新基线，未启动正式版，不将其写成历史资料恢复。新的真实单曲暂停种子由界面导入／播放建立，原种子 0400 保留。
+
+XW-75 新接受 [音频信息上层歌词交接](audio-info-intent-acceptance.md)：一次公开框架请求正确呈现歌词，Tab 到艺人、Escape 回到保留的音频信息，再由其自身关闭返回同曲暂停。UI runner 完整 Passed 1/0/exit0；早先普通测试包的传递失败及配置更正独立保留，没有据此修复产品。闭合资料、正式版和精确清理复核通过；XW-75 继续 In Review。
+
+用户随后要求的 [XW-101 模糊／精确歌词搜索](lyrics-search-modes.md) 已实现并完成本机原生小节：默认模糊，精确比较完整字段且不走宽搜索回退；来源限制有明确提示，切换保留输入并清除旧选择，重开仍默认模糊。986 项／133 套件、14 项发布检查、独立磁盘恢复、Release／元数据及独立审阅通过；真实候选未手动应用歌词，自动歌词与保存位置变化据实审计。合入和远端检查由对应任务／PR 记录接续，不将此功能计入未完成的系统、账号或设备矩阵。
+
 2026-10-14，XW-73 在 XW-100 合入后完成真实在线专辑播放小节：隔离候选 7303 从 Roselia → Lehre der Rose 菜单播放，真实时钟推进后暂停；Next 到 Blessing Chord、Previous 回 Avant-garde HISTORY，24 项 video ID、队列 occurrence 和顺序始终匹配本次真实响应。Repeat 在候选中临时关闭并恢复 One，Back 与正常退出通过。候选播放的事件 60→63、首曲计数和 browse 关联/专辑投影变化单独审计，原 679 Tracks、6 imports/1185 items 和 24 导入关联保留；正式版 673 Tracks/89 Events、27 表/64 项结构、45 偏好及应用摘要与本轮前置一致。系统模式保持 0。候选完整 296 项归档已对原源独立核验，精确 app/data/cache 与自有逻辑偏好已清理，全部种子/检查点/证据保留；物理空 plist 留存。XW-73 继续 In Review，其他来源/账号/平台条件不扩展，见 [作品播放验收](artist-release-playback-acceptance.md)。
 
 2026-10-14，XW-100 已建立三个独立原版本进程的真实页面重复触发，并完成原生横栏修复的本机复验。最终隔离候选 10021 的两个独立进程均通过 Roselia 页面原生横向来回滚动；临时模式 2 下逐键正向经过全部 17 张卡片、反向从第 12 张回到首张，焦点会带动横栏显露，Space 菜单／Escape、正确专辑打开、重读、重建、Back 和冷启动通过。早先 10019 与 10020 的焦点失败单独保留。974 项 / 132 套件、14 项发布检查、独立磁盘失败重试及 Release／签名通过；[PR #8](https://github.com/xiaotwu/Muses-Polyhymnia/pull/8) 已合并为 `e63e5cb`，精确 PR head 与 [main CI38690921797](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38690921797) 均全阶段通过，XW-100 为 Done；父引用已推送为 `fc42ed4`。模式恢复 0，两个候选与自有设置进程正常退出；正式版 PID 85043、应用摘要和 45 项偏好保持。正常程序此前产生的四条新增记录已保留为 89 条，未回滚；最终前后 27 表／64 项结构及库文件字节一致。后续仍保留完整 VoiceOver、macOS 26、账号与其他验收条件，见 [修复与验证记录](artist-catalog-acceptance.md#xw-100-repair-follow-up-2026-10-14)。
@@ -96,6 +102,7 @@ XW-75 的唯一名称 Shortcuts 候选已完成注册、独立 setup 启动/退�
 
 | 范围 | 下一步与实际前提 |
 | --- | --- |
+| XW-101 歌词搜索方式 | 模糊／精确两选项、默认模糊已实现；本机完整回归及真实默认／切换／清旧选择／重新打开／取消小节通过，详见 [功能记录](lyrics-search-modes.md)。远端 CI 与合入记录见对应任务／PR；正式 0.6.0 保留。 |
 | XW-97 旧导入署名 | Done；显式、可恢复修复已完成，本机完整回归、隔离 655 项 Apply/冷启/Undo 通过；PR #6 已合并，PR 与 main CI 均成功，正式资料未写入，待新版本显式应用。 |
 | XW-98 封面呈现 | Done；焦点卡比例/宽度、多推荐聚焦横栏和低档封面升级已完成；实际三尺寸及 Large 深色、原生横栏滚动通过，PR #6 已合并，PR 与 main CI 均成功。 |
 | XW-75 App Intents | 冷态歌词、完整串行键盘、真实来源预览/浮窗弹窗、修复后的冷 Play 与主窗视频弹窗，以及本轮未保存 Edit Info Title 草稿→一次外部请求→Cancel→原 query→Tab→Escape 已按记录范围接受。完整 Passed 1/0/exit0 及恢复清理见 [草稿交接](edit-draft-intent-acceptance.md)。其他未测呈现状态、手动 Siri/Shortcuts、实际 macOS 26 与完整 VoiceOver/设备矩阵仍保留；XW-75 继续 In Review。 |

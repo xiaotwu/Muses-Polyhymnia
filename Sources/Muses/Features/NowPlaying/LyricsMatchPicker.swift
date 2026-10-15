@@ -14,7 +14,7 @@ struct LyricsMatchPicker: View {
     @State private var intelligenceTask: Task<Void, Never>?
     @State private var preparingQuery = false
     @State private var intelligenceMessage: String?
-    @State private var searchMode = "fields"
+    @State private var searchMode: LyricsSearchMode = .fuzzy
 
     @State private var selectedCandidateID: Int?
     @State private var previewLines: [String] = []
@@ -42,15 +42,14 @@ struct LyricsMatchPicker: View {
             focusedField = .title
             await preparation.prepare(track: track, initialQuery: initialQuery, using: lyrics)
         }
-        .task(id: track.id.uuidString + ":" + track.youTubeId + ":" + source + ":" + searchMode
+        .task(id: track.id.uuidString + ":" + track.youTubeId + ":" + source + ":" + searchMode.rawValue
             + ":" + String(preparation.searchRevision) + ":" + String(preparation.isReady)) {
-            guard let query = preparation.searchTrack(for: track) else { loading = false; return }
             loading = true
             candidates = []
             selectedCandidateID = nil
             previewLines = []
-            let found = await lyrics.findCandidates(track: query, refresh: true, source: source,
-                keywords: searchMode == "keywords" ? [preparation.titleQuery, preparation.artistQuery].filter { !$0.isEmpty }.joined(separator: " ") : nil)
+            guard let query = preparation.searchTrack(for: track) else { loading = false; return }
+            let found = await lyrics.findCandidates(track: query, refresh: true, source: source, mode: searchMode)
             guard !Task.isCancelled, preparation.recordingID == track.id else { return }
             candidates = found
             selectedCandidateID = LyricsMatchPolicy.automatic(found, track: query)?.id
@@ -62,8 +61,7 @@ struct LyricsMatchPicker: View {
         .onChange(of: source) { _, _ in
             preparation.submit()
         }
-        .onChange(of: searchMode) { _, mode in
-            if mode == "keywords", source != "auto", source != "lrclib" { source = "lrclib" }
+        .onChange(of: searchMode) { _, _ in
             preparation.submit()
         }
     }
@@ -113,9 +111,9 @@ struct LyricsMatchPicker: View {
     private var compactQuery: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
-                TextField(tr("Song title or keywords", "歌名或关键词"), text: $preparation.titleQuery)
+                TextField(searchMode == .fuzzy ? tr("Song title or keywords", "歌名或关键词") : tr("Song title", "歌名"), text: $preparation.titleQuery)
                     .textFieldStyle(.roundedBorder).focused($focusedField, equals: .title)
-                    .accessibilityLabel(tr("Song title or keywords", "歌名或关键词"))
+                    .accessibilityLabel(searchMode == .fuzzy ? tr("Song title or keywords", "歌名或关键词") : tr("Song title", "歌名"))
                 TextField(tr("Artist (optional)", "艺人（可留空）"), text: $preparation.artistQuery)
                     .textFieldStyle(.roundedBorder).focused($focusedField, equals: .artist)
                     .frame(maxWidth: 240)
@@ -129,12 +127,12 @@ struct LyricsMatchPicker: View {
                 Picker(tr("Source", "来源"), selection: $source) {
                     Text(tr("All sources", "全部来源")).tag("auto")
                     Text("LRCLIB").tag("lrclib")
-                    Text("Musixmatch").tag("musixmatch").disabled(searchMode == "keywords")
-                    Text("Lyrics.ovh").tag("lyricsOVH").disabled(searchMode == "keywords")
+                    Text("Musixmatch").tag("musixmatch")
+                    Text("Lyrics.ovh").tag("lyricsOVH")
                 }.pickerStyle(.menu).fixedSize()
                 Picker(tr("Search mode", "搜索方式"), selection: $searchMode) {
-                    Text(tr("Title & artist", "歌名与艺人")).tag("fields")
-                    Text(tr("Keywords (fuzzy)", "关键词（模糊）")).tag("keywords")
+                    Text(tr("Fuzzy search", "模糊搜索")).tag(LyricsSearchMode.fuzzy)
+                    Text(tr("Exact search", "精确搜索")).tag(LyricsSearchMode.exact)
                 }.pickerStyle(.menu).fixedSize()
                 Spacer()
                 Button {
@@ -147,6 +145,10 @@ struct LyricsMatchPicker: View {
                 }.disabled(preparingQuery || LyricsIntelligence.availability != .available)
                     .help(LyricsIntelligence.availability.message)
             }.controlSize(.small)
+            Text(searchMode == .fuzzy
+                ? tr("Explore similar titles and keywords, then confirm the recording version.", "扩展歌名与关键词范围，找到后请确认录音版本。")
+                : tr("Match the complete title and any artist entered, ignoring case and extra spaces.", "完整匹配歌名及已填写的艺人，忽略大小写和多余空格。"))
+                .font(MusesTypography.caption).foregroundStyle(BrandColors.textSecondary)
             if preparingQuery {
                 ProgressView(tr("Preparing search terms…", "正在整理搜索词…")).controlSize(.small)
             }
@@ -162,7 +164,10 @@ struct LyricsMatchPicker: View {
     }
 
     @ViewBuilder private var resultsPane: some View {
-        if loading || (preparation.isPreparing && !preparation.isReady) {
+        if !searchMode.supports(source: source) {
+            ContentUnavailableView(tr("Exact search unavailable", "此来源不支持精确搜索"), systemImage: "text.magnifyingglass",
+                description: Text(tr("Choose another source or use fuzzy search.", "请选择其他来源，或使用模糊搜索。")))
+        } else if loading || (preparation.isPreparing && !preparation.isReady) {
             ProgressView(preparation.isPreparing && !preparation.isReady
                 ? tr("Preparing song information…", "正在准备歌曲信息…")
                 : tr("Finding matching recordings…", "正在查找匹配的录音版本…"))
@@ -245,7 +250,8 @@ struct LyricsMatchPicker: View {
                 lyrics.choose(selectedCandidate, for: track)
                 dismiss()
             }
-            .musesAction(prominent: true).disabled(loading || !preparation.isReady || selectedCandidate?.hasLyrics != true)
+            .musesAction(prominent: true).disabled(loading || !preparation.isReady
+                || !searchMode.supports(source: source) || selectedCandidate?.hasLyrics != true)
         }.padding(.horizontal, 24).padding(.vertical, 16)
     }
 

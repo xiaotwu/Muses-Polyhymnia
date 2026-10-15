@@ -445,30 +445,37 @@ final class LyricsService {
     }
 
     func findCandidates(track: TrackSnapshot, refresh: Bool = false,
-                        source: String = "auto", keywords: String? = nil) async -> [LyricsCandidate] {
+                        source: String = "auto", mode: LyricsSearchMode = .fuzzy) async -> [LyricsCandidate] {
+        guard mode.supports(source: source) else { return [] }
         var candidates: [LyricsCandidate] = []
         if source == "auto" || source == "lrclib" {
-            if let keywords, !keywords.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                candidates = await searchLrclib([LyricsEndpoint.lrclibKeywordSearch(keywords)])
+            if mode == .exact {
+                let title = track.title.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !title.isEmpty else { return [] }
+                // Exact searches never reuse or populate the broad candidate cache.
+                candidates = await searchLrclib([LyricsEndpoint.lrclibSearch(
+                    track: title, artist: track.artist.trimmingCharacters(in: .whitespacesAndNewlines))])
             } else {
                 candidates = await findLrclibCandidates(track: track, refresh: refresh)
             }
         }
-        if !Task.isCancelled, keywords == nil, source == "auto" || source == "musixmatch",
-           let result = await fetchMusixmatch(track: track) {
-            candidates.append(LyricsCandidate(id: -1, trackName: Self.sanitizedTitle(track.title),
-                artistName: LyricsMatchPolicy.queryArtist(track.artist), albumName: track.albumTitle,
+        if !Task.isCancelled, source == "auto" || source == "musixmatch",
+           let result = await fetchMusixmatch(track: track, mode: mode) {
+            candidates.append(LyricsCandidate(id: -1,
+                trackName: mode == .exact ? track.title : Self.sanitizedTitle(track.title),
+                artistName: mode == .exact ? track.artist : LyricsMatchPolicy.queryArtist(track.artist), albumName: track.albumTitle,
                 duration: track.durationSeconds, instrumental: false,
                 plainLyrics: result.plainLyrics, syncedLyrics: result.syncedLyrics, provider: .musixmatch))
         }
-        if !Task.isCancelled, keywords == nil, source == "auto" || source == "lyricsOVH",
+        if !Task.isCancelled, mode == .fuzzy, source == "auto" || source == "lyricsOVH",
            let result = await fetchLyricsOVH(track: track) {
             candidates.append(LyricsCandidate(id: -2, trackName: Self.sanitizedTitle(track.title),
                 artistName: LyricsMatchPolicy.queryArtist(track.artist), albumName: nil,
                 duration: nil, instrumental: false,
                 plainLyrics: result.plainLyrics, syncedLyrics: nil, provider: .lyricsOVH))
         }
-        return Task.isCancelled ? [] : LyricsMatchPolicy.ranked(candidates, track: track)
+        return Task.isCancelled ? [] : LyricsMatchPolicy.ranked(
+            candidates.filter { mode.includes($0, for: track) }, track: track)
     }
 
     private func fetchLyricsOVH(track: TrackSnapshot) async -> LyricsResult? {
@@ -497,17 +504,18 @@ final class LyricsService {
 
     // MARK: - Musixmatch
 
-    /// Queries the Musixmatch public Web API: `track.search` for the first track_id,
+    /// Queries the Musixmatch public Web API for a conservatively matched track_id,
     /// then fetches `track.subtitle.get` (synced LRC) and `track.lyrics.get` (plain text).
     /// Any failed step returns nil (`fetch` then falls back to LRCLIB).
-    private func fetchMusixmatch(track: TrackSnapshot) async -> LyricsResult? {
-        // 1. Search for the track and take the first entry with a track_id.
-        let searchTitle = Self.queryTitles(track.title).last ?? track.title
+    private func fetchMusixmatch(track: TrackSnapshot, mode: LyricsSearchMode = .fuzzy) async -> LyricsResult? {
+        // 1. Validate returned recording metadata before fetching its lyrics.
+        let searchTitle = mode == .exact ? track.title.trimmingCharacters(in: .whitespacesAndNewlines)
+            : Self.queryTitles(track.title).last ?? track.title
         let searchURL = LyricsEndpoint.musixmatchSearch(
-            track: searchTitle, artist: track.artist
+            track: searchTitle, artist: mode == .exact ? track.artist.trimmingCharacters(in: .whitespacesAndNewlines) : track.artist
         )
         guard let searchData = await get(searchURL),
-              let trackId = parseMusixmatchTrackId(data: searchData, track: track)
+              let trackId = parseMusixmatchTrackId(data: searchData, track: track, mode: mode)
         else {
             log.info("musixmatch: no track_id for \(track.title) / \(track.artist)")
             return nil
@@ -539,8 +547,8 @@ final class LyricsService {
         )
     }
 
-    /// Parses the `track.search` response and returns the first `track_id`.
-    private func parseMusixmatchTrackId(data: Data, track: TrackSnapshot) -> Int? {
+    /// Parses `track.search` metadata and keeps the existing automatic-match safeguards.
+    private func parseMusixmatchTrackId(data: Data, track: TrackSnapshot, mode: LyricsSearchMode) -> Int? {
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let message = json["message"] as? [String: Any],
               let body = message["body"] as? [String: Any],
@@ -559,7 +567,8 @@ final class LyricsService {
                                    duration: (item["track_length"] as? NSNumber)?.doubleValue,
                                    instrumental: false, plainLyrics: String(id), syncedLyrics: nil)
         }
-        return LyricsMatchPolicy.automatic(candidates, track: track)?.id
+        // Check provider metadata before it is wrapped in the submitted query.
+        return LyricsMatchPolicy.automatic(candidates.filter { mode.includes($0, for: track) }, track: track)?.id
     }
 
     /// Parses the `track.subtitle.get` response and returns `subtitle_body` (LRC text).
