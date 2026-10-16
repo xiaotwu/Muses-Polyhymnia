@@ -1,6 +1,6 @@
 # EQ 与外部歌词关闭后的返回位置
 
-2026-10-15，本机两个独立原版本进程均出现：EQ 位于顶层时，一次外部歌词请求正确呈现；关闭歌词后返回 Audio Info，而非原 EQ。用户随后明确选择“关闭歌词后回到原 EQ”，跟踪为 [XW-102](https://linear.app/xiaotwu/issue/XW-102)。窄修复已通过下述本机回归、原 EQ 返回及活跃 Save As 等待小节；修复前对照与未接受的草稿重开结果继续保留。集成状态见本修复 PR／Linear 实时记录；正式 0.6.0 未更新，父项 XW-75 继续 In Review。
+2026-10-15，本机两个独立原版本进程均出现：EQ 位于顶层时，一次外部歌词请求正确呈现；关闭歌词后返回 Audio Info，而非原 EQ。用户随后明确选择“关闭歌词后回到原 EQ”，跟踪为 [XW-102](https://linear.app/xiaotwu/issue/XW-102)。窄修复已通过下述本机回归、原 EQ 返回及活跃 Save As 等待小节；修复前对照与未接受的草稿重开结果继续保留。[PR #10](https://github.com/xiaotwu/Muses-Polyhymnia/pull/10) 已合并为 `9a85c48`，精确 PR head 的 [CI 38831450672](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38831450672) 与精确 merge 的 [main CI 38832872757](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38832872757) 均通过全部 11 阶段，XW-102 Done。后续删除确认 Cancel 小节在本文末尾单独记录；正式 0.6.0 未更新，父项 XW-75 继续 In Review。
 
 ## 原版本与执行边界
 
@@ -84,7 +84,7 @@ q1 的 startup、输入守卫后、投递前、投递后、歌词关闭后和最
 3. 保持同一 EQ，在活跃 Save As 中粘贴唯一诊断草稿，提交新 request02。框架返回后仍显示原 alert 和精确草稿，歌词没有覆盖它。点击 Cancel 后，无需重发即自动出现正确 query 的歌词窗口；空艺人／全部来源／默认模糊保持，终态为无匹配，没有选择或应用。Tab 到 Artist、Escape 后返回原 EQ，4k、十段平直及 bypass Off 保留。
 4. EQ 自身 Close 返回 Audio Info，Audio Info 自身 Close 返回同曲暂停 0:09／音量 0%；前后设备标签均为 MacBook Pro Speakers。正常 Command-Q 后精确候选／runner／helper 进程缺席，并返回源码阶段；没有改变系统键盘导航，模式为 0。
 
-本轮接受的是可见 Close 与 Escape 返回原 EQ／4k 状态，以及**活跃 Save As 跨请求**的文本保留和延后呈现。没有 Save／删除预设、未接受删除确认的原生路径、Cancel 后草稿恢复、EQ 听感效果或歌词来源身份；也没有新增草稿、Quick Search、视频、冷启动的原生覆盖。独立框架收据为 `eq-lyrics-return-repair/independent-review/r1-public-intent-results-review.json`。
+本 r1 轮接受的是可见 Close 与 Escape 返回原 EQ／4k 状态，以及**活跃 Save As 跨请求**的文本保留和延后呈现。r1 没有 Save／删除预设，未接受删除确认的原生路径、Cancel 后草稿恢复、EQ 听感效果或歌词来源身份；也没有新增草稿、Quick Search、视频、冷启动的原生覆盖。后续独立删除确认 Cancel 小节不回写为 r1 的结果。独立框架收据为 `eq-lyrics-return-repair/independent-review/r1-public-intent-results-review.json`。
 
 ## 修复后闭合资料与收尾边界
 
@@ -95,3 +95,21 @@ q1 的 startup、输入守卫后、投递前、投递后、歌词关闭后和最
 原版及修复候选的自有 app、namespace 和四套 runner 构建目录，已先归档为 291,286,049 字节、7,574 条目的主包（5,166 文件／2,388 目录／20 字面链接）。协调方和独立审阅者直接对仍存在的原件核对类型、模式、文件字节及链接目标，执行前再检查，随后删除八个精确目录并清空两个自有逻辑偏好域；物理空 plist 保留。两个由 metadata ID 确认归属的 runner 系统容器另有 96 条目补充归档，经协调方直接原件核验后精确移除。六个候选／runner 路径已执行精确注销；中间 dump 仍有两条 host 记录，随后仅对这两处已删除的自有路径再次注销，`registration-followup.json` 记录 fresh dump 为空。独立后验再读 dump，确认六个自有 identifier 无记录；不把最早注销当作持续全空证据。
 
 归档与清理收据分别在 `archives/eq-lyrics-return-completed-20261015/` 和 `archives/eq-lyrics-runner-system-completed-20261015/`，独立 `completed-cleanup-postcondition-review.json` 已通过。两归档均为 0400，后验核对主包与保留清单、系统容器元数据和精确路径缺席；不声称删除后重新读取过原件。源码、原始 0400 种子、23 份闭合备份、原版／修复四份请求的完整原始结果／xcresult、17 份顶层日志及协调方收据仍在原位；runner build 内部 Logs 已随构建目录完整归档，不能统称所有日志仍在原路径。正式版 207 项、正常资料／正式偏好缺席、当前产品构建、模式 0 及相关进程缺席再次核对。集成状态见本修复 PR／[XW-102](https://linear.app/xiaotwu/issue/XW-102) 实时记录；手动 Siri／Shortcuts、实际 macOS 26、完整 VoiceOver／设备矩阵及性能范围仍归 XW-75，父项继续 In Review。
+
+## 远端验证与删除确认 Cancel 接续
+
+PR #10 的完整 CI 实际为 998 项／134 套件（56.159 秒、9 项 opt-in 跳过）、发布检查 14 项（5.003 秒）和独立真实磁盘失败恢复 1 项（0.108 秒）。合并 main 为 998 项／134 套件（64.379 秒、相同跳过边界）、发布检查 14 项（10.035 秒）、独立磁盘恢复 1 项（0.184 秒）；两者元数据、ad-hoc 预览打包、签名验证及上传均通过，全部 11 阶段成功。预览不等于 Developer ID 正式签名、公证、appcast 或正式发布。main 的 whole tree 与已验 PR head 相同。两份完整 job 日志及 run ZIP 已保存并逐成员核对；早期收据误写 ZIP 成员数 14，保留原件并以 v2 更正为实际 13，不涉及 CI 重跑或测试结论变化。
+
+后续 `com.muses.acceptance.eq-delete-followup-oct15` / build `20261015.10202` 复用已验本机 Release／helper 字节、资源和元数据输入，没有重新构建产品。446 项产品输入与合并源码相符，静态资格另行核验。新 namespace 再整份复制原始 0400 真实种子并设为 0600，初始 18 项隔离偏好。f1 通过真实 EQ Save As 建立唯一预设 `XW75 Cancel 10202`，十段 gain 0／q 1、bypass Off；没有改变增益。此预设只属于隔离副本，后续不重置或注入资料。
+
+f1 在打开该预设的删除确认后启动 UI runner，但测试工具启用自动化模式超时，exit 65；源码测试及 `.run()` 均未执行，events／proof／消费标记缺席。legacy metrics 为 testsCount 0／errorCount 1，modern summary 的 total 1／failed 1 是初始化的 synthetic System Failure，不能写成产品交接失败或通过。协调方取消确认并正常退出，完整失败日志／xcresult 与六份闭合备份保留。
+
+f2 沿用 f1 停止后的真实预设及资料，以新 PID 84034、新 request02 和独立构建的 gated UI runner 继续；旧 request01 不重放。新 runner 先在普通 EQ 状态完成初始化，写出绑定 PID／launch／nonce／host 的 `harness-ready.json`，在最长 120 秒的异步等待内，由协调方使用 Cua 打开删除确认并保存检查点，再显式发布完整审批文件。源码重新核对身份后消费排他标记，调用一次 `.run()`；没有目标启动、UI 自动化、重试或产品测试目标关联。
+
+真实框架返回后，原“删除预设？从本机删除「XW75 Cancel 10202」。”确认仍在，歌词没有覆盖它。点击实际 Cancel 后，无需重发即出现 `Avant-garde HISTORY` 查询、空艺人、全部来源及默认模糊搜索；8 个候选未选，使用按钮禁用。Tab 到 Artist 后点击歌词自身 Close，返回同一 EQ，原测试预设仍被选中，1k／0.0 dB、十段平直和 bypass Off 保留。随后 EQ 自身 Close → Audio Info 自身 Close，设备前后均为 MacBook Pro Speakers，主窗口同曲暂停 0:09／音量 0%，正常 Command-Q 退出。
+
+完整新 xcresult 为 Passed 1／0、exit 0，proof 记录一次源调用及同 PID／launch；外层 121.230 秒包含初始化与协调方的 UI 审批等待，不能当作请求延迟或性能基准。界面操作全部由协调方 Cua 完成，没有真人复验；AX／截图在工具对话中，retrospective `native-result.json` 与计时措辞澄清附录单独保存，不声称独立审计重做了 GUI。
+
+f2 的七份业务检查点字节相同；正常退出另记生命周期保存变化。完整 Track 保留，歌词 NULL、播放计数 1、事件 0，唯一真实测试预设全行及其十段参数保持，Queue／Session JSON 语义保留。停止偏好仍为 21 项：初始 18 项全值保留，新增窗口位置、当前 EQ 数据和活动预设 ID；f1 → f2 的 20 项逐类型／值相同，EQ Data 仅 JSON 对象键顺序不同，解码十段参数相同，不能称全部原始偏好字节不变。正式版完整 207 项、原始 0400 种子、当前产品构建及历史封存材料保持，正常资料和正式物理偏好仍缺席，系统键盘导航为 0。
+
+此接续只接受删除确认阻塞、Cancel 后保留请求并自动呈现，以及歌词自身 Close 回原 EQ。没有实际确认 Delete、播放、应用歌词、修改输出／系统设置或新增 EQ 听感结论。私有完整材料在 `eq-delete-confirmation-followup/`，闭合审计和精确资源收尾以其独立收据及 XW-75 记录为准；完整系统、账号、VoiceOver、实际 macOS 26 与其他未测呈现条件继续保持未接受。
