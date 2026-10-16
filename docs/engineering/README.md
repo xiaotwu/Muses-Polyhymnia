@@ -1,5 +1,7 @@
 # 技术工作索引与对话归并
 
+2026-10-16 最新补验：[无当前录音与无效链接](empty-errors-intent-acceptance.md) 四项通过：两次无录音提示及自身 Close／Escape、不支持网址公开拒绝、缺失本地录音错误提示／自身 OK。四份框架各 Passed 1/0/exit0；14 份闭合备份字节一致，18→20 偏好及资料保护复核通过，自有资源已核验归档清理。产品源码未改，正式 0.6.0 与原始种子保留，XW-75 继续 In Review；两类链接错误的边界和剩余矩阵见报告。
+
 2026-10-15 最新补验：[非空导入与未保存笔记草稿的 Intent 交接](import-notes-intent-acceptance.md) 两项在同一隔离候选中通过。导入草稿经歌词自身 Close 后保留；Notes 原稿在请求等待期间保留，真实 Cancel 后自动呈现待处理歌词。两份请求各 Passed 1/0/exit0；未执行 Import、Save、Apply 或 Play，产品源码未改。XW-75 继续 In Review，系统／设备与未测呈现条件见 [当前状态](current-status.md)。
 
 2026-10-15 最新接续：[EQ 与外部歌词返回](eq-lyrics-return-acceptance.md) 的 XW-102 窄修复已通过本机回归与限定原生小节：同一新进程内，两份新请求分别以可见 Close 和 Save As 等待／Cancel 后 Tab／Escape 返回原 4k EQ；完整框架各 Passed 1/0。活跃 Save As 跨请求的文本保留已接受，Cancel 后重开草稿没有接受，原版两独立 PID 的失败对照保留。998 项／134 套件、发布／磁盘检查、Release、静态资格、框架及闭合资料／20 项偏好／正式版保护独立审计通过；自有资源已核验归档并按精确路径清理，原始请求、种子和检查点保留。集成状态见本修复 PR／Linear 实时记录，XW-75 继续 In Review，正式 0.6.0 未更新。
