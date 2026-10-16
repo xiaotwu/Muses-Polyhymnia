@@ -5,6 +5,8 @@ import SwiftData
 /// Changes are pushed to PlaybackService.setEQ in real time. During AVPlayer streaming
 /// the engine treats setEQ as a no-op until playback switches to the local file.
 struct EQEditorView: View {
+    @Binding var lyricsSearchRequest: LyricsSearchRequest?
+    let lyricsSearchHost: @MainActor () -> LyricsSearchHost
     @Environment(PlaybackService.self) private var playback
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \EQPreset.createdAt, order: .reverse) private var customPresets: [EQPreset]
@@ -31,9 +33,18 @@ struct EQEditorView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .frame(minWidth: 640, minHeight: 520)
         .actionConfirmation($pendingRemoval)
+        .sheet(item: pendingLyricsSearch) { request in
+            LyricsSearchSheet(request: request)
+        }
         .onAppear {
             bands = playback.eqBands
         }
+    }
+
+    private var pendingLyricsSearch: Binding<LyricsSearchRequest?> {
+        LyricsSearchPresentation.binding(request: $lyricsSearchRequest, host: .equalizer,
+                                         activeHost: lyricsSearchHost,
+                                         isBlocked: { showSaveDialog || pendingRemoval != nil })
     }
 
     // MARK: - Header

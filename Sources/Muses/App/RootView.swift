@@ -34,10 +34,6 @@ struct RootView: View {
     @State private var showNowPlaying = false
     @State private var immersiveToolbarRevealed = false
     @State private var lyricsSearchRequest: LyricsSearchRequest?
-    private struct LyricsSearchRequest: Identifiable {
-        let id = UUID()
-        let query: String
-    }
     /// The visual layer remains mounted only for the 300ms opacity dismissal;
     /// logical presentation, hit testing, and accessibility stop immediately.
     @State private var nowPlayingOverlayMounted = false
@@ -53,6 +49,7 @@ struct RootView: View {
     @State private var showQueue = false
     @State private var showLyricsDrawer = false
     @State private var showAudioInfo = false
+    @State private var showAudioInfoEQ = false
     @AppStorage(PrefKey.language) private var language = "system"
     @AppStorage(PrefKey.nowPlayingLyricsMode) private var lyricsModeRaw: String = NowPlayingLyricsMode.inline.rawValue
     @Environment(\.libraryStoreFallback) private var libraryStoreFallback
@@ -103,6 +100,9 @@ struct RootView: View {
                 }
             }
             .onChange(of: showNowPlaying) { _, _ in immersiveToolbarRevealed = false }
+            .onChange(of: showAudioInfo) { _, shown in
+                if !shown { showAudioInfoEQ = false }
+            }
             .onChange(of: [showNowPlaying, showQuickSearch, showYouTubeLink,
                            showYouTubeVideo, showQueue, showLyricsDrawer, showAudioInfo]) { previous, current in
                 if zip(previous, current).contains(where: { !$0.0 && $0.1 }) {
@@ -431,6 +431,16 @@ struct RootView: View {
             }
     }
 
+    private var activeLyricsSearchHost: LyricsSearchHost {
+        LyricsSearchPresentation.host(audioInfoPresented: showAudioInfo,
+                                      equalizerPresented: showAudioInfoEQ)
+    }
+
+    private var rootLyricsSearchRequest: Binding<LyricsSearchRequest?> {
+        LyricsSearchPresentation.binding(request: $lyricsSearchRequest, host: .root,
+                                         activeHost: { activeLyricsSearchHost })
+    }
+
     private var sheetHost: some View {
         alertHost
             .sheet(isPresented: $showQuickSearch) {
@@ -442,19 +452,13 @@ struct RootView: View {
                     showQuickSearch = false
                 }
             }
-            .sheet(item: $lyricsSearchRequest) { request in
-                if let track = playback.transportState.track {
-                    LyricsMatchPicker(track: track, initialQuery: request.query).id(track.id)
-                } else {
-                    VStack(spacing: 16) {
-                        ContentUnavailableView(tr("Play a song first", "请先播放歌曲"), systemImage: "music.note",
-                            description: Text(tr("Lyrics are matched to the current recording.", "歌词会匹配当前录音版本。")))
-                        Button(tr("Close", "关闭")) { lyricsSearchRequest = nil }.keyboardShortcut(.cancelAction)
-                    }.padding(24).frame(width: 460, height: 260)
-                }
+            .sheet(item: rootLyricsSearchRequest) { request in
+                LyricsSearchSheet(request: request)
             }
             .sheet(isPresented: $showAudioInfo) {
-                AudioInfoPanel()
+                AudioInfoPanel(isEqualizerPresented: $showAudioInfoEQ,
+                               lyricsSearchRequest: $lyricsSearchRequest,
+                               lyricsSearchHost: { activeLyricsSearchHost })
                     .tint(BrandColors.accent)
             }
     }
