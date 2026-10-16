@@ -1,6 +1,8 @@
 # 歌词模糊与精确搜索
 
-2026-10-15，用户在实际歌词窗口中要求提供“模糊搜索／精确搜索”，默认模糊搜索，独立跟踪为 [XW-101](https://linear.app/xiaotwu/issue/XW-101/muses-add-fuzzy-and-exact-lyrics-search-modes-defaulting-to-fuzzy)。本次实现和本机原生检查已完成；远端 CI 与合入信息由对应 PR 和任务记录接续。正式 0.6.0 保留，未将候选安装为正式版。
+2026-10-15，用户在实际歌词窗口中要求提供“模糊搜索／精确搜索”，默认模糊搜索，独立跟踪为 [XW-101](https://linear.app/xiaotwu/issue/XW-101/muses-add-fuzzy-and-exact-lyrics-search-modes-defaulting-to-fuzzy)，现已 Done。[PR #9](https://github.com/xiaotwu/Muses-Polyhymnia/pull/9) 已合并为 `1094dbfa55a001eac0e5896aad2120a8dbe3fe7f`；精确 PR head `6c29e3219a00de5ef24d5e7442cb062f417459dd` 的 [CI 38822515891](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38822515891) 与精确合并提交的 [main CI 38824085026](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38824085026) 均全阶段成功。父仓库引用 `46d3e6d4105c1cf87c13b7dbb71b5e5009f613a5` 已推送。正式 0.6.0 保留，功能未另行正式发版，未将候选安装为正式版。
+
+远端两次常规 Swift Testing 均报告 986 项／133 套件，分别为 59.475 秒与 55.191 秒，保留 9 项原 opt-in 跳过边界；14 项发布配置分别为 6.485 秒与 5.703 秒，独立磁盘恢复 1 项／1 套件分别为 0.184 秒与 0.092 秒。Release、App Intents 元数据、签名预览打包及上传均成功。这些远端运行与下文的本机计时分别记录，不作为后续 XW-102 修复的验证。
 
 ## 行为
 
@@ -37,3 +39,5 @@
 候选与独立目录已按 234 个条目归档，并独立逐项对照仍存在的原件核验文件字节、类型、权限和符号链接，再按精确路径清理。原始暂停种子及最新验证的整份停止资料各以 0400 保留，闭合检查点、日志和审计仍在；逻辑偏好已清空，物理空 plist 保留，正式版和当前构建未改动。
 
 私有证据位于 `~/.muses/tmp/engineering-oct15/lyrics-search-mode/`，含完整源码补丁、构建／测试日志、资格、界面步骤及闭合数据库。该功能检查不扩展 XW-75 的系统调用、实际 macOS 26、完整 VoiceOver、设备矩阵或性能结论。
+
+后续独立的 [XW-102 EQ 与外部歌词返回](eq-lyrics-return-acceptance.md) 已完成限定本机返回／等待小节及自有资源归档清理，保留原始请求和闭合资料；它不扩展本功能的候选身份或手动应用歌词结论。

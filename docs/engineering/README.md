@@ -1,6 +1,8 @@
 # 技术工作索引与对话归并
 
-2026-10-15 最新接续：前次文档提交 `03f7328` 的 [CI 38694351482](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38694351482) 已确认全阶段成功。[音频信息与外部歌词交接](audio-info-intent-acceptance.md) 新小节通过，原传递失败及工具资格修正完整保留，XW-75 继续 In Review。用户新要求的 [模糊／精确歌词搜索](lyrics-search-modes.md) 默认模糊，已通过本机 986 项／133 套件、发布检查、Release、独立审阅及真实界面默认／切换／清旧选择／重开检查。正式版为用户明确授权重新安装、校验且未启动的干净 0.6.0；新真实暂停种子保留，不将已由用户清除的历史资料写成恢复。最新范围见 [当前状态](current-status.md)。
+2026-10-15 最新接续：[EQ 与外部歌词返回](eq-lyrics-return-acceptance.md) 的 XW-102 窄修复已通过本机回归与限定原生小节：同一新进程内，两份新请求分别以可见 Close 和 Save As 等待／Cancel 后 Tab／Escape 返回原 4k EQ；完整框架各 Passed 1/0。活跃 Save As 跨请求的文本保留已接受，Cancel 后重开草稿没有接受，原版两独立 PID 的失败对照保留。998 项／134 套件、发布／磁盘检查、Release、静态资格、框架及闭合资料／20 项偏好／正式版保护独立审计通过；自有资源已核验归档并按精确路径清理，原始请求、种子和检查点保留。集成状态见本修复 PR／Linear 实时记录，XW-75 继续 In Review，正式 0.6.0 未更新。
+
+[模糊／精确歌词搜索](lyrics-search-modes.md) 的 XW-101 已 Done，PR #9 合并 `1094dbf`，精确 [PR CI 38822515891](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38822515891) 与 [main CI 38824085026](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38824085026) 全阶段成功，父引用 `46d3e6d` 已推送；正式 0.6.0 尚未更新。[音频信息与外部歌词交接](audio-info-intent-acceptance.md) 的已接受小节和原传递失败／资格更正保持原范围。正式版是用户授权重新安装、校验且未启动的干净基线；新真实暂停种子保留，不将已清除的旧资料写成恢复。最新范围见 [当前状态](current-status.md)。
 
 2026-10-14 修复前历史检查点：[艺人目录原生接续](artist-catalog-acceptance.md)：Roselia 详情、真实在线重读、人工专辑末端和 Back/退出已按范围记录，候选已清理；首轮辅助功能滚动崩溃由 XW-100 独立追踪，正常资料的后来播放/会话变化已独立核对保留，五个简化诊断各一次 AX 动作成功，未复现复杂页面崩溃且不构成修复；原包核验归档、诊断资源清理完成，下一步须建立真实页面可重复触发。XW-73 保持 In Review；该检查点当时为 25 项开放（18 In Review、7 In Progress），唯一开放 Bug 为 XW-100。其后 XW-100 已由 PR #8 修复并 Done，当前结论见状态文档。
 
@@ -24,7 +26,7 @@
 
 | 分类 | 技术文档 | 执行任务 |
 | --- | --- | --- |
-| 已证实的缺陷与修复 | [修复任务](repairs.md)、[来源修复](source-state-acceptance.md)、[CI 回归](source-ci-regression.md)、[缓存恢复](source-cache-recovery.md)、[重试/Pull/刷新/标签](remaining-review-fixes.md)、[App Intents](app-intents-handoff.md)、[图库歌词](gallery-lyrics-acceptance.md)、[普通歌单](ordinary-playlist-metadata.md)、[真实磁盘恢复](pull-disk-recovery.md)、[Pull 原生恢复](pull-native-recovery.md)、[冷启动与位置恢复](cold-start-recovery.md)、[信息弹窗 Escape](settings-info-escape-acceptance.md) | 新修复及证据以 [当前状态](current-status.md) 为准；XW-84/89/99 已 Done；XW-99 本机/保护复验、PR #7 合并及精确 PR/main CI 均通过，原失败与计时边界保留 |
+| 已证实的缺陷与修复 | [修复任务](repairs.md)、[来源修复](source-state-acceptance.md)、[CI 回归](source-ci-regression.md)、[缓存恢复](source-cache-recovery.md)、[重试/Pull/刷新/标签](remaining-review-fixes.md)、[App Intents](app-intents-handoff.md)、[图库歌词](gallery-lyrics-acceptance.md)、[普通歌单](ordinary-playlist-metadata.md)、[真实磁盘恢复](pull-disk-recovery.md)、[Pull 原生恢复](pull-native-recovery.md)、[冷启动与位置恢复](cold-start-recovery.md)、[信息弹窗 Escape](settings-info-escape-acceptance.md)、[EQ 歌词返回](eq-lyrics-return-acceptance.md) | 新修复及证据以 [当前状态](current-status.md) 为准；XW-84/89/99 已 Done；XW-102 本机回归／限定原生返回通过，集成见实时任务／PR；原失败与草稿边界保留 |
 | 功能实现与补充验收 | [功能及验收](feature-acceptance.md)、[草稿/历史跟进](playlist-flow-followup.md)、[非空目录验收](library-catalog-acceptance.md)、[Edit Info 草稿与 Intent](edit-draft-intent-acceptance.md) | XW-79 已完成；XW-73 已补齐 24 首真实专辑的非空目录/正常刷新小节，XW-75 已接受本轮 Title 草稿交接；XW-71、XW-72、XW-73、XW-75、XW-62 与既有阶段任务保留各自剩余条件 |
 | 性能与优化调查 | [优化项](performance.md) | XW-74；无证据的排查候选不直接变成重构任务 |
 
