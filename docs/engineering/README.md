@@ -1,5 +1,7 @@
 # 技术工作索引与对话归并
 
+2026-10-15 最新补验：[非空导入与未保存笔记草稿的 Intent 交接](import-notes-intent-acceptance.md) 两项在同一隔离候选中通过。导入草稿经歌词自身 Close 后保留；Notes 原稿在请求等待期间保留，真实 Cancel 后自动呈现待处理歌词。两份请求各 Passed 1/0/exit0；未执行 Import、Save、Apply 或 Play，产品源码未改。XW-75 继续 In Review，系统／设备与未测呈现条件见 [当前状态](current-status.md)。
+
 2026-10-15 最新接续：[EQ 与外部歌词返回](eq-lyrics-return-acceptance.md) 的 XW-102 窄修复已通过本机回归与限定原生小节：同一新进程内，两份新请求分别以可见 Close 和 Save As 等待／Cancel 后 Tab／Escape 返回原 4k EQ；完整框架各 Passed 1/0。活跃 Save As 跨请求的文本保留已接受，Cancel 后重开草稿没有接受，原版两独立 PID 的失败对照保留。998 项／134 套件、发布／磁盘检查、Release、静态资格、框架及闭合资料／20 项偏好／正式版保护独立审计通过；自有资源已核验归档并按精确路径清理，原始请求、种子和检查点保留。集成状态见本修复 PR／Linear 实时记录，XW-75 继续 In Review，正式 0.6.0 未更新。
 
 [模糊／精确歌词搜索](lyrics-search-modes.md) 的 XW-101 已 Done，PR #9 合并 `1094dbf`，精确 [PR CI 38822515891](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38822515891) 与 [main CI 38824085026](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38824085026) 全阶段成功，父引用 `46d3e6d` 已推送；正式 0.6.0 尚未更新。[音频信息与外部歌词交接](audio-info-intent-acceptance.md) 的已接受小节和原传递失败／资格更正保持原范围。正式版是用户授权重新安装、校验且未启动的干净基线；新真实暂停种子保留，不将已清除的旧资料写成恢复。最新范围见 [当前状态](current-status.md)。
