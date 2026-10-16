@@ -6,10 +6,12 @@ import SwiftUI
 /// output device/replayGain/EQ state/volume. Unavailable fields render "Unknown" and are never fabricated.
 /// Embeds the shared spectrum renderer plus an entry point to the EQ editor. Gated by `ffAudioNerd`.
 struct AudioInfoPanel: View {
+    @Binding var isEqualizerPresented: Bool
+    @Binding var lyricsSearchRequest: LyricsSearchRequest?
+    let lyricsSearchHost: @MainActor () -> LyricsSearchHost
     @Environment(PlaybackService.self) private var playback
     @Environment(AudioDeviceService.self) private var deviceService
     @AppStorage(PrefKey.eqActivePresetId) private var eqPresetId: String = "Flat"
-    @State private var showEQ = false
     @State private var showTechnicalDetails = false
     @Environment(\.dismiss) private var dismiss
 
@@ -55,7 +57,7 @@ struct AudioInfoPanel: View {
             .formStyle(.grouped)
             // EQ entry point.
             Button {
-                showEQ = true
+                isEqualizerPresented = true
             } label: {
                 Label(tr("Open EQ Editor", "打开 EQ 编辑器"), systemImage: "slider.vertical.3")
             }
@@ -64,7 +66,10 @@ struct AudioInfoPanel: View {
         }
         .padding(20)
         .frame(minWidth: 420, idealWidth: 460, minHeight: 500, idealHeight: 620)
-        .sheet(isPresented: $showEQ) { EQEditorView() }
+        .sheet(isPresented: $isEqualizerPresented) {
+            EQEditorView(lyricsSearchRequest: $lyricsSearchRequest,
+                         lyricsSearchHost: lyricsSearchHost)
+        }
         .onAppear { deviceService.refresh() }
     }
 
