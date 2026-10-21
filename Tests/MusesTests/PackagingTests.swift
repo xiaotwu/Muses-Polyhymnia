@@ -26,6 +26,7 @@ struct PackagingTests {
     func allScriptsSyntax() throws {
         let scripts = [
             "Scripts/copy-ytdlp.sh",
+            "Scripts/copy-deno.sh",
             "Scripts/make-icon.sh",
             "Scripts/sync-app-icon.sh",
             "Scripts/build-app.sh",
@@ -237,7 +238,7 @@ struct PackagingTests {
         #expect(script.contains("$SPARKLE/Updater.app"))
         #expect(script.contains("configure-updates.py"))
         let helper = try #require(script.range(of: "for component in"))
-        let application = try #require(script.range(of: "codesign --deep --force"))
+        let application = try #require(script.range(of: "--entitlements \"$ENTITLEMENTS\""))
         #expect(helper.lowerBound < application.lowerBound)
     }
 

@@ -166,6 +166,10 @@ final class YTDlpBridge {
     /// Explicitly specified binary path (injectable for tests).
     private let binaryPath: String?
 
+    /// Finder launches do not inherit a developer shell's PATH. YouTube's
+    /// signature challenges need the runtime shipped inside the application.
+    private let javaScriptRuntimePath: String?
+
     /// Cache of the resolved binary path (resolved only once).
     private var resolvedBinary: String?
 
@@ -190,8 +194,12 @@ final class YTDlpBridge {
 
     init(binaryPath: String? = nil,
          searchCache: YTDlpSearchCache? = .default,
-         runner: YTDlpRunner = YTDlpRunner()) {
+         runner: YTDlpRunner = YTDlpRunner(),
+         javaScriptRuntimePath: String? = nil) {
         self.binaryPath = binaryPath
+        let bundledRuntime = Bundle.main.bundleURL.appending(path: "Contents/Helpers/deno").path
+        self.javaScriptRuntimePath = javaScriptRuntimePath
+            ?? (FileManager.default.isExecutableFile(atPath: bundledRuntime) ? bundledRuntime : nil)
         self.searchCache = searchCache
         self.runner = runner
     }
@@ -614,9 +622,12 @@ final class YTDlpBridge {
         -> (stdout: String, stderr: String) {
         // Isolate yt-dlp's implicit user config and disk cache for acceptance
         // bundles. Explicit cookie consent remains governed by cookieArgs().
-        let args = MusesDataPaths.isAcceptance
+        var args = MusesDataPaths.isAcceptance
             ? ["--ignore-config", "--cache-dir", MusesDataPaths.caches.appending(path: "yt-dlp").path] + args
             : ["--cache-dir", MusesDataPaths.caches.appending(path: "yt-dlp").path] + args
+        if let javaScriptRuntimePath {
+            args = ["--js-runtimes", "deno:\(javaScriptRuntimePath)"] + args
+        }
         let started = Date()
         do {
             return try await runner.run(

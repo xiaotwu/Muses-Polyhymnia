@@ -156,6 +156,11 @@ actor YTDlpRunner {
             let process = Process()
             process.executableURL = URL(fileURLWithPath: executablePath)
             process.arguments = args
+            // Keep the bundled runtime's cache in this app's own namespace.
+            var environment = ProcessInfo.processInfo.environment
+            environment["DENO_DIR"] = MusesDataPaths.caches.appending(path: "deno").path
+            environment["DENO_NO_UPDATE_CHECK"] = "1"
+            process.environment = environment
 
             let stdoutPipe = Pipe()
             let stderrPipe = Pipe()

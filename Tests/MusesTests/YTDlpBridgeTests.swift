@@ -23,6 +23,62 @@ struct YTDlpBridgeTests {
 
     // MARK: - resolveStreamURL
 
+    @Test("Stream resolution passes the bundled runtime as one explicit argument")
+    func streamResolutionUsesExplicitRuntime() async throws {
+        let runtime = "/Applications/Muses Test.app/Contents/Helpers/deno"
+        let bin = try makeFakeBinary(script: """
+            #!/bin/sh
+            while [ "$#" -gt 0 ]; do
+                if [ "$1" = "--js-runtimes" ]; then
+                    shift
+                    [ "$1" = "deno:\(runtime)" ] || exit 4
+                    echo "https://example.com/audio.m4a"
+                    exit 0
+                fi
+                shift
+            done
+            echo "Missing explicit JavaScript runtime" >&2
+            exit 3
+            """)
+        defer { try? FileManager.default.removeItem(atPath: (bin as NSString).deletingLastPathComponent) }
+        let bridge = YTDlpBridge(binaryPath: bin, javaScriptRuntimePath: runtime)
+        let url = try await bridge.resolveStreamURL(videoId: "vid1", quality: "256k")
+        #expect(url.absoluteString == "https://example.com/audio.m4a")
+    }
+
+    @Test("Cookie recovery retains the runtime and its app-owned cache environment")
+    func cookieRecoveryRetainsRuntime() async throws {
+        let runtime = "/Applications/Muses Test.app/Contents/Helpers/deno"
+        let cache = MusesDataPaths.caches.appending(path: "deno").path
+        let bin = try makeFakeBinary(script: """
+            #!/bin/sh
+            [ "$DENO_DIR" = "\(cache)" ] || exit 5
+            [ "$DENO_NO_UPDATE_CHECK" = "1" ] || exit 6
+            runtime_ok=0
+            recovery=0
+            while [ "$#" -gt 0 ]; do
+                case "$1" in
+                    --js-runtimes)
+                        shift
+                        [ "$1" = "deno:\(runtime)" ] || exit 4
+                        runtime_ok=1 ;;
+                    --ignore-config) recovery=1 ;;
+                esac
+                shift
+            done
+            [ "$runtime_ok" = 1 ] || exit 3
+            if [ "$recovery" = 0 ]; then
+                echo "Cookie permission error" >&2
+                exit 1
+            fi
+            echo "https://example.com/recovered.m4a"
+            """)
+        defer { try? FileManager.default.removeItem(atPath: (bin as NSString).deletingLastPathComponent) }
+        let bridge = YTDlpBridge(binaryPath: bin, javaScriptRuntimePath: runtime)
+        let url = try await bridge.resolveStreamURL(videoId: "vid1", quality: "256k")
+        #expect(url.absoluteString == "https://example.com/recovered.m4a")
+    }
+
     @Test("resolveStreamURL parses first stdout line as URL")
     func resolveStreamURLParsesFirstStdoutLine() async throws {
         let bin = try makeFakeBinary(script: """
