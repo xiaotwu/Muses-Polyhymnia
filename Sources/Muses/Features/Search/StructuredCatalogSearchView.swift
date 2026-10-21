@@ -117,13 +117,12 @@ struct StructuredCatalogSearchView: View {
             }
             Divider().padding(.vertical, 8)
         }
-        .task(id: search.query + "|" + search.scope.rawValue) {
+        .task(id: search.query + "|" + search.scope.rawValue + "|" + L10n.languageCode) {
             guard browser.detail == nil else { return }
-            browser.clear()
             guard search.scope.searchesYouTube, !search.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
             do { try await Task.sleep(for: .milliseconds(300)) } catch { return }
             guard !Task.isCancelled, !search.wasCancelled, browser.detail == nil else { return }
-            browser.search(search.query)
+            browser.searchIfNeeded(search.query)
         }
         .onDisappear { browser.cancel() }
         .onChange(of: browser.fetchedAt) { _, _ in syncPodcastDetail() }

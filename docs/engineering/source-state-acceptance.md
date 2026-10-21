@@ -1,5 +1,7 @@
 # Discovery and catalog source-state acceptance
 
+October 21 follow-up: [real search paging and return acceptance](search-paging-return-acceptance.md) records two native reproductions of XW-105, the narrow re-entry fix, real continuation and supplemental-prefix requests, and the independent detail Back/Forward check. It retains the remaining error/cancellation/account/platform boundaries; XW-74 was not restarted.
+
 October 14 artist follow-up: [artist catalog acceptance](artist-catalog-acceptance.md) adds scoped detail, genuine online re-read, human shelf-tail observation and Back/normal exit. The separate AX-action crash remains XW-100; this does not extend provider continuation, account-success, source-error, playback or full accessibility coverage.
 
 > Superseded on 2026-10-13: the user retired anonymous Public Home discovery. Its loading/cache/Retry observations below are historical evidence and no longer define an active feature or remaining acceptance requirement. Home now offers Muses recommendations and genuine, separately consented account recommendations; explicit Search/catalog evidence remains separately scoped.

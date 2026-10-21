@@ -22,6 +22,7 @@ final class MusicCatalogBrowser {
     var canGoBack: Bool { historyIndex > 0 }
     var canGoForward: Bool { historyIndex + 1 < detailHistory.count }
     private var query = ""
+    private var searchLocale = ""
     private var task: Task<Void, Never>?
     private var requestID = UUID()
     private var retryingMore = false
@@ -33,10 +34,28 @@ final class MusicCatalogBrowser {
 
     func search(_ value: String, kind: MusicCatalogKind? = nil) {
         query = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        searchLocale = currentSearchLocale
         self.kind = kind
         detail = nil
         detailHistory = [nil]; historyIndex = 0
         start(extending: false)
+    }
+
+    /// Re-entering Search retains its category, loaded pages and live cursor.
+    /// Only a new identity or an interrupted initial request needs a new load.
+    func searchIfNeeded(_ value: String) {
+        guard detail == nil else { return }
+        let text = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        if query != text || searchLocale != currentSearchLocale {
+            search(text, kind: query == text ? kind : nil)
+        } else if fetchedAt == nil && !loading && !failed {
+            start(extending: false)
+        }
+    }
+
+    private var currentSearchLocale: String {
+        (Locale.current.region?.identifier ?? "US") + "|" + L10n.languageCode
     }
 
     func open(_ item: MusicCatalogItem) {
@@ -82,7 +101,7 @@ final class MusicCatalogBrowser {
         detailHistory = [nil]; historyIndex = 0
         items = []; relatedItems = []; nextCursor = nil; detail = nil; kind = nil
         metadata = nil
-        fetchedAt = nil; query = ""; failed = false; isStale = false
+        fetchedAt = nil; query = ""; searchLocale = ""; failed = false; isStale = false
     }
 
     private func start(extending: Bool, preserving: Bool = false) {

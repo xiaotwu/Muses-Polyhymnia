@@ -1,5 +1,7 @@
 # 功能实现与补充验收
 
+2026-10-21 接续：[XW-73 真实续页／返回](search-paging-return-acceptance.md) 两次复现并修复 XW-105；真实 continuation、补充搜索扩展及独立详情 Back／Forward 按报告接受。随后 [XW-26 单曲视频画面／seek](video-seek-acceptance.md) 补齐实际帧、可见时间轴和同曲暂停位置承接；其他来源／持久化／设备条件继续保留。正式版和资料受保护，XW-74 未重启。
+
 2026-10-20 当前用户决定：XW-62 已[完整移除评论与回复](comments-retirement-acceptance.md)，包括查看入口和读取请求；旧非空评论／分页和 `insufficientPermissions` 验收条件退休，历史证据保留。移除后的实际视频／章节行为按报告接受，不计为旧评论功能验收通过。另补验[目录冷重开](catalog-cold-reopen-acceptance.md)，并修复实际发现的 [XW-104 繁体设置文案](settings-traditional-chinese-acceptance.md)。用户确认触控板正常并跳过后续测量；[性能基线仍不完整](scrolling-native-input-followup-oct20.md)，没有据此优化应用。
 
 2026-10-20 接续：[快捷指令来源与手动运行](manual-shortcuts-acceptance.md) 已接受两类动作的精确来源、歌词三类窗口、真实 Play 冷启动／Pause 和无效链接错误／OK。Siri、其他配置及系统／设备条件继续保留；产品源码未改，当前范围仍以 [统一核对记录](current-status.md) 为准。

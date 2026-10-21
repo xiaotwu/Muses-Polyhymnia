@@ -1,5 +1,11 @@
 # 当前修复与验收状态
 
+2026-10-21，按用户顺序先推进 XW-73，再推进 XW-26。真实搜索两次复现类别／续页在首页返回后被重置，单列 [XW-105 修复与复验](search-paging-return-acceptance.md)：保留相同查询的类别、已加载页与游标；修复候选两次返回保留结果，保留游标继续取页成功，补充搜索请求上限实际 20→40，独立副本的详情 Back／Forward 通过。28 项／3 套件定向回归、新 Release／元数据／签名通过。滚动位置仍回顶部，不宣称完整取消／Retry／账号或平台矩阵通过，XW-73 仍 In Review。
+
+随后 [XW-26 单曲真实视频与 seek](video-seek-acceptance.md) 接受既有 `75wwBVDPeyY` 的实际帧、0:41→0:31 可见时间轴点击、seek 后续播／暂停，以及关闭后同曲约 0:32 的暂停承接。531 个队列 occurrence／顺序、原资料及 decoded JSON 保留，队列与会话均保存 31,555.064459 ms；当前曲播放计数等预期写入单列，XW-26 继续 In Progress。
+
+四份独立候选已正常退出并恢复 20 项初始偏好。切换瞬态菜单时的一次候选误播已立即暂停、单独审计，详情与视频改用新副本，未混入无写入证据。正式 0.6.0、正常库／47 偏好、原始只读种子及旧证据继续保留。**XW-74 本轮未启动**，没有采样、滚动基线或性能优化。
+
 2026-10-20，XW-62 按用户决定[完整移除评论与回复](comments-retirement-acceptance.md)：入口、面板、浏览器、读取 API 和专属模型均已删除；旧非空评论／分页及 `insufficientPermissions` 条件退休。隔离候选的视频浮动／回主窗、无评论入口、章节加载到真实空态及自身关闭已核对；真人确认一次 Escape 关章节、再次关视频。41 项定向回归与 14 项发布检查通过，交付及 CI 由 [PR #12](https://github.com/xiaotwu/Muses-Polyhymnia/pull/12) 跟踪。正式 0.6.0 保留，未正式发版。
 
 XW-73 新接受[真实目录与冷重开小节](catalog-cold-reopen-acceptance.md)：531 首资料缺少确认目录身份时显示诚实空态；Roselia 搜索 loading、稳定艺人、Lehre der Rose 的 24 项／实际绘制末项、Back 保留 query，以及冷启动从 Home 重走该路径均有实际证据。专辑身份／顺序／metadata 保留，但响应字节与时间戳变化，不声称离线或 cache hit。真实 Web Home、其余来源／错误／账号及平台矩阵继续保留，XW-73 仍 In Review。

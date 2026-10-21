@@ -6,6 +6,7 @@ private actor CatalogBrowserFixture: MusicCatalogProviding {
     var failNext = true
     var failBrowseAfterFirst = false
     var browseCount = 0
+    var searchCount = 0
     init(failBrowseAfterFirst: Bool = false) {
         self.failBrowseAfterFirst = failBrowseAfterFirst
     }
@@ -13,7 +14,10 @@ private actor CatalogBrowserFixture: MusicCatalogProviding {
     func page(_ ids: [String], next: Bool) -> MusicCatalogPage {
         .init(items: ids.map { .init(id: $0, kind: .song, title: $0, subtitle: "", artwork: nil, artists: [], releases: [], channels: []) }, filters: [], next: next ? .init(session: session, endpoint: "search", token: "fixture") : nil, fetchedAt: Date(), region: "US")
     }
-    func search(_ query: String, kind: MusicCatalogKind?) async throws -> MusicCatalogPage { page([query], next: true) }
+    func search(_ query: String, kind: MusicCatalogKind?) async throws -> MusicCatalogPage {
+        searchCount += 1
+        return page([query], next: true)
+    }
     func browse(_ id: String) async throws -> MusicCatalogPage {
         browseCount += 1
         if failBrowseAfterFirst && browseCount > 1 { throw MusicCatalogError.unavailable }
@@ -35,6 +39,25 @@ private final class CatalogLocaleBox: @unchecked Sendable {
     func get() -> LocaleScopedMusicCatalogProvider.Scope { lock.withLock { value } }
     func set(_ value: LocaleScopedMusicCatalogProvider.Scope) {
         lock.withLock { self.value = value }
+    }
+}
+
+private actor InterruptedCatalogFixture: MusicCatalogProviding {
+    var searches = 0
+    private var first: CheckedContinuation<MusicCatalogPage, Never>?
+    func search(_ query: String, kind: MusicCatalogKind?) async throws -> MusicCatalogPage {
+        searches += 1
+        if searches == 1 { return await withCheckedContinuation { first = $0 } }
+        return page("resumed")
+    }
+    func releaseFirst() { first?.resume(returning: page("late")); first = nil }
+    func browse(_ id: String) async throws -> MusicCatalogPage { page(id) }
+    func next(_ cursor: MusicCatalogCursor) async throws -> MusicCatalogPage { page("next") }
+    func reset() {}
+    private func page(_ id: String) -> MusicCatalogPage {
+        .init(items: [.init(id: id, kind: .song, title: id, subtitle: "", artwork: nil,
+                           artists: [], releases: [], channels: [])],
+              filters: [], next: nil, fetchedAt: Date(), region: "US")
     }
 }
 
@@ -64,6 +87,81 @@ private actor LocaleCatalogFixture: MusicCatalogProviding {
 
 @Suite("Structured catalog browser state") @MainActor
 struct MusicCatalogBrowserTests {
+    @Test func reentryResumesInterruptedInitialRequestAndRejectsLateResult() async {
+        let provider = InterruptedCatalogFixture()
+        let browser = MusicCatalogBrowser(provider: provider)
+        browser.search("first", kind: .song)
+        for _ in 0..<500 where await provider.searches == 0 { await Task.yield() }
+        browser.cancel()
+        browser.searchIfNeeded("first")
+        await settle(browser)
+        #expect(browser.kind == .song)
+        #expect(browser.items.map(\.id) == ["resumed"])
+        await provider.releaseFirst()
+        for _ in 0..<20 { await Task.yield() }
+        #expect(browser.items.map(\.id) == ["resumed"])
+        #expect(await provider.searches == 2)
+    }
+
+    @Test func returningToSearchRetainsCategoryPagesAndCursor() async {
+        let provider = CatalogBrowserFixture()
+        let browser = MusicCatalogBrowser(provider: provider)
+        browser.search("first", kind: .song)
+        await settle(browser)
+        browser.more()
+        await settle(browser)
+        browser.retry()
+        await settle(browser)
+        let fetchedAt = browser.fetchedAt
+        browser.cancel()
+        browser.searchIfNeeded(" first ")
+        #expect(browser.kind == .song)
+        #expect(browser.items.map(\.id) == ["first", "second"])
+        #expect(browser.nextCursor == nil)
+        #expect(browser.fetchedAt == fetchedAt)
+        #expect(!browser.loading)
+        #expect(await provider.searchCount == 1)
+    }
+
+    @Test func returningToFailedPageRetainsRetryCursor() async {
+        let provider = CatalogBrowserFixture()
+        let browser = MusicCatalogBrowser(provider: provider)
+        browser.search("first", kind: .song)
+        await settle(browser)
+        browser.more()
+        await settle(browser)
+        let cursor = browser.nextCursor
+        browser.cancel()
+        browser.searchIfNeeded("first")
+        #expect(browser.failed)
+        #expect(browser.kind == .song)
+        #expect(browser.items.map(\.id) == ["first"])
+        #expect(browser.nextCursor?.session == cursor?.session)
+        #expect(browser.nextCursor?.endpoint == cursor?.endpoint)
+        #expect(browser.nextCursor?.token == cursor?.token)
+        browser.retry()
+        await settle(browser)
+        #expect(browser.items.map(\.id) == ["first", "second"])
+        #expect(await provider.searchCount == 1)
+    }
+
+    @Test func reentryStartsNewIdentityButDoesNotReplaceDetail() async {
+        let browser = MusicCatalogBrowser(provider: CatalogBrowserFixture())
+        browser.search("first", kind: .song)
+        await settle(browser)
+        browser.searchIfNeeded("second")
+        await settle(browser)
+        #expect(browser.kind == nil)
+        #expect(browser.items.map(\.id) == ["second"])
+        let detail = MusicCatalogItem(id: "browse:album", kind: .album,
+            title: "Album", subtitle: "", artwork: nil, artists: [], releases: [], channels: [])
+        browser.open(detail)
+        await settle(browser)
+        browser.searchIfNeeded("second")
+        #expect(browser.detail?.id == detail.id)
+        #expect(browser.items.map(\.id) == ["browse:album", "browse:album"])
+    }
+
     @Test func savedBrowseOpensWithoutSearchAndRetainsRowsOnFailedRefresh() async {
         let browser = MusicCatalogBrowser(provider: CatalogBrowserFixture(failBrowseAfterFirst: true))
         let show = MusicCatalogItem(id: "browse:MPSPshow", kind: .podcast,
