@@ -50,6 +50,7 @@ echo "== Muses .app 打包 (身份: $IDENTITY, 版本: $VERSION) =="
 
 # 1) 前置:yt-dlp + 图标。
 ./Scripts/copy-ytdlp.sh
+./Scripts/copy-deno.sh
 ./Scripts/make-icon.sh
 
 # 2) Release 构建。
@@ -65,6 +66,8 @@ mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources" "$CONTENTS/Helpers" "$CONTENTS/
 cp "$RELEASE_DIR/Muses" "$CONTENTS/MacOS/Muses"
 cp "$RELEASE_DIR/MusesWebHomeHelper" "$CONTENTS/Helpers/MusesWebHomeHelper"
 chmod 700 "$CONTENTS/Helpers/MusesWebHomeHelper"
+cp "build/dependencies/deno-2.9.7/deno" "$CONTENTS/Helpers/deno"
+cp "build/dependencies/deno-2.9.7/deno-LICENSE" "$CONTENTS/Resources/deno-LICENSE"
 
 # 4) 拷贝资源 + Info.plist。
 echo "[3/5] 拷贝 Resources / Info.plist"
@@ -130,7 +133,7 @@ MUSES_SIGN_IDENTITY="$IDENTITY" MUSES_BUNDLE_PATH="$APP" python3 "$REPO_ROOT/Scr
 "$REPO_ROOT/Scripts/sync-app-icon.sh" "$APP"
 
 # 6) Sign every nested executable before signing the app.
-echo "[5/5] codesign (--deep --options runtime)"
+echo "[5/5] codesign (inside-out, hardened runtime)"
 ENTITLEMENTS="$RES_DIR/Muses.entitlements"
 YTDLP_ENTITLEMENTS="$RES_DIR/YTDLP.entitlements"
 TIMESTAMP_ARGS=(--timestamp=none)
@@ -152,6 +155,11 @@ for YTDLP_BINARY in \
         --entitlements "$YTDLP_ENTITLEMENTS" \
         --sign "$IDENTITY" "$YTDLP_BINARY"
 done
+# Deno alone needs JIT; the application and other helpers retain their own
+# entitlements. Sign and execute it under hardened runtime before shipping.
+codesign --force --options runtime "${TIMESTAMP_ARGS[@]}" \
+    --entitlements "$RES_DIR/Deno.entitlements" \
+    --sign "$IDENTITY" "$CONTENTS/Helpers/deno"
 # Sign Sparkle's helpers and XPC services before the enclosing framework.
 SPARKLE="$CONTENTS/Frameworks/Sparkle.framework/Versions/B"
 for component in "$SPARKLE/XPCServices/Downloader.xpc" "$SPARKLE/XPCServices/Installer.xpc" \
@@ -165,7 +173,9 @@ codesign --force --options runtime "${TIMESTAMP_ARGS[@]}" --sign "$IDENTITY" \
 # 严格签名和 TeamIdentifier，绝不从 PATH 加载同名程序。
 codesign --force --options runtime "${TIMESTAMP_ARGS[@]}" \
     --sign "$IDENTITY" "$CONTENTS/Helpers/MusesWebHomeHelper"
-codesign --deep --force --options runtime "${TIMESTAMP_ARGS[@]}" \
+# Nested code is already signed. A deep re-sign would overwrite Deno's narrow
+# JIT entitlement with the application's different entitlement set.
+codesign --force --options runtime "${TIMESTAMP_ARGS[@]}" \
     --entitlements "$ENTITLEMENTS" \
     --sign "$IDENTITY" "$APP"
 
@@ -173,6 +183,10 @@ codesign --deep --force --options runtime "${TIMESTAMP_ARGS[@]}" \
 codesign --verify --deep --strict "$CONTENTS/Frameworks/Sparkle.framework"
 otool -L "$CONTENTS/MacOS/Muses" | grep -q '@rpath/Sparkle.framework/'
 codesign --verify --deep --strict "$APP" && echo "      ✓ codesign 验证通过"
+codesign --verify --strict "$CONTENTS/Helpers/deno"
+PATH=/usr/bin:/bin:/usr/sbin:/sbin \
+    DENO_DIR="$REPO_ROOT/build/dependencies/deno-cache" DENO_NO_UPDATE_CHECK=1 \
+    "$CONTENTS/Helpers/deno" eval 'if (1 + 1 !== 2) Deno.exit(1)'
 codesign --verify --strict "$CONTENTS/Helpers/MusesWebHomeHelper" \
     && echo "      ✓ Web Home helper 签名验证通过"
 for YTDLP_BINARY in \
