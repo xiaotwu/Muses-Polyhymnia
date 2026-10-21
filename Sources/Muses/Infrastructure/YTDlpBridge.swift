@@ -589,8 +589,8 @@ final class YTDlpBridge {
     /// **Internal** (not private) so tests can inject timeouts; non-test code
     /// should use the higher-level `resolveStreamURL` / `fetchPlaylist` / `version`.
     ///
-    /// stdout and stderr are read concurrently in `Task.detached(priority: .utility)`
-    /// so large outputs (long playlists) cannot fill the pipe buffers and deadlock.
+    /// stdout and stderr drain concurrently outside Swift's cooperative pool,
+    /// so large outputs cannot fill the pipes or starve foreground extraction.
     /// The subprocess races against the timeout; on expiry it is `terminate()`d and
     /// `.timeout` is thrown.
     ///
@@ -666,7 +666,22 @@ final class YTDlpBridge {
                             executablePath: executablePath, args: fallbackArgs,
                             timeout: max(0.05, timeout - Date().timeIntervalSince(started)))
                     } catch {
-                        throw e
+                        // Recovery's result determines retryability. Keeping the
+                        // initial cookie error would hide a transient timeout or
+                        // replace an accurate permanent-media failure.
+                        if let recoveryError = error as? YTDlpError, recoveryError == .timeout {
+                            log.error("yt-dlp cookie recovery timed out")
+                        } else if case let YTDlpError.exitCode(code, message) = error {
+                            let category = message.localizedCaseInsensitiveContains("page needs to be reloaded") ? "page-reload"
+                                : message.localizedCaseInsensitiveContains("challenge") ? "challenge"
+                                : message.localizedCaseInsensitiveContains("HTTP Error 429") ? "rate-limit"
+                                : message.localizedCaseInsensitiveContains("HTTP Error 403") ? "http-403"
+                                : message.localizedCaseInsensitiveContains("unavailable") ? "unavailable" : "other"
+                            log.error("yt-dlp cookie recovery exit \(code, privacy: .public); category=\(category, privacy: .public)")
+                        } else if !(error is CancellationError) {
+                            log.error("yt-dlp cookie recovery failed")
+                        }
+                        throw error
                     }
                 }
             case .notFound:

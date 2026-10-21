@@ -1,4 +1,4 @@
-# Cold playlist playback and resolver pipe progress
+# Cold playlist playback, pipe progress and recovery errors
 
 2026-10-21, [XW-107](https://linear.app/xiaotwu/issue/XW-107/muses-keep-resolver-pipe-reads-off-cooperative-workers-during-cold), discovered at the 0.6.2 publication gate after the XW-106 runtime fix.
 
@@ -19,3 +19,11 @@ The same reproduction with only pipe draining moved to a Dispatch queue for bloc
 The regression suite adds complete 256 KiB stdout and stderr capture. CI also runs that test and the existing foreground-lane regression with one cooperative worker. Full CI and a rebuilt, signed/notarized final package's repeated cold-media Play All, pause/resume, Next/Previous and queue preservation remain publication gates. No 0.6.2 release or update-feed replacement has occurred at this checkpoint. XW-74 remains paused.
 
 Local focused verification passed 33 tests in four suites. The two one-worker regressions both passed: foreground selection in 0.020 seconds and complete dual-pipe capture in 0.164 seconds. These local checks do not replace the pending remote CI or final native gate.
+
+## Recovery error follow-up
+
+The pipe-only commit `34c7671` passed [full CI 39687619872](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/39687619872), signing/notarization and distribution verification, but its fresh final-package candidate still reached Retry on cold Play All. This second package was also held and retained. The pipe fix is a verified progress repair, not evidence that it alone resolved the native failure.
+
+The cookie-recovery catch rethrew the initial browser error even when recovery itself timed out. That hid the error used by `StreamResolutionPolicy`: a timeout should permit the existing bounded retry, while the original cookie error does not. A controlled executable reproduced this in two failing tests: a recovery timeout returned the initial cookie exit, and an unavailable video also returned that same misleading error.
+
+Recovery now propagates its actual error without changing timeout budgets, cookie consent, fallback arguments or retry classification. Diagnostic messages contain fixed failure categories and exit codes only, never raw stderr or signed URLs. The timeout and permanent-media regressions passed after the change, as did 35 focused tests in four suites. Full CI and a newly rebuilt final-package cold Play All gate must pass before publication; the earlier artifacts and CI runs do not satisfy that gate.

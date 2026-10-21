@@ -6,6 +6,8 @@ The application now includes the JavaScript runtime required by its media resolv
 
 Resolver output is drained without occupying Swift's cooperative workers, so background extraction cannot block the workers needed to start a selected playlist song.
 
+Transient failures during browser-access recovery now reach the existing retry handling instead of being replaced by the initial browser error. Permanent media restrictions continue to stop retries.
+
 Real playlist playback, pause/resume and Next/Previous were verified with the playlist's queue identities and canonical order preserved. Account consent and source restrictions retain their existing behavior.
 
 ## Compatibility and installation
