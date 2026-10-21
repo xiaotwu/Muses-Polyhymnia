@@ -327,48 +327,6 @@ struct YouTubeDataAPIClient {
                                items: { $0.items })
     }
 
-    /// Read-only public thread page. The caller owns the volatile page token;
-    /// comment text and tokens are never placed in a durable catalog cache.
-    func commentThreads(videoID: String, pageToken: String? = nil) async throws
-        -> YouTubeCommentPage {
-        guard videoID.count == 11, MusicCatalogParser.validID(videoID) else {
-            throw DataAPIError.parse("invalid video id")
-        }
-        var url = URLComponents(string: "\(Self.base)/commentThreads")!
-        url.queryItems = [
-            .init(name: "part", value: "snippet"),
-            .init(name: "videoId", value: videoID),
-            .init(name: "textFormat", value: "plainText"),
-            .init(name: "maxResults", value: "100")
-        ]
-        if let pageToken, !pageToken.isEmpty {
-            url.queryItems?.append(.init(name: "pageToken", value: pageToken))
-        }
-        let data = try await get(url.url!.absoluteString)
-        return try JSONDecoder().decode(YouTubeCommentPage.self, from: data)
-    }
-
-    /// A thread can omit replies, so this separate endpoint is required for a
-    /// complete reply list. Pagination remains explicit and cancellable.
-    func commentReplies(parentID: String, pageToken: String? = nil) async throws
-        -> YouTubeCommentReplyPage {
-        guard !parentID.isEmpty, parentID.count <= 512 else {
-            throw DataAPIError.parse("invalid parent comment id")
-        }
-        var url = URLComponents(string: "\(Self.base)/comments")!
-        url.queryItems = [
-            .init(name: "part", value: "snippet"),
-            .init(name: "parentId", value: parentID),
-            .init(name: "textFormat", value: "plainText"),
-            .init(name: "maxResults", value: "100")
-        ]
-        if let pageToken, !pageToken.isEmpty {
-            url.queryItems?.append(.init(name: "pageToken", value: pageToken))
-        }
-        let data = try await get(url.url!.absoluteString)
-        return try JSONDecoder().decode(YouTubeCommentReplyPage.self, from: data)
-    }
-
     /// Source-backed podcast metadata. Missing IDs or fields remain unknown;
     /// absence from a response is not proof of deletion or privacy state.
     func videoMetadata(ids: [String]) async throws -> [YouTubeVideoMetadata] {
@@ -582,69 +540,6 @@ private struct YouTubeVideoMetadataResponse: Decodable {
         let uploadStatus: String?
         let privacyStatus: String?
     }
-}
-
-struct YouTubeComment: Decodable, Sendable, Equatable, Identifiable {
-    let id: String
-    let author: String
-    let authorChannelID: String?
-    let videoID: String?
-    let parentID: String?
-    let text: String
-    let publishedAt: Date?
-
-    enum CodingKeys: String, CodingKey { case id, snippet }
-    struct Snippet: Decodable {
-        let authorDisplayName: String
-        let authorChannelId: ChannelIdentity?
-        let videoId: String?
-        let parentId: String?
-        let textDisplay: String
-        let publishedAt: String?
-    }
-    struct ChannelIdentity: Decodable { let value: String }
-
-    init(from decoder: Decoder) throws {
-        let source = try decoder.container(keyedBy: CodingKeys.self)
-        id = try source.decode(String.self, forKey: .id)
-        let snippet = try source.decode(Snippet.self, forKey: .snippet)
-        author = snippet.authorDisplayName
-        authorChannelID = snippet.authorChannelId?.value
-        videoID = snippet.videoId
-        parentID = snippet.parentId
-        text = snippet.textDisplay
-        publishedAt = snippet.publishedAt.flatMap { ISO8601DateFormatter().date(from: $0) }
-    }
-}
-
-struct YouTubeCommentThread: Decodable, Sendable, Equatable, Identifiable {
-    let id: String
-    let topLevelComment: YouTubeComment
-    let totalReplyCount: Int
-
-    enum CodingKeys: String, CodingKey { case id, snippet }
-    struct Snippet: Decodable {
-        let topLevelComment: YouTubeComment
-        let totalReplyCount: Int
-    }
-
-    init(from decoder: Decoder) throws {
-        let source = try decoder.container(keyedBy: CodingKeys.self)
-        id = try source.decode(String.self, forKey: .id)
-        let snippet = try source.decode(Snippet.self, forKey: .snippet)
-        topLevelComment = snippet.topLevelComment
-        totalReplyCount = snippet.totalReplyCount
-    }
-}
-
-struct YouTubeCommentPage: Decodable, Sendable, Equatable {
-    let items: [YouTubeCommentThread]
-    let nextPageToken: String?
-}
-
-struct YouTubeCommentReplyPage: Decodable, Sendable, Equatable {
-    let items: [YouTubeComment]
-    let nextPageToken: String?
 }
 
 struct YouTubeChannel: Codable, Sendable, Equatable {

@@ -1,5 +1,15 @@
 # 当前修复与验收状态
 
+2026-10-20，XW-62 按用户决定[完整移除评论与回复](comments-retirement-acceptance.md)：入口、面板、浏览器、读取 API 和专属模型均已删除；旧非空评论／分页及 `insufficientPermissions` 条件退休。隔离候选的视频浮动／回主窗、无评论入口、章节加载到真实空态及自身关闭已核对；真人确认一次 Escape 关章节、再次关视频。41 项定向回归与 14 项发布检查通过，交付及 CI 由 [PR #12](https://github.com/xiaotwu/Muses-Polyhymnia/pull/12) 跟踪。正式 0.6.0 保留，未正式发版。
+
+XW-73 新接受[真实目录与冷重开小节](catalog-cold-reopen-acceptance.md)：531 首资料缺少确认目录身份时显示诚实空态；Roselia 搜索 loading、稳定艺人、Lehre der Rose 的 24 项／实际绘制末项、Back 保留 query，以及冷启动从 Home 重走该路径均有实际证据。专辑身份／顺序／metadata 保留，但响应字节与时间戳变化，不声称离线或 cache hit。真实 Web Home、其余来源／错误／账号及平台矩阵继续保留，XW-73 仍 In Review。
+
+XW-71 实际繁体页面暴露缺失译文，单列 [XW-104 繁体设置修复](settings-traditional-chinese-acceptance.md)：补齐 34 条静态文案及动态信息按钮标签，原有 762 条译文保留。新 Release、11 项本地化／字体回归与实际繁体 General／Appearance、Large Georgia 三样本、信息说明和四组 Help 正文通过；字号／字体／语言已恢复。XW-71 仍保留完整 VoiceOver、实际 macOS 26 等条件，不重复要求既有 XW-99 已接受小节。
+
+新增[原生滚动输入接续](scrolling-native-input-followup-oct20.md)：首轮仅捕获一个短手势，后续启动等待未覆盖真人输入，不能形成应用／AX 性能基线。用户确认触控板正常并明确跳过后，等待程序已停止且未启动新录制。另一次选中首行后的方向键序列通过 1→2→14→1，并恢复滚动位置；未复现方向键缺陷，也未做性能优化。XW-74 仍 In Review，后续测量须由用户另行恢复。
+
+三个本轮候选均正常退出，各自 20 项偏好按值和类型恢复；四份停止快照保留 531 Tracks／6 Events，资料／导入／历史表相同，队列 JSON 语义与生命周期／ORM 差异单独审计。正式版完整清单、正常资料／47 偏好、原始只读种子、旧证据及共享 Release 的保护核对通过。
+
 2026-10-20，XW-74 新增 [32 次真实滚动与检查开销归因](scrolling-inspection-followup-oct20.md)：四组都保留了实际下滚／返回检查点，正常保存的 125.912 秒 Time Profiler 覆盖 A1/B1/B2。最少显式检查的 A 仍含大量 AX hierarchy/layout 工作；B 的额外读取又拉长输入间隔，且署名缓存仍在更新，因此尚不能隔离普通滚动的应用热点。CPU 原始计数单位误标已纠正并独立校准；A2 覆盖不完整，原前台 reader 的主循环限制也按实保留。32 次前台授权已消费，不声称 FPS、能耗、泄漏或应用优化通过，XW-74 继续 In Review。
 
 XW-72 本轮确认了此前未覆盖的后台进入缺陷，单列 [XW-103 托盘焦点与布局](tray-player-acceptance.md)：后台 Escape 不抬主窗、标题打开原主窗均由真人接受；布局移除卡片音量、更多置右、播放居中，标题／小号歌手各一行，超宽停顿后滚动。**16:9** 已测稳定 320×180pt，比例／文字／延迟滚动／系统深色／标题和 Escape 通过 r5 真人复验；r6 的完整模式轮换、编号列表图标、音频输出／退出图标及“退出”文案也由真人确认。最终私有 Release 与 90 项／7 套件通过，交付由 [PR #11](https://github.com/xiaotwu/Muses-Polyhymnia/pull/11) 跟踪。正式 0.6.0、当前正常库和全部旧证据继续保留，未正式发版。
@@ -129,12 +139,12 @@ XW-75 的唯一名称 Shortcuts 候选已完成注册、独立 setup 启动/退�
 | XW-97 旧导入署名 | Done；显式、可恢复修复已完成，本机完整回归、隔离 655 项 Apply/冷启/Undo 通过；PR #6 已合并，PR 与 main CI 均成功，正式资料未写入，待新版本显式应用。 |
 | XW-98 封面呈现 | Done；焦点卡比例/宽度、多推荐聚焦横栏和低档封面升级已完成；实际三尺寸及 Large 深色、原生横栏滚动通过，PR #6 已合并，PR 与 main CI 均成功。 |
 | XW-75 App Intents | 冷态歌词、完整串行键盘、真实来源预览/浮窗弹窗、修复后的冷 Play／主窗视频弹窗、[Edit Info 草稿交接](edit-draft-intent-acceptance.md)、[Audio Info 上层歌词](audio-info-intent-acceptance.md)、[非空 Import／未保存 Notes 草稿交接](import-notes-intent-acceptance.md) 及 [无当前录音／无效链接](empty-errors-intent-acceptance.md) 按各自范围接受。新增 [快捷指令来源／五项手动运行](manual-shortcuts-acceptance.md)，歌词三类窗口及真实 Play／无效链接均通过；[EQ 返回](eq-lyrics-return-acceptance.md) 保留原版两轮失败，XW-102 修复后限定本机返回／活跃 Save As 等待及后续删除确认 Cancel 交接通过；不增加 Cancel 后草稿恢复、真正删除或 EQ 听感结论。其他未测呈现、Siri 与其他未测 Shortcuts 配置、实际 macOS 26 与完整 VoiceOver/设备矩阵仍保留；XW-75 继续 In Review。 |
-| XW-26 Pull/播放父项 | XW-84 的原生错误与同草稿重试已关闭，见 [原生恢复](pull-native-recovery.md)。父项保留真实评论/回复、其它来源/视频和未测持久化分支；自然远端冲突、Push/manage 与破坏性历史/group 保持原排除范围。 |
-| XW-71 Settings | 十类设置/历史、字体指针/键盘、语言/字号恢复和 Dark 840×804 三项检查已接受。本轮临时模式 2 下四个 Help disclosure Tab/Space、信息 AX Cancel/原焦点及修复后的原按钮 Escape、继续 Tab、点击打开与人类文本选中 Escape 按范围通过；系统恢复 0，保护/清理独立复审通过。XW-99 已 Done，PR #7 已合并且精确 PR/main CI 全阶段通过；完整 VoiceOver、实际 macOS 26 与其他设备/焦点条件仍保留，XW-71 继续 In Review。 |
+| XW-26 Pull/播放父项 | XW-84 的原生错误与同草稿重试已关闭，见 [原生恢复](pull-native-recovery.md)。评论／回复按用户决定完整退休；父项保留其它来源／视频和未测持久化分支；自然远端冲突、Push/manage 与破坏性历史/group 保持原排除范围。 |
+| XW-71 Settings | 十类设置/历史、字体指针/键盘、语言/字号恢复和 Dark 840×804 三项检查已接受。本轮临时模式 2 下四个 Help disclosure Tab/Space、信息 AX Cancel/原焦点及修复后的原按钮 Escape、继续 Tab、点击打开与人类文本选中 Escape 按范围通过；系统恢复 0，保护/清理独立复审通过。XW-99 已 Done，PR #7 已合并且精确 PR/main CI 全阶段通过；新增 [XW-104 繁体文案](settings-traditional-chinese-acceptance.md) 修复及限定原生结果；完整 VoiceOver、实际 macOS 26 与其他设备/焦点条件仍保留，XW-71 继续 In Review。 |
 | XW-99 信息弹窗 Escape | Done；`8560bab` 本机 Release、独立源码审阅、限定原生复验与完整保护/清理复审通过。[PR #7](https://github.com/xiaotwu/Muses-Polyhymnia/pull/7) 已合并 `fc339c8`，精确 PR head `639a277` 的 [PR CI 38653245594](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38653245594) 和精确合并提交的 [main CI 38654810970](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38654810970) 全阶段成功，执行源码一致。原始人类前台失败报告、后台路径、后来无归因消失及首次编译失败保留；见 [验收报告](settings-info-escape-acceptance.md)。 |
 | XW-72 辅助窗口 | MiniPlayer 生命周期/Pin/共享播放、真实同步桌面歌词及原限定菜单栏路径继续有效。新增后台进入的物理 Escape 缺陷由 XW-103 修复，r5 的 Escape／标题打开、16:9／单行滚动与系统 Dark 文字已由真人接受；完整控件焦点、真实未同步歌词及平台／辅助功能矩阵仍保留。 |
 | XW-103 托盘焦点／布局 | 源码与本轮原生验收通过；后台 Escape／标题打开、16:9／延迟滚动／系统深色和最终模式／菜单图标／“退出”文案均由真人接受，私有 Release 与 90 项回归通过。交付见 [PR #11](https://github.com/xiaotwu/Muses-Polyhymnia/pull/11)；完整边界及归档见 [修复记录](tray-player-acceptance.md)。 |
-| XW-73 来源、XW-62 评论 | 既有两来源、缓存/取消边界与 Albums 小节继续有效，旧公共 Home Retry 退休。本轮艺人详情、在线正常重读、人工横向末端/后读及 Back/退出按 [艺人目录报告](artist-catalog-acceptance.md) 的限定范围记录；首轮 AX 崩溃单独追踪。另已完成 [真实在线专辑 Play/Next/Previous](artist-release-playback-acceptance.md)，24 项实际响应身份/顺序与正常保护核对通过；剩余真实专门同意且身份匹配的 Web Home、其他目录/播放/错误与平台矩阵、实际 provider continuation 及非空评论回复；评论权限仍 insufficientPermissions。 |
+| XW-73 来源、XW-62 评论退休 | 既有两来源、缓存/取消边界与 Albums 小节继续有效，旧公共 Home Retry 退休。本轮艺人详情、在线正常重读、人工横向末端/后读及 Back/退出按 [艺人目录报告](artist-catalog-acceptance.md) 的限定范围记录；首轮 AX 崩溃单独追踪。另已完成 [真实在线专辑 Play/Next/Previous](artist-release-playback-acceptance.md)，24 项实际响应身份/顺序与正常保护核对通过；新增 [目录冷重开](catalog-cold-reopen-acceptance.md) 的稳定艺人／24 项专辑、真实绘制末项及 Back/query 小节。剩余真实专门同意且身份匹配的 Web Home、其他目录／播放／错误与平台矩阵及实际 provider continuation；XW-62 已完整退休评论／回复，旧权限与非空回复条件不再待验。 |
 | XW-100 艺人专辑 AX 滚动 | 最终 10021 本机真实页面／冷启动 AX 来回与 17 卡键盘焦点显露通过，菜单及正确专辑打开保留；974 项／132 套件、Release／签名与发布检查通过。原版本三次崩溃、七个窄失败及两次焦点失败独立保留；PR #8 已合并，精确 PR head/main CI 全阶段成功，Done；后续 XW-73 作品播放小节已推进。完整 VoiceOver 与 macOS 26 未覆盖。 |
 | XW-93 加载标记归属 | Done；两条受控状态缺陷已修复，39 项 / 5 套件回归、独立复审和完整 CI 通过，PR #3 已集成。不增加原生、真实 Web 来源或旧内容泄漏结论。 |
 | XW-94/95 署名和歌词默认查询 | Done；原始失败、144/107 项定向回归、独立复审、签名隔离版歌词输入小节及 PR #4 完整 CI 通过。保留 UUID、手工 metadata、录音版本和显式 query；不猜测永久删除后的来源，不把数字验收参数或 37 个手动查询候选称为当前录音自动匹配成功。真实换账号重导入没有新增原生结论。 |
