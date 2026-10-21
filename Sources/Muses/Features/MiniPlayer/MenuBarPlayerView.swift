@@ -26,31 +26,31 @@ struct MenuBarPlayerView: View {
     }
 
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 6) {
             HStack(alignment: .top, spacing: 12) {
                 if let track {
                     ArtworkView(source: ArtworkSource.resolve(for: track), cornerRadius: 8,
-                                glyphSize: 24, targetSize: 56)
-                        .frame(width: 56, height: 56)
+                                glyphSize: 24, targetSize: 44)
+                        .frame(width: 44, height: 44)
                 } else {
                     MusesMark(size: 44)
                 }
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(songInformation?.title ?? tr("Not Playing", "未在播放"))
-                        .font(MusesTypography.song(size: 14, emphasized: true, text: songInformation?.title ?? "")).lineLimit(2)
-                    Text(songInformation?.artist ?? "Muses")
-                        .font(MusesTypography.song(size: 12, text: songInformation?.artist ?? "")).foregroundStyle(.secondary).lineLimit(1)
+                    Button(action: onOpenMain) {
+                        DelayedMarqueeText(
+                            text: songInformation?.title ?? tr("Not Playing", "未在播放"),
+                            font: MusesTypography.song(size: 14, emphasized: true, text: songInformation?.title ?? ""))
+                    }
+                    .buttonStyle(.fullAreaPlain)
+                    .help(tr("Open Muses", "打开 Muses"))
+                    .accessibilityLabel(songInformation?.title ?? tr("Not Playing", "未在播放"))
+                    .accessibilityHint(tr("Open Muses", "打开 Muses"))
+                    DelayedMarqueeText(text: songInformation?.artist ?? "Muses",
+                                       font: MusesTypography.song(size: 11, text: songInformation?.artist ?? ""))
+                        .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .frame(minHeight: 56, alignment: .leading)
-                Button(action: onOpenMain) {
-                    Image(systemName: "arrow.up.right.square")
-                        .font(MusesTypography.system(size: 13, weight: .semibold))
-                        .frame(width: 28, height: 28)
-                }
-                .buttonStyle(.fullAreaPlain)
-                .help(tr("Open Muses", "打开 Muses"))
-                .accessibilityLabel(tr("Open Muses", "打开 Muses"))
+                .frame(minHeight: 44, alignment: .leading)
             }
 
             VStack(spacing: 2) {
@@ -80,12 +80,14 @@ struct MenuBarPlayerView: View {
                 .foregroundStyle(.secondary)
             }
 
-            HStack(spacing: 12) {
-                RepeatPlaybackButton(hit: 32, iconSize: 14)
+            HStack(spacing: 0) {
+                TrayPlaybackModeButton()
                     .disabled(track == nil)
+                Spacer(minLength: 0)
                 ChromeIconButton(systemName: "backward.fill", help: tr("Previous", "上一首"),
                                  accessibility: tr("Previous", "上一首")) { playback.previous() }
                     .disabled(track == nil)
+                Spacer(minLength: 0)
                 Button { playback.toggle() } label: {
                     Image(systemName: playback.primaryAction.symbol)
                         .font(MusesTypography.system(size: 24, weight: .semibold))
@@ -95,30 +97,12 @@ struct MenuBarPlayerView: View {
                 .modifier(PlaybackCoreSurface()).help(playback.primaryAction.title)
                 .disabled(!playback.isPrimaryActionAvailable)
                 .accessibilityLabel(playback.primaryAction.title)
+                Spacer(minLength: 0)
                 ChromeIconButton(systemName: "forward.fill", help: tr("Next", "下一首"),
                                  accessibility: tr("Next", "下一首")) { playback.next() }
                     .disabled(track == nil)
-                ChromeIconMenu(systemName: "ellipsis", title: tr("Player options", "播放器选项")) {
-                    Button(playback.volume <= 0.001 ? tr("Unmute", "取消静音") : tr("Mute", "静音")) { playback.toggleMute() }
-                    if let audioDevices {
-                        Menu(tr("Audio output", "音频输出")) {
-                            ForEach(NowPlayingOutputDevicePolicy.visibleDevices(audioDevices.devices)) { device in
-                                Button { _ = audioDevices.setDefault(device.id) } label: {
-                                    Label(device.name, systemImage: device.id == audioDevices.defaultDeviceID ? "checkmark" : "hifispeaker")
-                                }
-                            }
-                        }
-                    }
-                    Button(tr("Shuffle", "随机播放")) { playback.queue.toggleShuffle() }
-                        .disabled(track == nil)
-                    if let id = track?.youTubeId, let url = URL(string: "https://youtu.be/\(id)") {
-                        ShareLink(item: url)
-                    }
-                    Divider()
-                    Button(tr("Quit Muses", "退出 Muses"), action: onQuit)
-                }
                 Spacer(minLength: 0)
-                VolumeKnob(size: 40)
+                playerOptions
             }
             .environment(\.groupedChromeActions, true)
 
@@ -127,8 +111,10 @@ struct MenuBarPlayerView: View {
                     .font(MusesTypography.caption).foregroundStyle(.secondary)
             }
         }
-        .padding(18)
-        .frame(width: 332)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .frame(width: 294)
+        .frame(minHeight: 154)
         .foregroundStyle(BrandColors.textPrimary)
         .tint(BrandColors.accent)
         .fixedSize(horizontal: false, vertical: true)
@@ -146,6 +132,32 @@ struct MenuBarPlayerView: View {
             if !isSeeking { seekTrackID = nil }
         }
         .onDisappear { isSeeking = false; seekTrackID = nil }
+    }
+
+    private var playerOptions: some View {
+        ChromeIconMenu(systemName: "ellipsis", title: tr("Player options", "播放器选项")) {
+            if let audioDevices {
+                Menu {
+                    ForEach(NowPlayingOutputDevicePolicy.visibleDevices(audioDevices.devices)) { device in
+                        Button { _ = audioDevices.setDefault(device.id) } label: {
+                            Label(device.name, systemImage: device.id == audioDevices.defaultDeviceID ? "checkmark" : "hifispeaker")
+                        }
+                    }
+                } label: {
+                    Label(tr("Audio output", "音频输出"), systemImage: "speaker.wave.2")
+                }
+            }
+            if let id = track?.youTubeId, let url = URL(string: "https://youtu.be/\(id)") {
+                ShareLink(item: url) {
+                    Label(tr("Share", "分享"), systemImage: "square.and.arrow.up")
+                }
+            }
+            Divider()
+            Button(action: onQuit) {
+                Label(tr("Quit", "退出"), systemImage: "power")
+            }
+        }
+        .labelStyle(.titleAndIcon)
     }
 
     private func formatTime(_ value: Double) -> String {

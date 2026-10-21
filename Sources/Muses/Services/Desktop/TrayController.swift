@@ -90,7 +90,7 @@ final class TrayController: NSObject, NSPopoverDelegate {
         guard let item = statusItem else { return }
         let track = trackProvider()
         item.button?.title = ""
-        item.button?.image = TrayIcon.menuBarImage
+        item.button?.image = TrayIcon.statusBarImage
         item.button?.imagePosition = .imageOnly
         item.button?.imageScaling = .scaleProportionallyDown
         metadataTask?.cancel()
@@ -188,8 +188,20 @@ final class TrayController: NSObject, NSPopoverDelegate {
         installDismissMonitors()
     }
 
+    func popoverDidShow(_ notification: Notification) {
+        guard let shown = notification.object as? NSPopover,
+              shown === popover, shown.isShown else { return }
+        // A status-item click need not activate the app. Complete the keyboard
+        // handoff after AppKit has presented the popover, without raising main.
+        shown.contentViewController?.view.window?.makeKeyAndOrderFront(nil)
+    }
+
     func popoverDidClose(_ notification: Notification) {
+        guard let closed = notification.object as? NSPopover,
+              closed === popover else { return }
         removeDismissMonitors()
+        // Release the hosting tree, including any overflow-text animation.
+        popover = nil
     }
 
     private func installDismissMonitors() {
@@ -253,13 +265,16 @@ final class TrayController: NSObject, NSPopoverDelegate {
 /// invert it for light and dark menu bars.
 enum TrayIcon {
     static let logoImage = loadLogo()
-    static let menuBarImage: NSImage = {
+    private static let menuBarSource: NSImage? = {
         let url = Bundle.module.url(forResource: "MenuBarMark", withExtension: "png", subdirectory: "Resources")
-        let image = url.flatMap { NSImage(contentsOf: $0) }
-        // Center the lyre in the native 18pt canvas with a small symmetric inset.
-        // Avoid a baseline lift: the tall mark already reads high beside other symbols.
-        return templateImage(from: image, pointSize: 18, contentInset: 0.5, trimInk: true)
+        return url.flatMap { NSImage(contentsOf: $0) }
     }()
+    static let menuBarImage = templateImage(from: menuBarSource, pointSize: 18,
+                                            contentInset: 0.5, trimInk: true)
+    // Lower only the status-item mark by one backing pixel, retaining its ink
+    // inside the 18pt canvas. Other uses keep their centered alignment.
+    static let statusBarImage = templateImage(from: menuBarSource, pointSize: 18,
+                                              contentInset: 0.5, trimInk: true, verticalOffset: -0.5)
     static let settingsImage = templateImage(pointSize: 24)
 
     static func loadLogo() -> NSImage? {
@@ -271,7 +286,7 @@ enum TrayIcon {
 
     static func templateImage(from source: NSImage? = nil, pointSize: CGFloat = 18,
                               sourceInsetFraction: CGFloat = 0, contentInset: CGFloat = 0,
-                              trimInk: Bool = false) -> NSImage {
+                              trimInk: Bool = false, verticalOffset: CGFloat = 0) -> NSImage {
         let src = source ?? logoImage ?? NSImage(size: NSSize(width: pointSize, height: pointSize))
         let scale: CGFloat = 2
         let px = max(Int((pointSize * scale).rounded()), 1)
@@ -306,6 +321,7 @@ enum TrayIcon {
             drawRect = NSRect(x: (CGFloat(px) - size.width) / 2, y: (CGFloat(px) - size.height) / 2,
                               width: size.width, height: size.height)
         }
+        drawRect.origin.y += verticalOffset * scale
         src.draw(in: drawRect,
                  from: sourceRect,
                  operation: .copy,
