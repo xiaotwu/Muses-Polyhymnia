@@ -1,5 +1,7 @@
 # 技术工作索引与对话归并
 
+2026-10-20 最新补验：[快捷指令动作来源与手动运行](manual-shortcuts-acceptance.md) 五项通过。真实动作描述及唯一注册路径绑定 Search／Play 到准确候选；冷歌词、最小化恢复、关窗重建、真实 Play 冷启动／Pause 和无效链接错误／OK 均有原生证据。当前正常 531 Tracks／6 Events／47 偏好及正式版保留，候选真实播放写入单独核对；自有应用均退出，测试快捷指令与候选保留接续。产品源码未改，XW-75 继续 In Review，Siri 与其余系统／设备条件见报告及 [当前状态](current-status.md)。
+
 2026-10-16 最新补验：[无当前录音与无效链接](empty-errors-intent-acceptance.md) 四项通过：两次无录音提示及自身 Close／Escape、不支持网址公开拒绝、缺失本地录音错误提示／自身 OK。四份框架各 Passed 1/0/exit0；14 份闭合备份字节一致，18→20 偏好及资料保护复核通过，自有资源已核验归档清理。产品源码未改，正式 0.6.0 与原始种子保留，XW-75 继续 In Review；两类链接错误的边界和剩余矩阵见报告。
 
 2026-10-15 最新补验：[非空导入与未保存笔记草稿的 Intent 交接](import-notes-intent-acceptance.md) 两项在同一隔离候选中通过。导入草稿经歌词自身 Close 后保留；Notes 原稿在请求等待期间保留，真实 Cancel 后自动呈现待处理歌词。两份请求各 Passed 1/0/exit0；未执行 Import、Save、Apply 或 Play，产品源码未改。XW-75 继续 In Review，系统／设备与未测呈现条件见 [当前状态](current-status.md)。

@@ -1,5 +1,9 @@
 # 当前修复与验收状态
 
+2026-10-20，XW-75 新接受 [快捷指令来源与五项手动运行](manual-shortcuts-acceptance.md)：真实复制出的 Search／Play 动作描述均绑定唯一隔离候选；歌词冷启动、同窗口最小化恢复、同 PID 关窗重建、真实链接 Play 冷启动／时钟推进／Pause，以及不支持链接的完整公开错误／自身 OK 均通过。窗口先由被动元数据确认，再读候选界面；五次 Run 使用原生 Cua 控件，人工仅协助打开空白编辑器。产品源码无需修改，Siri、其他未测呈现、实际 macOS 26 与完整 VoiceOver／设备／焦点条件继续保留，XW-75 仍 In Review。
+
+本轮按当前已存在的正常库建立新基线：531 Tracks／6 Events、27 表及 47 偏好保留，两份只读备份字节与完整 typed values 相同，正式 0.6.0 的完整 207 项清单相同。十份候选快照保留真实 Play 的计数 1→2 和两处位置 8693.333333→31669.365079 ms；歌词和后续无效链接均未改动各自的保存位置，20 项候选偏好同值同类型。候选及自有 Shortcuts 均正常退出；两份测试快捷指令、候选和资料保留供 XW-75 接续，未声称已清理。系统模式保持 0，原始 0400 种子与全部旧证据保留；人工新建期间快捷指令标识变化按实记录，不推断删除原因或恢复未知内容。
+
 2026-10-16，XW-75 新接受 [无当前录音与无效链接](empty-errors-intent-acceptance.md) 四项限定检查：两份歌词请求均显示“请先播放歌曲／歌词会匹配当前录音版本。”，自身 Close 与 Escape 均关闭；不支持的网址得到完整公开拒绝消息，不存在的本地录音显示实际错误 alert 并可由自身“好”关闭。四份完整框架各 Passed 1/0/exit0，其中不支持链接为预期抛错；产品源码无需修改，XW-75 继续 In Review。
 
 全新 namespace 由真实首次启动建立，未复制种子或注入 SQL。十四份闭合备份／27 表完整 typed values 及文件字节均相同，业务表为空；实际 18→20 项偏好仅新增窗口 frame 与平直 EQ，原 18 项类型和值保持。自有候选、namespace、四套完整 runner 及共享容器均经逐成员归档核对后清理，五个精确注册路径注销并回读三种标识为 0；正式 0.6.0、原始 0400 暂停种子和全部既有证据保留。手动 Siri/Shortcuts、真实 macOS 26、完整 VoiceOver／设备／焦点及其他未测条件继续保留。
@@ -118,7 +122,7 @@ XW-75 的唯一名称 Shortcuts 候选已完成注册、独立 setup 启动/退�
 | XW-102 EQ 歌词返回 | Done；PR #10 与精确 merge main CI 全 11 阶段通过。可见 Close／Escape 回原 4k EQ、活跃 Save As 跨请求保留／延后呈现及闭合资料保护通过；两新请求各 Passed 1/0。后续 f2 删除确认 Cancel 小节单独通过。Cancel 后重开草稿未接受，原版失败与无新 Intent 的对照保留；范围及收尾见 [修复记录](eq-lyrics-return-acceptance.md)。 |
 | XW-97 旧导入署名 | Done；显式、可恢复修复已完成，本机完整回归、隔离 655 项 Apply/冷启/Undo 通过；PR #6 已合并，PR 与 main CI 均成功，正式资料未写入，待新版本显式应用。 |
 | XW-98 封面呈现 | Done；焦点卡比例/宽度、多推荐聚焦横栏和低档封面升级已完成；实际三尺寸及 Large 深色、原生横栏滚动通过，PR #6 已合并，PR 与 main CI 均成功。 |
-| XW-75 App Intents | 冷态歌词、完整串行键盘、真实来源预览/浮窗弹窗、修复后的冷 Play／主窗视频弹窗、[Edit Info 草稿交接](edit-draft-intent-acceptance.md)、[Audio Info 上层歌词](audio-info-intent-acceptance.md)、[非空 Import／未保存 Notes 草稿交接](import-notes-intent-acceptance.md) 及 [无当前录音／无效链接](empty-errors-intent-acceptance.md) 按各自范围接受。[EQ 返回](eq-lyrics-return-acceptance.md) 保留原版两轮失败，XW-102 修复后限定本机返回／活跃 Save As 等待及后续删除确认 Cancel 交接通过；不增加 Cancel 后草稿恢复、真正删除或 EQ 听感结论。其他未测呈现、手动 Siri/Shortcuts、实际 macOS 26 与完整 VoiceOver/设备矩阵仍保留；XW-75 继续 In Review。 |
+| XW-75 App Intents | 冷态歌词、完整串行键盘、真实来源预览/浮窗弹窗、修复后的冷 Play／主窗视频弹窗、[Edit Info 草稿交接](edit-draft-intent-acceptance.md)、[Audio Info 上层歌词](audio-info-intent-acceptance.md)、[非空 Import／未保存 Notes 草稿交接](import-notes-intent-acceptance.md) 及 [无当前录音／无效链接](empty-errors-intent-acceptance.md) 按各自范围接受。新增 [快捷指令来源／五项手动运行](manual-shortcuts-acceptance.md)，歌词三类窗口及真实 Play／无效链接均通过；[EQ 返回](eq-lyrics-return-acceptance.md) 保留原版两轮失败，XW-102 修复后限定本机返回／活跃 Save As 等待及后续删除确认 Cancel 交接通过；不增加 Cancel 后草稿恢复、真正删除或 EQ 听感结论。其他未测呈现、Siri 与其他未测 Shortcuts 配置、实际 macOS 26 与完整 VoiceOver/设备矩阵仍保留；XW-75 继续 In Review。 |
 | XW-26 Pull/播放父项 | XW-84 的原生错误与同草稿重试已关闭，见 [原生恢复](pull-native-recovery.md)。父项保留真实评论/回复、其它来源/视频和未测持久化分支；自然远端冲突、Push/manage 与破坏性历史/group 保持原排除范围。 |
 | XW-71 Settings | 十类设置/历史、字体指针/键盘、语言/字号恢复和 Dark 840×804 三项检查已接受。本轮临时模式 2 下四个 Help disclosure Tab/Space、信息 AX Cancel/原焦点及修复后的原按钮 Escape、继续 Tab、点击打开与人类文本选中 Escape 按范围通过；系统恢复 0，保护/清理独立复审通过。XW-99 已 Done，PR #7 已合并且精确 PR/main CI 全阶段通过；完整 VoiceOver、实际 macOS 26 与其他设备/焦点条件仍保留，XW-71 继续 In Review。 |
 | XW-99 信息弹窗 Escape | Done；`8560bab` 本机 Release、独立源码审阅、限定原生复验与完整保护/清理复审通过。[PR #7](https://github.com/xiaotwu/Muses-Polyhymnia/pull/7) 已合并 `fc339c8`，精确 PR head `639a277` 的 [PR CI 38653245594](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38653245594) 和精确合并提交的 [main CI 38654810970](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/38654810970) 全阶段成功，执行源码一致。原始人类前台失败报告、后台路径、后来无归因消失及首次编译失败保留；见 [验收报告](settings-info-escape-acceptance.md)。 |
