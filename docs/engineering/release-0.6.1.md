@@ -7,6 +7,7 @@
 - 标签及实际发布源码：`52d104ce7d06410579afa8deae7db77cde360db6`。
 - [PR #14](https://github.com/xiaotwu/Muses-Polyhymnia/pull/14) 已合入 main `de5cfa697f2ed918870c6ac0dea7567193596fee`，与标签的 whole tree 完全相同；分发包来自该精确已验版本提交，没有重编其他来源。
 - 精确标签源码的 [完整 CI 39568128485](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/39568128485) 全部 11 阶段通过：1007 项常规 Swift 报告／135 套件（62.142 秒，9 项既有 opt-in 跳过）、14 项发布检查（8.976 秒）、独立磁盘失败恢复 1 项（0.100 秒）、Release／App Intents 元数据／预览打包与上传。
+- 精确 merge `de5cfa6` 的 [main CI 39570281825](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/39570281825) 同样全阶段通过：1007 项／135 套件（56.149 秒）、14 项发布检查（6.988 秒）及独立磁盘失败恢复（0.138 秒），元数据、打包与上传通过。
 - 本地 14 项发布检查通过（1.574 秒）。版本变更仅更新默认版本、打包及 CI 配置和文档，产品修复已在先前定向原生记录中接受。
 
 ## 分发资产与更新源
@@ -41,3 +42,5 @@
 本轮实时 Linear 共 23 项开放（17 In Review、6 In Progress），无开放 Bug 标签任务。XW-73 其余取消／Retry／来源与账号条件、XW-26 其他播放及持久化路径、完整 VoiceOver／实际 macOS 26／其他设备矩阵继续保留。XW-74 未恢复，没有采样或性能优化结论。
 
 家族仓库只聚合已公开的三个资产并验证来源摘要，不重建或改变字节。官网 Mac 默认下载改用该平台的 `/releases/latest`，另设 Release history 到版本列表；安装说明保留 macOS 26／Apple Silicon 要求和 0.5.11 兼容入口，避免默认入口固定在某个版本。
+
+家族交付 `cba6a3a` 的 [Pages CI 39571273396](https://github.com/xiaotwu/Project-Muses/actions/runs/39571273396) 已完成 build／deploy。公开首页和安装页实际回读均含最新 Mac 稳定版链接与历史版本入口，默认链接实际重定向至 v0.6.1；macOS 26／Apple Silicon 及旧版兼容说明一致。家族镜像的三个资产与来源摘要相同，公开 provenance 指向精确标签源码。后续父引用只同步本条记录，不改变已验证的网页内容。
