@@ -76,7 +76,7 @@ environment, then run:
 ```sh
 export MUSES_NOTARY_PROFILE=muses
 make release MUSES_SIGN_IDENTITY='Developer ID Application: ...' \
-  MUSES_VERSION=0.6.1 MUSES_BUILD=20261021.1
+  MUSES_VERSION=0.6.2 MUSES_BUILD=20261021.2
 ```
 
 `make release` signs framework/helpers inside-out, notarizes/staples the app,
@@ -88,7 +88,7 @@ previews disable updating; release builds reject missing keys or ad-hoc signing.
 Publication is separate and must be explicitly requested:
 
 ```sh
-MUSES_VERSION=0.6.1 ./Scripts/publish-update.sh
+MUSES_VERSION=0.6.2 ./Scripts/publish-update.sh
 ```
 
 The script creates/resumes a draft release, uploads the DMG, publishes the version,
