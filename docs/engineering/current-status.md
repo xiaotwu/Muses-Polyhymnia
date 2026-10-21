@@ -1,6 +1,6 @@
 # 当前修复与验收状态
 
-2026-10-20，XW-62 按用户决定[完整移除评论与回复](comments-retirement-acceptance.md)：入口、面板、浏览器、读取 API 和专属模型均已删除；旧非空评论／分页及 `insufficientPermissions` 条件退休。隔离候选的视频浮动／回主窗、无评论入口、章节加载到真实空态及自身关闭已核对；真人确认一次 Escape 关章节、再次关视频。41 项定向回归与 14 项发布检查通过，交付及 CI 由本次修复 PR 跟踪。正式 0.6.0 保留，未正式发版。
+2026-10-20，XW-62 按用户决定[完整移除评论与回复](comments-retirement-acceptance.md)：入口、面板、浏览器、读取 API 和专属模型均已删除；旧非空评论／分页及 `insufficientPermissions` 条件退休。隔离候选的视频浮动／回主窗、无评论入口、章节加载到真实空态及自身关闭已核对；真人确认一次 Escape 关章节、再次关视频。41 项定向回归与 14 项发布检查通过，交付及 CI 由 [PR #12](https://github.com/xiaotwu/Muses-Polyhymnia/pull/12) 跟踪。正式 0.6.0 保留，未正式发版。
 
 XW-73 新接受[真实目录与冷重开小节](catalog-cold-reopen-acceptance.md)：531 首资料缺少确认目录身份时显示诚实空态；Roselia 搜索 loading、稳定艺人、Lehre der Rose 的 24 项／实际绘制末项、Back 保留 query，以及冷启动从 Home 重走该路径均有实际证据。专辑身份／顺序／metadata 保留，但响应字节与时间戳变化，不声称离线或 cache hit。真实 Web Home、其余来源／错误／账号及平台矩阵继续保留，XW-73 仍 In Review。
 
