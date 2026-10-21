@@ -170,12 +170,14 @@ actor YTDlpRunner {
             let errHandle = stderrPipe.fileHandleForReading
 
             // Read both pipes concurrently so large outputs cannot fill the
-            // pipe buffers and deadlock.
+            // pipe buffers and deadlock. Blocking reads must stay off Swift's
+            // cooperative pool, including for detached tasks: a background
+            // extraction must not occupy the workers needed to launch playback.
             let outRead = Task.detached(priority: .utility) { () -> Data in
-                outHandle.readDataToEndOfFile()
+                await Self.readPipe(outHandle)
             }
             let errRead = Task.detached(priority: .utility) { () -> Data in
-                errHandle.readDataToEndOfFile()
+                await Self.readPipe(errHandle)
             }
 
             let deadline = ProcessDeadline()
@@ -224,6 +226,14 @@ actor YTDlpRunner {
         } onCancel: {
             worker.cancel()
             processControl.cancel()
+        }
+    }
+
+    private static func readPipe(_ handle: FileHandle) async -> Data {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .utility).async {
+                continuation.resume(returning: handle.readDataToEndOfFile())
+            }
         }
     }
 }

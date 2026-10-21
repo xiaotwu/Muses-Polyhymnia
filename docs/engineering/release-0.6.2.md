@@ -1,6 +1,6 @@
 # Muses 0.6.2 发布记录
 
-2026-10-21，用户要求汇总专门对话的提交并发布修复小版本，现准备 `0.6.2`，build `20261021.2`。范围仅为 [XW-106／PR #15 的 Finder 启动播放修复](playlist-playback-runtime-061.md)，不重新开启其他验收或 XW-74。
+2026-10-21，用户要求汇总专门对话的提交并发布修复小版本，现准备 `0.6.2`，build `20261021.2`。范围为 [XW-106／PR #15 的 Finder 启动播放修复](playlist-playback-runtime-061.md)，以及最终包冷播放门槛发现的 [XW-107 管道进度修复](playlist-pipe-progress.md)，不重新开启其他验收或 XW-74。
 
 ## 修复来源
 
@@ -9,6 +9,8 @@ PR #15 已合入 `cf22b0ab64cbe4626067837b66e952030eccf505`。修复固定摘要
 专门对话的精确 PR head `749d820` 已通过 [完整 CI 39676388510](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/39676388510)：1009 项常规报告、14 项发布检查、独立磁盘恢复、Release／元数据及签名预览打包／上传。真实 Liked 的时钟、暂停恢复、上下曲、534 项队列顺序及用户听到音乐的确认见原记录，不把这些旧候选结果当成本轮最终分发包已经验证。
 
 ## 本轮发布门槛
+
+首轮版本提交 `2e56eca` 的 [完整 CI](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/39681182839)、签名公证、Gatekeeper、完整包一致性和签名更新源离线检查通过，但真实冷媒体 Play All 仍出现 Retry，因此未发布。该成品和失败证据保留；新增修复必须重新构建、签名公证及实际验收，不能沿用旧 CI 或包验收结论。
 
 版本提交的完整 CI、最终 Developer ID／hardened runtime／嵌套代码与 Deno JIT 验证、应用及 DMG 公证装订、Gatekeeper、ZIP／DMG 内容一致性、最终包隔离真实歌单播放，均须实际通过后再发布。
 

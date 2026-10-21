@@ -17,6 +17,11 @@ jobs:
         run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s Tests/ReleaseTests
       - name: Tests
         run: swift test --no-parallel
+      - name: Subprocess progress with one cooperative worker
+        timeout-minutes: 2
+        env:
+          LIBDISPATCH_COOPERATIVE_POOL_STRICT: "1"
+        run: swift test --skip-build --no-parallel --filter 'RepairRegressionTests/(foregroundLane|concurrentPipeDraining)'
       - name: Pull disk failure recovery
         timeout-minutes: 2
         env:
