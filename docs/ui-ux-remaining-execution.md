@@ -1,5 +1,7 @@
 # Remaining Linear work and compact-window execution — 2026-10-07
 
+October 20 current scope supersedes the historical Remaining table below: the user completely retires comments and replies, including reading. XW-62 now tracks [removal and retained playback verification](engineering/comments-retirement-acceptance.md); populated-comment authorization/paging is no longer acceptance work. XW-71's Help Tab/Space and information-origin focus/Escape cells are already accepted. Actual macOS 26, full VoiceOver, remaining real-account/catalog conditions and the [separate scrolling baseline](engineering/scrolling-native-input-followup-oct20.md) retain their explicit limits.
+
 This round reconciled the 20 unfinished Muses issues under XW-5 against executable source and the [64-area evidence table](ui-ux-acceptance-reconciliation.md). Descriptions now distinguish implemented behavior, accepted native states, remaining checks and external limitations. Original descriptions are retained privately. No independent Linear project was returned; XW-5 is the work's parent.
 
 ## Completed scope: XW-53

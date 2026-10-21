@@ -1,5 +1,7 @@
 # 技术工作索引与对话归并
 
+2026-10-20 当前接续：[XW-62 完整退休评论／回复](comments-retirement-acceptance.md)、[XW-73 真实目录与冷重开](catalog-cold-reopen-acceptance.md)、[XW-104 繁体设置文案修复](settings-traditional-chinese-acceptance.md) 已完成各自源码／限定原生小节。原评论权限条件退休；XW-71/73 的剩余平台／账号条件继续保留。[原生滚动输入接续](scrolling-native-input-followup-oct20.md) 没有获得有效性能基线；用户确认触控板正常并要求跳过，已停止等待且没有启动新录制。选中表格后的方向键验证通过，无性能补丁。交付、CI 与当前父项状态见 [当前状态](current-status.md)，正式版与正常资料继续保留。
+
 2026-10-20 最新补验：[快捷指令动作来源与手动运行](manual-shortcuts-acceptance.md) 五项通过。真实动作描述及唯一注册路径绑定 Search／Play 到准确候选；冷歌词、最小化恢复、关窗重建、真实 Play 冷启动／Pause 和无效链接错误／OK 均有原生证据。当前正常 531 Tracks／6 Events／47 偏好及正式版保留，候选真实播放写入单独核对；自有应用均退出，测试快捷指令与候选保留接续。产品源码未改，XW-75 继续 In Review，Siri 与其余系统／设备条件见报告及 [当前状态](current-status.md)。
 
 2026-10-16 最新补验：[无当前录音与无效链接](empty-errors-intent-acceptance.md) 四项通过：两次无录音提示及自身 Close／Escape、不支持网址公开拒绝、缺失本地录音错误提示／自身 OK。四份框架各 Passed 1/0/exit0；14 份闭合备份字节一致，18→20 偏好及资料保护复核通过，自有资源已核验归档清理。产品源码未改，正式 0.6.0 与原始种子保留，XW-75 继续 In Review；两类链接错误的边界和剩余矩阵见报告。
@@ -33,7 +35,7 @@
 | 分类 | 技术文档 | 执行任务 |
 | --- | --- | --- |
 | 已证实的缺陷与修复 | [修复任务](repairs.md)、[来源修复](source-state-acceptance.md)、[CI 回归](source-ci-regression.md)、[缓存恢复](source-cache-recovery.md)、[重试/Pull/刷新/标签](remaining-review-fixes.md)、[App Intents](app-intents-handoff.md)、[图库歌词](gallery-lyrics-acceptance.md)、[普通歌单](ordinary-playlist-metadata.md)、[真实磁盘恢复](pull-disk-recovery.md)、[Pull 原生恢复](pull-native-recovery.md)、[冷启动与位置恢复](cold-start-recovery.md)、[信息弹窗 Escape](settings-info-escape-acceptance.md)、[EQ 歌词返回](eq-lyrics-return-acceptance.md) | 新修复及证据以 [当前状态](current-status.md) 为准；XW-84/89/99 已 Done；XW-102 本机回归／限定原生返回通过，集成见实时任务／PR；原失败与草稿边界保留 |
-| 功能实现与补充验收 | [功能及验收](feature-acceptance.md)、[草稿/历史跟进](playlist-flow-followup.md)、[非空目录验收](library-catalog-acceptance.md)、[Edit Info 草稿与 Intent](edit-draft-intent-acceptance.md) | XW-79 已完成；XW-73 已补齐 24 首真实专辑的非空目录/正常刷新小节，XW-75 已接受本轮 Title 草稿交接；XW-71、XW-72、XW-73、XW-75、XW-62 与既有阶段任务保留各自剩余条件 |
+| 功能实现与补充验收 | [功能及验收](feature-acceptance.md)、[草稿/历史跟进](playlist-flow-followup.md)、[非空目录验收](library-catalog-acceptance.md)、[Edit Info 草稿与 Intent](edit-draft-intent-acceptance.md) | XW-79 已完成；XW-73 已补齐 24 首真实专辑的非空目录/正常刷新小节，XW-75 已接受本轮 Title 草稿交接；XW-62 的评论／回复已完整退休；XW-71、XW-72、XW-73、XW-75 与既有阶段任务保留各自剩余条件 |
 | 性能与优化调查 | [优化项](performance.md) | XW-74；无证据的排查候选不直接变成重构任务 |
 
 判断顺序：当前用户决定和批准规格 → 当前源码 → 实际运行 → 测试 → 历史记录。历史对话不能恢复已淘汰产品方向；测试通过不能替代原生界面验收。总体 UI 验收仍使用 [64 区域对照表](../ui-ux-acceptance-reconciliation.md)，具体操作使用 [验收记录](../ui-ux-redesign-acceptance.md)。
@@ -86,6 +88,6 @@
 
 ## 授权与验收边界
 
-早期验收使用隔离的 `com.muses.acceptance.*` 实例；2026-10-13 用户另行授权正式版实际操作，其范围、前后库审计和恢复见 [正式版检查](post-release-formal-inspection.md)。源码修复后的候选继续隔离验证；早期歌单操作限于 `test`，后续补验另行限定为自有可丢弃的普通 Playlist。阶段性测试配置不构成永久产品或用户限制，接续范围以当前用户授权和具体任务为准。保留生产数据、Keychain、普通应用与正常构建。旧隔离验收不操作 Liked；后续授权浏览原有 Liked 导入歌单但不改写它。不执行远端写入、权限扩张、输出设备变化，也不安装到正常应用。OS 辅助功能/显示设置保持原有范围；2026-10-14 用户单独授权的本轮 Settings Keyboard navigation 0→2→0 已在 UI 恢复，不扩展为其他系统设置授权。完整 VoiceOver/显示矩阵、实际 macOS 26 原生运行、非空订阅账号与评论权限限制仍分别记录，不能由 macOS CI runner 或模拟数据代替。
+早期验收使用隔离的 `com.muses.acceptance.*` 实例；2026-10-13 用户另行授权正式版实际操作，其范围、前后库审计和恢复见 [正式版检查](post-release-formal-inspection.md)。源码修复后的候选继续隔离验证；早期歌单操作限于 `test`，后续补验另行限定为自有可丢弃的普通 Playlist。阶段性测试配置不构成永久产品或用户限制，接续范围以当前用户授权和具体任务为准。保留生产数据、Keychain、普通应用与正常构建。旧隔离验收不操作 Liked；后续授权浏览原有 Liked 导入歌单但不改写它。不执行远端写入、权限扩张、输出设备变化，也不安装到正常应用。OS 辅助功能/显示设置保持原有范围；2026-10-14 用户单独授权的本轮 Settings Keyboard navigation 0→2→0 已在 UI 恢复，不扩展为其他系统设置授权。完整 VoiceOver／显示矩阵、实际 macOS 26 原生运行和非空订阅账号仍分别记录，不能由 macOS CI runner 或模拟数据代替。旧评论权限观察保留为历史；评论功能现已完整退休。
 
 每轮保存具体源码、系统、窗口、数据及操作条件；恢复临时偏好后正常退出，核对原始数据/偏好和精确进程所有权，再清理自建构建与缓存。2026-10-12 用户已明确授权本次 0.6.0 打包与 GitHub 发布；这不等于安装到当前正常应用，也不关闭发布后的未验收条件。

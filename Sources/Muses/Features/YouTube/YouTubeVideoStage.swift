@@ -138,7 +138,6 @@ struct YouTubeVideoOverlay: View {
     @State private var escapeMonitor: Any?
     @State private var closeHovered = false
     @State private var chaptersPresented = false
-    @State private var commentsPresented = false
     @State private var closeKeyboardRevealed = false
     @FocusState private var closeFocused: Bool
 
@@ -181,7 +180,7 @@ struct YouTubeVideoOverlay: View {
                 .frame(width: size.width, height: size.height)
                 .overlay(alignment: .topTrailing) {
                     let revealed = closeHovered || closeKeyboardRevealed || closeFocused
-                        || chaptersPresented || commentsPresented || NSWorkspace.shared.isVoiceOverEnabled
+                        || chaptersPresented || NSWorkspace.shared.isVoiceOverEnabled
                     ZStack {
                         VideoCloseHoverRegion(isHovered: $closeHovered)
                         ChromeIconButton(
@@ -223,31 +222,11 @@ struct YouTubeVideoOverlay: View {
                                 chaptersPresented = false
                             }
                         }
-                        ChromeIconButton(
-                            systemName: "text.bubble",
-                            help: tr("Comments", "评论", zhHant: "留言"),
-                            accessibility: tr("Comments", "评论", zhHant: "留言"),
-                            action: { commentsPresented = true }
-                        )
-                        .offset(x: 96)
-                        .opacity(revealed ? 1 : 0)
-                        .allowsHitTesting(revealed)
                     }
                     .frame(width: 256, height: 56)
                     .contentShape(Rectangle())
                     .padding(.trailing, 100)
                     .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: revealed)
-                }
-                if commentsPresented {
-                    HStack(spacing: 0) {
-                        Spacer(minLength: 0)
-                        YouTubeCommentsView(videoID: videoId) { commentsPresented = false }
-                            .frame(width: min(420, max(280, geometry.size.width * 0.36)),
-                                   height: geometry.size.height)
-                            .background(Color(nsColor: .windowBackgroundColor))
-                            .overlay(alignment: .leading) { Divider() }
-                    }
-
                 }
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
@@ -275,13 +254,6 @@ struct YouTubeVideoOverlay: View {
                 if chaptersPresented {
                     if event.keyCode == 53 {
                         chaptersPresented = false
-                        return nil
-                    }
-                    return event
-                }
-                if commentsPresented {
-                    if event.keyCode == 53 {
-                        commentsPresented = false
                         return nil
                     }
                     return event
@@ -317,7 +289,7 @@ struct YouTubeVideoOverlay: View {
             guard isPresented,
                   ContentKeyboardScope.acceptsShortcuts(
                     in: MusesSingleInstance.mainWindow(in: NSApp.windows)
-                  ), !chaptersPresented, !commentsPresented else { return }
+                  ), !chaptersPresented else { return }
             close()
         }
         .animation(MusesMotion.overlayAnimation(reduceMotion: reduceMotion), value: isPresented)

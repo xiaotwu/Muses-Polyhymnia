@@ -1,5 +1,7 @@
 # 功能实现与补充验收
 
+2026-10-20 当前用户决定：XW-62 已[完整移除评论与回复](comments-retirement-acceptance.md)，包括查看入口和读取请求；旧非空评论／分页和 `insufficientPermissions` 验收条件退休，历史证据保留。移除后的实际视频／章节行为按报告接受，不计为旧评论功能验收通过。另补验[目录冷重开](catalog-cold-reopen-acceptance.md)，并修复实际发现的 [XW-104 繁体设置文案](settings-traditional-chinese-acceptance.md)。用户确认触控板正常并跳过后续测量；[性能基线仍不完整](scrolling-native-input-followup-oct20.md)，没有据此优化应用。
+
 2026-10-20 接续：[快捷指令来源与手动运行](manual-shortcuts-acceptance.md) 已接受两类动作的精确来源、歌词三类窗口、真实 Play 冷启动／Pause 和无效链接错误／OK。Siri、其他配置及系统／设备条件继续保留；产品源码未改，当前范围仍以 [统一核对记录](current-status.md) 为准。
 
 2026-10-13 更新：用户授权的正式版检查已补齐 XW-75 原完整串行窗口/键盘路径、真实歌词预览与浮窗弹窗交互；确认 XW-90 冷态 Play 窗口和 XW-92 主窗口视频键盘缺陷。用户另行退休公共发现，由 XW-91 执行；下文旧匿名 Home/自然公共错误 Retry 范围不再作为待办，真实账号、目录及系统条件继续保留。当前范围见 [正式版检查](post-release-formal-inspection.md)。
@@ -12,7 +14,7 @@
 
 | Linear | 范围与结果要求 | 实现边界 |
 | --- | --- | --- |
-| XW-71，父 XW-25 | Help/按钮遍历、信息弹窗原按钮焦点返回，以及完整 OS/VoiceOver 矩阵；十类分类/历史、字体指针与 Up/Down/Return/取消、样本及语言/字号恢复已经接受 | 当前系统键盘模式 0；不通过修改 OS 设置或全局焦点机制制造通过结果 |
+| XW-71，父 XW-25 | 完整 VoiceOver、实际 macOS 26 及其余未覆盖配置；十类分类/历史、字体指针与 Up/Down/Return/取消、样本及语言/字号恢复，以及四项 Help 的 Tab/Space、信息弹窗原按钮焦点和 Escape 已接受 | [XW-99 原生结果](settings-info-escape-acceptance.md) 包含真人文字选择后 Escape；临时键盘导航已恢复 0，不把历史 Help/焦点待办重复列为当前缺口 |
 | XW-72，父 XW-25 | 物理控件交接/完整焦点、真实未同步歌词、系统 Dark 菜单栏及其余外部矩阵；生命周期/Pin/快捷键、共享音量及真实同步桌面歌词已经接受 | 保持同一 PlaybackService。两首既有 test 录音的有界只读查找未找到真实未同步文档，不剥除时间戳或扩大整库查询 |
 | XW-73，父 XW-19 | 当前候选成功身份匹配的 Web Home及其余来源/平台矩阵；非空 Library Albums/详情/正常刷新/Back、Artists 详情/在线重读，以及限定在线专辑 Play/Next/Previous 已补验 | [真实作品播放小节](artist-release-playback-acceptance.md) 核对本次响应 24 项身份/顺序与预期候选写入；其他播放分支仍保留。公共 Home 与其错误 Retry 条件已退休。[24 首真实来源导入与目录验收](library-catalog-acceptance.md) 保留稳定身份和原库真值；不把正常刷新当作错误 Retry 或完整 loading/外观矩阵 |
 | XW-75，父 XW-25，In Review | 冷态歌词、完整串行窗口/键盘、真实歌词预览/浮窗弹窗、修复后的冷态 Play 和主窗视频弹窗已按限定范围通过；两动作来源及五项原生 Shortcuts Run 已按报告接受；继续其它未测呈现、Siri、其他 Shortcuts 配置和系统/设备矩阵 | 精确 bundle 的真实 AppIntentsTesting 证据见 [交接报告](app-intents-handoff.md) 与 [正式版检查](post-release-formal-inspection.md)；不将框架调用当作手动 Siri 或 macOS 26 图形验收 |
@@ -27,7 +29,7 @@
 | --- | --- | --- |
 | XW-26、XW-13、XW-16 | 已有队列/草稿/历史和 XW-79 尾曲通过项之外的真实来源/Pull、持久化失败、外部及未授权的破坏性分支 | 不为验收便利简化成熟工作流；不把未授权分支当作当前执行指令，不操作 Liked 或远端 Push |
 | XW-14、XW-15 | 歌词来源/翻译/艺术图对比、视频/EQ/辅助状态 | 没有真实时间轴不能发明歌词同步；网页视频不是音频引擎 |
-| XW-62 | 非空评论回复、独立分页 token、Load More → Replies、关闭/视频切换和晚到响应 | 现有权限 403 不是非空分页通过；禁止认证旁路 |
+| XW-62 | 完整移除视频评论／回复的入口、面板、浏览器、读取 API 与专属模型；复验视频关闭和章节等保留行为 | 用户已退休评论功能；旧非空分页及权限限制保留为历史，不扩张授权、不迁移正常资料库 |
 | XW-18 | 当前候选在现有授权下成功且身份匹配的 Personalized Home、真实恢复分支；历史 XW-20 仅保留当时范围 | 单独明确同意、固定浏览器来源、helper IPC 和临时 jar 边界继续生效 |
 | XW-6、XW-7、XW-25 | 实际 macOS 26 原生运行及尚缺的导航/辅助功能状态 | CI 的 macos-26 编译不证明完整图形交互；用户延期的 OS 矩阵仍未通过 |
 | XW-8、XW-26 | 已授权且有内容的订阅频道/Shorts/分页 | 当前频道空订阅不能证明非空状态；不修改真实账号订阅来制造样本 |
@@ -36,7 +38,7 @@
 
 当前合同保留独立 Albums/Artists、Track-backed Music Videos、主窗口 Search、原生导航与十类 Settings、浮动 PlayerBar、完整 Queue、封面/黑胶/歌词、按需视频、播客进度和 Sparkle 更新。项目改名、已发布版本及已修复菜单/署名不重新进入 Feature 待办。旧 macOS 14 说明、旧页面/菜单设计和已过时发布清单是历史证据，当前 macOS 26 与产品合同优先。
 
-补查早期方案后，以下差异已单独核对：`CatalogTrackReleaseMembership` 与目录投影已有稳定多发行关联，不重复创建旧 R002 的“缺失实现”；完整播客、Shorts 和只读回复已有实现，旧 R014/R015 的缺失说明不是当前状态。官方播放器字幕/画质与原生悬浮视频继续按既有边界运行，不增设无效分辨率或通用 DRM/WebKit 音频路径。当前语言是英语、简体中文、繁体中文及系统跟随；早期十七语言提案没有当作当前完成或新增实施授权。
+补查早期方案后，以下差异已单独核对：`CatalogTrackReleaseMembership` 与目录投影已有稳定多发行关联，不重复创建旧 R002 的“缺失实现”；完整播客与 Shorts 已有实现，旧 R014/R015 的缺失说明不是当前状态。只读回复属于已退休的历史功能。官方播放器字幕/画质与原生悬浮视频继续按既有边界运行，不增设无效分辨率或通用 DRM/WebKit 音频路径。当前语言是英语、简体中文、繁体中文及系统跟随；早期十七语言提案没有当作当前完成或新增实施授权。
 
 早期对话提出重启恢复最后浏览页面；`ef8730e` 后 `RootView.handleAppear` 明确从 Home 初始化，当前实际冷启证据也是 Home。保留这一冲突的历史来源与当前行为，不把旧方案直接恢复为功能任务。Settings 别名/深链接和窗口内 Back/Forward 的验证仍属于 XW-69/71。队列与播放位置的暂停恢复另属已实现播放合同；睡眠唤醒、真实设备断开等缺少条件的验收保留在 XW-26 的边界，不自动触发系统操作。
 

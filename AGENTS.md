@@ -114,7 +114,7 @@ Unless a task explicitly changes them, preserve:
 - Songs, playlists, pins, recently played, search, YouTube imports, followed podcasts, and subscriptions. Inbox tables remain on disk but have no chrome entry.
 - Likes, pins, metadata, and playback-history preservation.
 - YouTube resynchronization of imported playlists.
-- Podcast episode progress, speed, skip controls, followed-show paging, and stable channel identity. Video comments are read-only; preserve reply paging without comment write or permission expansion. Shorts from subscribed channels retain stable video identity and collection playback context.
+- Podcast episode progress, speed, skip controls, followed-show paging, and stable channel identity. Per the October 20 product decision, remove video comments and replies entirely, including browsing and read endpoints; do not reintroduce them or expand permissions. Preserve video playback and chapters. Shorts from subscribed channels retain stable video identity and collection playback context.
 - Keyboard shortcuts, application menus, context menus, sharing.
 - System media controls, notifications policy, and window restoration.
 - Immediate language switching via `tr(_ en: String, _ zhHans: String, ...)`.

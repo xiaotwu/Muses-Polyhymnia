@@ -2,7 +2,7 @@ import Foundation
 import Testing
 @testable import Muses
 
-private actor CommentRequestRecorder {
+private actor CatalogRequestRecorder {
     var urls: [URL] = []
     var methods: [String] = []
     var bodies: [Data?] = []
@@ -13,11 +13,11 @@ private actor CommentRequestRecorder {
     }
 }
 
-@Suite("YouTube comment reads")
-struct YouTubeCommentReadTests {
+@Suite("YouTube catalog reads")
+struct YouTubeCatalogReadTests {
     @Test("subscription target resolves only an exact stable channel ID")
     func channelLookup() async throws {
-        let recorder = CommentRequestRecorder()
+        let recorder = CatalogRequestRecorder()
         let client = YouTubeDataAPIClient(accessTokenProvider: { "test-token" },
             http: { request in
                 let url = try #require(request.url)
@@ -60,41 +60,4 @@ struct YouTubeCommentReadTests {
         #expect(item.availability == .available)
     }
 
-    @Test("thread and reply pages use plain text and separate continuation tokens")
-    func pages() async throws {
-        let recorder = CommentRequestRecorder()
-        let client = YouTubeDataAPIClient(accessTokenProvider: { "test-token" },
-            http: { request in
-                let url = try #require(request.url)
-                await recorder.append(request)
-                let isReply = url.path.hasSuffix("/comments")
-                let body = isReply ? """
-                    {"nextPageToken":"more-replies","items":[{"id":"reply-1","snippet":{
-                    "authorDisplayName":"Reader","authorChannelId":{"value":"UCreader"},
-                    "textDisplay":"Hello & world","publishedAt":"2026-01-01T00:00:00Z"}}]}
-                    """ : """
-                    {"nextPageToken":"more-threads","items":[{"id":"thread-1","snippet":{
-                    "totalReplyCount":2,"topLevelComment":{"id":"top-1","snippet":{
-                    "authorDisplayName":"Author","textDisplay":"Top comment"}}}}]}
-                    """
-                return (Data(body.utf8), HTTPURLResponse(url: url,
-                    statusCode: 200, httpVersion: nil, headerFields: nil)!)
-            })
-
-        let threads = try await client.commentThreads(videoID: "abcdefghijk")
-        #expect(threads.items.first?.topLevelComment.text == "Top comment")
-        #expect(threads.items.first?.totalReplyCount == 2)
-        #expect(threads.nextPageToken == "more-threads")
-        let replies = try await client.commentReplies(parentID: "top-1", pageToken: "page + 2")
-        #expect(replies.items.first?.authorChannelID == "UCreader")
-        #expect(replies.items.first?.text == "Hello & world")
-        #expect(replies.nextPageToken == "more-replies")
-        let urls = await recorder.urls
-        #expect(urls.count == 2)
-        #expect(await recorder.methods == ["GET", "GET"])
-        #expect(URLComponents(url: urls[0], resolvingAgainstBaseURL: false)?
-            .queryItems?.contains(.init(name: "textFormat", value: "plainText")) == true)
-        #expect(URLComponents(url: urls[1], resolvingAgainstBaseURL: false)?
-            .queryItems?.contains(.init(name: "pageToken", value: "page + 2")) == true)
-    }
 }
