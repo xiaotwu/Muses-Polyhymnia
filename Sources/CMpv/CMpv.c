@@ -61,6 +61,9 @@ muses_mpv *muses_mpv_open(const char *path, int *error) {
     OPTION("cache", "yes"); OPTION("cache-on-disk", "no");
     OPTION("demuxer-max-bytes", "16777216"); OPTION("demuxer-max-back-bytes", "4194304");
     OPTION("network-timeout", "20"); OPTION("audio-fallback-to-null", "no");
+    // CoreAudio can reject planar-float channel layouts (-50). Request packed
+    // float PCM at the device boundary; keep the resolved source codec unchanged.
+    OPTION("audio-format", "float");
     *error = c->initialize(c->handle);
     if (*error < 0) goto fail;
     const char *names[] = {"time-pos", "duration", "pause", "paused-for-cache", "seeking",

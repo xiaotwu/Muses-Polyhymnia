@@ -115,3 +115,25 @@ original Shortcuts, older release evidence and canonical shared build directorie
 remain protected. New builds and test namespaces are private. No release, feed,
 tag or installation update is authorized by a source/CI success alone. XW-74 stays
 paused. Membership/Premium acceptance is explicitly deferred by the human.
+
+## First native gate and output-format correction
+
+The first signed Debug candidate at dd56fce still failed the original thirteenth
+public item. Its actual trace reached typed resolution (10.846s), FILE_LOADED and
+PLAYBACK_RESTART, then returned mpv AO initialization error -14. The candidate
+was normally quit; this was a failed native gate, despite the source/test passes.
+
+A controlled no-cookie probe fetched 64KiB of that same Opus251 representation.
+With the exact packaged library, options and controls, decoded floatp failed at
+CoreAudio's input channel-layout setup with OSStatus-50; integer and packed-float
+WAV controls succeeded. Adding only audio-format=float to the paused Opus case
+allowed CoreAudio to initialize. The same packed-format case then ran muted,
+advanced beyond3.6s and ended with natural EOF/error0. The waveform data and
+library were unchanged, and no system output setting was changed. Thus a GUI or
+hardened-runtime condition is not necessary to reproduce this failure.
+
+The C boundary now requests packed float PCM. This changes device format
+negotiation, not extractor quality or the advertised source bit depth. The first
+candidate and diagnostics are retained. A rebuilt signed application must still
+pass real sustained public playback and audible-output acceptance; the muted
+prefix probe alone cannot satisfy that gate.
