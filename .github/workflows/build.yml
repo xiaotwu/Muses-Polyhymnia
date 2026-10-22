@@ -26,7 +26,7 @@ jobs:
         timeout-minutes: 2
         env:
           LIBDISPATCH_COOPERATIVE_POOL_STRICT: "1"
-        run: swift test --skip-build --no-parallel --filter 'RepairRegressionTests/(foregroundLane|concurrentPipeDraining)'
+        run: swift test --skip-build --no-parallel --filter 'RepairRegressionTests/(foregroundLane|concurrentPipeDraining)|ResolverTimingTests|ResolverOutputBoundsTests'
       - name: Pull disk failure recovery
         timeout-minutes: 2
         env:

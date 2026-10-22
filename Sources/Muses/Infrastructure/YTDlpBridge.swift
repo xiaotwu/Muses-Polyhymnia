@@ -263,6 +263,8 @@ final class YTDlpBridge {
 
     func resolveAudioStream(videoId: String, quality: String,
                             timeout: TimeInterval = 20) async throws -> ResolvedAudioStream {
+        let publicProgress = streamAccessPolicy == .publicAudio
+        let trace = YTDlpRunTrace(captureProgress: publicProgress)
         try Task.checkCancellation()
         guard YTDlpPlaylistEntry(id: videoId, title: "").resourceKind == .video else {
             throw YTDlpError.parseFailed("Invalid video identity")
@@ -282,7 +284,9 @@ final class YTDlpBridge {
         // Retired video profiles can remain in existing preferences. Typed
         // playback always requests audio; legacy URL/video callers keep their map.
         let audioProfile = ["best", "1080p", "720p"].contains(quality) ? "bestaudio" : quality
-        let args = cookies + ["--ignore-config", "--socket-timeout", "5",
+        // Verbose diagnostics stay on stderr; stdout remains the typed JSON.
+        // Public extraction emits only allowlisted numeric phase events.
+        let args = cookies + (publicProgress ? ["--verbose"] : []) + ["--ignore-config", "--socket-timeout", "5",
             "--extractor-retries", "0", "--retries", "0", "--skip-download",
             "--no-playlist", "--dump-single-json", "--check-formats",
             "--format-sort-force", "-S", "abr,asr",
@@ -292,7 +296,7 @@ final class YTDlpBridge {
         do {
             (stdout, _) = try await runInternal(executablePath: bin, args: args,
                 timeout: timeout, allowCookieFallback: false,
-                stdoutLimit: AudioStreamJSONParser.maximumBytes)
+                stdoutLimit: AudioStreamJSONParser.maximumBytes, trace: trace)
         } catch let YTDlpError.exitCode(code, message) {
             // Raw stderr may contain signed URLs or session material. Only a
             // fixed category crosses the playback boundary.
@@ -311,7 +315,10 @@ final class YTDlpBridge {
         }
         try Task.checkCancellation()
         guard context == streamContextID else { throw CancellationError() }
-        return try AudioStreamJSONParser.parse(stdout, videoID: videoId, contextID: context)
+        trace.record(.parseBegin)
+        let stream = try AudioStreamJSONParser.parse(stdout, videoID: videoId, contextID: context)
+        trace.record(.parseEnd)
+        return stream
     }
 
     // MARK: - Binary resolution
@@ -710,7 +717,8 @@ final class YTDlpBridge {
                              args: [String],
                              timeout: TimeInterval, allowCookieFallback: Bool = true,
                              stdoutLimit: Int = 64 * 1024 * 1024,
-                             stderrLimit: Int = 1024 * 1024) async throws
+                             stderrLimit: Int = 1024 * 1024,
+                             trace: YTDlpRunTrace? = nil) async throws
         -> (stdout: String, stderr: String) {
         // Isolate yt-dlp's implicit user config and disk cache for acceptance
         // bundles. Explicit cookie consent remains governed by cookieArgs().
@@ -724,7 +732,7 @@ final class YTDlpBridge {
         do {
             return try await runner.run(
                 executablePath: executablePath, args: args, timeout: timeout,
-                stdoutLimit: stdoutLimit, stderrLimit: stderrLimit)
+                stdoutLimit: stdoutLimit, stderrLimit: stderrLimit, trace: trace)
         } catch let e as YTDlpError {
             switch e {
             case .timeout:
