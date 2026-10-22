@@ -90,6 +90,7 @@ final class StreamURLCache {
     /// Removes a quality-specific entry, or every quality for `videoId` when `quality` is nil.
     func invalidate(videoId: String, quality: String? = nil) {
         ensureLoadedFromDisk()
+        streams = streams.filter { key, _ in key.videoID != videoId || (quality != nil && key.quality != quality!) }
         if let quality {
             entries.removeValue(forKey: Self.cacheKey(videoId: videoId, quality: quality))
         } else {
@@ -109,6 +110,54 @@ final class StreamURLCache {
         return entry.url
     }
 
+    private struct StreamKey: Hashable {
+        let videoID: String
+        let quality: String
+        let context: String
+    }
+    private struct StreamEntry {
+        let stream: ResolvedAudioStream
+        let expiresAt: Date
+    }
+    // Complete request contexts are volatile; never write headers or signed
+    // session URLs into the legacy URL-only persistence file.
+    private var streams: [StreamKey: StreamEntry] = [:]
+
+    func getStream(videoId: String, quality: String, contextID: String) -> ResolvedAudioStream? {
+        let key = StreamKey(videoID: videoId, quality: quality, context: contextID)
+        guard let entry = streams[key] else { return nil }
+        guard entry.expiresAt > Date(), !entry.stream.isExpired() else {
+            streams.removeValue(forKey: key)
+            return nil
+        }
+        return entry.stream
+    }
+
+    func setStream(videoId: String, quality: String, stream: ResolvedAudioStream) {
+        let key = StreamKey(videoID: videoId, quality: quality, context: stream.contextID)
+        streams = streams.filter { $0.value.expiresAt > Date() }
+        // Bound speculative/prefetch metadata, independently of library size.
+        if streams.count >= 128, let oldest = streams.min(by: { $0.value.expiresAt < $1.value.expiresAt })?.key {
+            streams.removeValue(forKey: oldest)
+        }
+        let signedExpiry = URLComponents(url: stream.url, resolvingAgainstBaseURL: false)?.queryItems?
+            .first(where: { $0.name == "expire" })?.value.flatMap(Double.init)
+            .flatMap { $0.isFinite ? Date(timeIntervalSince1970: $0 - 30) : nil }
+        let expiry = min(Date().addingTimeInterval(defaultTTL),
+                         stream.expiresAt?.addingTimeInterval(-30) ?? .distantFuture,
+                         signedExpiry ?? .distantFuture)
+        guard expiry > Date() else { return }
+        streams[key] = StreamEntry(stream: stream, expiresAt: expiry)
+    }
+
+    func invalidateStream(videoId: String, quality: String, contextID: String) {
+        streams.removeValue(forKey: StreamKey(videoID: videoId, quality: quality, context: contextID))
+    }
+
+    func retainStreamContext(_ contextID: String) {
+        streams = streams.filter { $0.key.context == contextID }
+    }
+
     /// Removes a single entry (alias for `invalidate`).
     func remove(videoId: String) {
         invalidate(videoId: videoId)
@@ -119,6 +168,7 @@ final class StreamURLCache {
         ensureLoadedFromDisk()
         let now = Date()
         entries = entries.filter { _, entry in entry.expiresAt > now }
+        streams = streams.filter { $0.value.expiresAt > now }
         persistToDisk()
     }
 }

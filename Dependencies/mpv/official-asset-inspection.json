@@ -1,0 +1,11 @@
+{
+  "inspectedDate": "2026-10-21",
+  "url": "https://github.com/mpv-player/mpv/releases/download/v0.41.0/mpv-v0.41.0-macos-26-arm.zip",
+  "size": 43704958,
+  "sha256": "09820c0d84f6687446b84eb9df81fcf6a26ebe869cee58ea1857d7948cfb7c71",
+  "githubReleaseDigestMatched": true,
+  "archiveEntries": 120,
+  "containsLibmpv": false,
+  "licenseNoticePaths": [],
+  "disposition": "Not used: CLI app archive, missing libmpv and notices"
+}

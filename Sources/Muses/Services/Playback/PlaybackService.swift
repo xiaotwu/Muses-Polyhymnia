@@ -6,7 +6,7 @@ final class PlaybackService {
     private(set) var eqBands: [EQBand] = EQPresets.flat
     private(set) var eqBypassed = false
     private var eqDefaults: UserDefaults?
-    /// The single production playback backend is YouTubeStreamEngine.
+    /// The single injected native engine owns audio; this facade owns user intent and the queue.
     var state: PlayerState { engine.state }
     var transportState: PlayerState { videoSession?.state ?? state }
     /// An unresolved restore owns a real saved offset even while its engine
@@ -185,7 +185,7 @@ final class PlaybackService {
         await engine.prewarmSelections(tracks.filter { $0.id != state.track?.id })
     }
 
-    /// Preloads the next queued track into the current engine (the precondition for local gapless playback).
+    /// Prepares the next queued source without bypassing the normal load identity.
     private func prepareNext() {
         guard !queue.smartShuffle.enabled else { return }
         guard let nextItem = queue.peekNext(),

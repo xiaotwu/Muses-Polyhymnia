@@ -11,8 +11,13 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - name: Toolchain
-        run: swift --version
+        run: |
+          test "$(uname -m)" = arm64
+          swift --version
       - name: Release configuration tests
         run: PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s Tests/ReleaseTests
       - name: Tests
@@ -36,9 +41,13 @@ jobs:
             -derivedDataPath .build/out \
             CODE_SIGNING_ALLOWED=NO \
             build
+      - name: Prepare pinned audio dependency
+        timeout-minutes: 20
+        run: python3 Scripts/prepare-mpv.py --work-dir "$RUNNER_TEMP/muses-mpv" --jobs 3
       - name: Package preview
         env:
           MUSES_VERSION: 0.6.2
+          MUSES_MPV_DEPENDENCY_DIR: ${{ runner.temp }}/muses-mpv
         run: |
           ./Scripts/build-app.sh --identity -
           ./Scripts/sign-update.sh

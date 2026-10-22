@@ -42,7 +42,7 @@ struct ResolvedAudioStream: Equatable, Sendable, CustomStringConvertible, Custom
 }
 
 @MainActor
-protocol ResolvedStreamProvider: AnyObject {
+protocol ResolvedStreamProvider: AnyObject, Sendable {
     func resolveStream(videoID: String, quality: String) async throws -> ResolvedAudioStream
     func invalidateStream(videoID: String, quality: String)
 }

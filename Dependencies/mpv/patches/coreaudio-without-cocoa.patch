@@ -1,0 +1,13 @@
+--- a/meson.build
++++ b/meson.build
+@@ -827,6 +827,10 @@
+                        'AudioUnit', 'AudioToolbox'], required: get_option('coreaudio'))
+ features += {'coreaudio': coreaudio.found()}
+ if features['coreaudio']
++    # CoreAudio uses CF string helpers even in a headless libmpv build.
++    if not features['cocoa']
++        sources += files('osdep/utils-mac.c')
++    endif
+     dependencies += coreaudio
+     sources += files('audio/out/ao_coreaudio.c',
+                      'audio/out/ao_coreaudio_exclusive.c',

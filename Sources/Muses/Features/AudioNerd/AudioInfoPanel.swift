@@ -76,7 +76,7 @@ struct AudioInfoPanel: View {
     private var informationRows: [AudioInfoModel.Row] {
         AudioInfoModel.rows(track: playback.transportState.track, defaultDeviceName: currentDeviceName,
             eqPresetId: playback.eqBypassed ? tr("Bypassed", "已旁路") : eqPresetId,
-            volume: Double(playback.volume))
+            volume: Double(playback.volume), playbackQuality: playback.transportState.quality)
     }
 
     private var currentDeviceName: String? {
@@ -108,18 +108,28 @@ enum AudioInfoModel {
 
     /// Builds ordered info rows from a track snapshot + output device name + EQ preset id + volume. nil fields render as "Unknown".
     static func rows(track: TrackSnapshot?, defaultDeviceName: String?,
-                     eqPresetId: String, volume: Double) -> [Row] {
+                     eqPresetId: String, volume: Double,
+                     playbackQuality: AudioQualityInfo? = nil) -> [Row] {
         let src = track == nil ? unknown : "YouTube"
+        let actual = track == nil ? nil : playbackQuality
+        let codec: String? = actual.map { $0.codec.trimmingCharacters(in: .whitespacesAndNewlines) } ?? track?.codec
+        let sampleRate = actual != nil ? actual.flatMap { $0.sampleRate > 0 ? $0.sampleRate : nil } : track?.sampleRate
+        let bitDepth = actual != nil ? actual.flatMap { $0.bitDepth > 0 ? $0.bitDepth : nil } : track?.bitDepth
+        let bitrate = actual != nil ? actual?.bitrateLabel : track?.bitRate.map { "\($0 / 1000) kbps" }
+        let knownCodec = codec.flatMap { value in
+            !value.isEmpty && !["native", "unknown"].contains(value.lowercased()) ? value : nil
+        }
+        let lossless = actual != nil ? (knownCodec == nil ? nil : actual?.isLossless) : track?.isLossless
         return [
-            Row(label: tr("Codec", "编码"), value: track?.codec ?? unknown),
+            Row(label: tr("Codec", "编码"), value: knownCodec ?? unknown),
             Row(label: tr("Lossless", "无损"),
-                value: track.map { $0.isLossless ? tr("Yes", "是") : tr("No", "否") } ?? unknown),
+                value: lossless.map { $0 ? tr("Yes", "是") : tr("No", "否") } ?? unknown),
             Row(label: tr("Sample Rate", "采样率"),
-                value: track?.sampleRate.map(AudioQualityInfo.sampleRateLabel) ?? unknown),
+                value: sampleRate.map(AudioQualityInfo.sampleRateLabel) ?? unknown),
             Row(label: tr("Bit Depth", "位深"),
-                value: track?.bitDepth.map { "\($0)-bit" } ?? unknown),
+                value: bitDepth.map { "\($0)-bit" } ?? unknown),
             Row(label: tr("Bit Rate", "比特率"),
-                value: track?.bitRate.map { "\($0 / 1000) kbps" } ?? unknown),
+                value: bitrate ?? unknown),
             Row(label: tr("Channels", "声道"),
                 value: track?.channels.map { $0 == 1 ? tr("Mono", "单声道")
                                        : $0 == 2 ? tr("Stereo", "立体声")

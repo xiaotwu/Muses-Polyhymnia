@@ -10,8 +10,11 @@ actor SharedStreamResource {
     static let chunkSize: Int64 = 262_144
     static let maximumSize: Int64 = 512 * 1_048_576
     private var source: URL
-    private let renew: (@Sendable () async throws -> URL)?
-    private var renewal: Task<URL, Error>?
+    private let renew: (@Sendable () async throws -> ResolvedAudioStream)?
+    private var renewal: Task<ResolvedAudioStream, Error>?
+    private var requestHeaders: [String: String]
+    private let typedIdentity: ResolvedAudioStream?
+    private let publicationGate: MediaCachePublicationGate
     private let destination: URL
     private let staging: URL
     private let session: URLSession
@@ -26,13 +29,42 @@ actor SharedStreamResource {
     init(source: URL, destination: URL, session: URLSession,
          renew: (@Sendable () async throws -> URL)? = nil) {
         self.source = source
-        self.renew = renew
+        if let renew { self.renew = { @Sendable in ResolvedAudioStream(url: try await renew()) } }
+        else { self.renew = nil }
+        self.requestHeaders = [:]
+        self.typedIdentity = nil
+        self.publicationGate = MediaCachePublicationGate()
         self.destination = destination
-        self.session = session
+        self.session = MediaFileCache.ephemeralSession(copying: session)
         staging = destination.deletingLastPathComponent().appendingPathComponent(".\(UUID().uuidString).partial")
     }
 
-    deinit { try? FileManager.default.removeItem(at: staging) }
+    /// The public full-cache route preserves request headers and selected representation identity.
+    init(stream: ResolvedAudioStream, destination: URL, session: URLSession? = nil,
+         publicationGate: MediaCachePublicationGate = MediaCachePublicationGate(),
+         renewStream: (@Sendable () async throws -> ResolvedAudioStream)? = nil) throws {
+        guard let ext = MediaFileCache.cacheExtension(for: stream), destination.pathExtension.lowercased() == ext,
+              MediaFileCache.isSafeDestination(destination, in: destination.deletingLastPathComponent()) else {
+            throw URLError(.unsupportedURL)
+        }
+        self.source = stream.url
+        self.requestHeaders = stream.requestHeaders
+        self.typedIdentity = stream
+        self.publicationGate = publicationGate
+        self.renew = renewStream
+        self.destination = destination
+        self.session = MediaFileCache.ephemeralSession(copying: session)
+        staging = destination.deletingLastPathComponent().appendingPathComponent(".\(UUID().uuidString).partial")
+    }
+
+    deinit {
+        session.invalidateAndCancel()
+        try? handle?.close()
+        // Do not follow a root that has since become a symlink during cleanup.
+        if MediaFileCache.isSafeDestination(staging, in: staging.deletingLastPathComponent()) {
+            try? FileManager.default.removeItem(at: staging)
+        }
+    }
 
     func information() async throws -> Metadata {
         try checkActive()
@@ -61,39 +93,56 @@ actor SharedStreamResource {
         return data
     }
 
-    func finish() async throws -> URL {
+    func finish(shouldContinue: (@Sendable () async -> Bool)? = nil) async throws -> URL {
         let info = try await information()
         var offset: Int64 = 0
         while offset < info.size {
+            if let shouldContinue, !(await shouldContinue()) { throw CancellationError() }
             _ = try await chunk(at: offset)
             offset += Self.chunkSize
         }
+        if let shouldContinue, !(await shouldContinue()) { throw CancellationError() }
         try checkActive()
         if !published {
             try handle?.synchronize()
-            if !FileManager.default.fileExists(atPath: destination.path) {
-                try FileManager.default.moveItem(at: staging, to: destination)
-            } else {
-                try? FileManager.default.removeItem(at: staging)
+            try publicationGate.whileOpen {
+                try Task.checkCancellation()
+                let root = destination.deletingLastPathComponent()
+                guard MediaFileCache.isSafeDestination(destination, in: root),
+                      MediaFileCache.isSafeDestination(staging, in: root) else { throw URLError(.noPermissionsToReadFile) }
+                if !FileManager.default.fileExists(atPath: destination.path) {
+                    try FileManager.default.moveItem(at: staging, to: destination)
+                } else {
+                    // A concurrent complete writer wins. Never replace or delete an existing user-owned file.
+                    guard let size = try? destination.resourceValues(forKeys: [.fileSizeKey]).fileSize,
+                          Int64(size) == info.size else { throw URLError(.cannotWriteToFile) }
+                    try? FileManager.default.removeItem(at: staging)
+                }
+                published = true
             }
-            published = true
         }
         return destination
     }
 
     func cancel() {
         cancelled = true
+        publicationGate.close()
         renewal?.cancel()
         for request in requests.values { request.task.cancel() }
         requests.removeAll()
         try? handle?.close()
         handle = nil
-        if !published { try? FileManager.default.removeItem(at: staging) }
+        if !published, MediaFileCache.isSafeDestination(staging, in: staging.deletingLastPathComponent()) {
+            try? FileManager.default.removeItem(at: staging)
+        }
     }
 
     private func checkActive() throws {
         try Task.checkCancellation()
-        if cancelled { throw CancellationError() }
+        if cancelled || !publicationGate.isOpen { throw CancellationError() }
+        guard ["https", "http"].contains(source.scheme ?? ""), source.user == nil, source.password == nil else {
+            throw URLError(.unsupportedURL)
+        }
     }
 
     private func chunk(at offset: Int64) async throws -> Chunk {
@@ -109,11 +158,13 @@ actor SharedStreamResource {
         if let existing = requests[offset] { task = existing.task; requestID = existing.id }
         else {
             requestID = UUID()
-            let source = source, session = session
+            let source = source, session = session, headers = requestHeaders
             task = Task {
                 var request = URLRequest(url: source)
                 request.timeoutInterval = 8
                 request.cachePolicy = .reloadIgnoringLocalCacheData
+                request.httpShouldHandleCookies = false
+                for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
                 request.setValue("bytes=\(offset)-\(offset + Self.chunkSize - 1)", forHTTPHeaderField: "Range")
                 let (data, response) = try await session.data(for: request)
                 try Task.checkCancellation()
@@ -131,10 +182,17 @@ actor SharedStreamResource {
         do {
             let result = try await task.value
             try checkActive()
-            guard metadata == nil || metadata?.size == result.metadata.size else { throw URLError(.badServerResponse) }
+            guard metadata == nil || metadata?.size == result.metadata.size,
+                  typedIdentity?.contentLength == nil || typedIdentity?.contentLength == result.metadata.size else {
+                throw URLError(.badServerResponse)
+            }
             if handle == nil {
-                try FileManager.default.createDirectory(at: staging.deletingLastPathComponent(), withIntermediateDirectories: true)
-                guard FileManager.default.createFile(atPath: staging.path, contents: nil) else { throw URLError(.cannotCreateFile) }
+                let root = staging.deletingLastPathComponent()
+                guard MediaFileCache.isSafeDestination(staging, in: root) else { throw URLError(.noPermissionsToReadFile) }
+                try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true,
+                                                       attributes: [.posixPermissions: 0o700])
+                guard MediaFileCache.isSafeDestination(staging, in: root) else { throw URLError(.noPermissionsToReadFile) }
+                guard FileManager.default.createFile(atPath: staging.path, contents: nil, attributes: [.posixPermissions: 0o600]) else { throw URLError(.cannotCreateFile) }
                 handle = try FileHandle(forUpdating: staging)
             }
             if !completed.contains(offset) {
@@ -156,8 +214,14 @@ actor SharedStreamResource {
                 try checkActive()
                 // One refreshed address per resource. Repeated rejection must
                 // fail instead of creating an unbounded retry recursion.
-                guard refreshed != source else { throw error }
-                source = refreshed
+                guard refreshed.url != source else { throw error }
+                if let identity = typedIdentity {
+                    guard MediaFileCache.cacheExtension(for: refreshed) == destination.pathExtension.lowercased(),
+                          refreshed.contextID == identity.contextID, refreshed.formatID == identity.formatID,
+                          refreshed.codec == identity.codec, refreshed.container == identity.container else { throw error }
+                }
+                source = refreshed.url
+                requestHeaders = refreshed.requestHeaders
                 return try await chunk(at: offset)
             }
             throw error

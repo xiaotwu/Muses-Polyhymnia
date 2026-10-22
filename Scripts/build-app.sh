@@ -13,6 +13,7 @@
 #   MUSES_GOOGLE_OAUTH_CLIENT_ID       Muses 项目持有的 Desktop OAuth client ID
 #   MUSES_GOOGLE_OAUTH_CLIENT_SECRET   Matching Desktop OAuth field when required by the issuer
 #   MUSES_GOOGLE_OAUTH_REDIRECT_URI    可选；默认 http://127.0.0.1:0/（Desktop loopback 随机端口）
+#   MUSES_MPV_DEPENDENCY_DIR          Prepared isolated libmpv directory (required)
 #   MUSES_WEB_HOME_ENABLED             构建级 kill switch(默认 YES)
 #
 # 用法:
@@ -48,6 +49,13 @@ CONTENTS="$APP/Contents"
 
 echo "== Muses .app 打包 (身份: $IDENTITY, 版本: $VERSION) =="
 
+# Validate the native dependency before changing any packaging inputs.
+MPV_DEPENDENCY_DIR="${MUSES_MPV_DEPENDENCY_DIR:-}"
+if [[ -z "$MPV_DEPENDENCY_DIR" || ! -f "$MPV_DEPENDENCY_DIR/manifest.json" ]]; then
+    echo "Set MUSES_MPV_DEPENDENCY_DIR after running Scripts/prepare-mpv.py --work-dir <dedicated-dir>" >&2
+    exit 1
+fi
+
 # 1) 前置:yt-dlp + 图标。
 ./Scripts/copy-ytdlp.sh
 ./Scripts/copy-deno.sh
@@ -82,6 +90,7 @@ if [[ ! -d "$SPARKLE_SOURCE" ]]; then
     exit 1
 fi
 /usr/bin/ditto "$SPARKLE_SOURCE" "$CONTENTS/Frameworks/Sparkle.framework"
+python3 "$REPO_ROOT/Scripts/bundle-mpv.py" install --app "$APP" --dependency-dir "$MPV_DEPENDENCY_DIR"
 "$REPO_ROOT/Scripts/build-app-intents.sh" Release "$CONTENTS/Resources"
 # Bundle.module must resolve inside the installed app, not a source checkout.
 RESOURCE_BUNDLE="$RELEASE_DIR/Muses-Polyhymnia_Muses.bundle"
@@ -160,6 +169,7 @@ done
 codesign --force --options runtime "${TIMESTAMP_ARGS[@]}" \
     --entitlements "$RES_DIR/Deno.entitlements" \
     --sign "$IDENTITY" "$CONTENTS/Helpers/deno"
+python3 "$REPO_ROOT/Scripts/bundle-mpv.py" sign --app "$APP" --identity "$IDENTITY"
 # Sign Sparkle's helpers and XPC services before the enclosing framework.
 SPARKLE="$CONTENTS/Frameworks/Sparkle.framework/Versions/B"
 for component in "$SPARKLE/XPCServices/Downloader.xpc" "$SPARKLE/XPCServices/Installer.xpc" \
@@ -180,6 +190,7 @@ codesign --force --options runtime "${TIMESTAMP_ARGS[@]}" \
     --sign "$IDENTITY" "$APP"
 
 # 7) 验证。
+python3 "$REPO_ROOT/Scripts/bundle-mpv.py" verify --app "$APP"
 codesign --verify --deep --strict "$CONTENTS/Frameworks/Sparkle.framework"
 otool -L "$CONTENTS/MacOS/Muses" | grep -q '@rpath/Sparkle.framework/'
 codesign --verify --deep --strict "$APP" && echo "      ✓ codesign 验证通过"

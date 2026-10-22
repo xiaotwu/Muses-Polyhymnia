@@ -11,11 +11,11 @@ protocol PlayerEngine: AnyObject {
     func prewarmSelection(_ track: TrackSnapshot) async
     func prewarmSelections(_ tracks: [TrackSnapshot]) async
     func load(_ track: TrackSnapshot) async throws
-    /// Preloads the next track onto the standby player node (no scheduling, no playback).
+    /// Prepares the next source without granting playback intent. Engines may
+    /// resolve only, or additionally prepare a standby decoder when supported.
     func prepare(_ track: TrackSnapshot) async
-    /// Plays the preloaded track: schedules onto the inactive node, starts playback,
-    /// swaps the nodes, and updates state. Returns true on a successful switch,
-    /// false when there is no preloaded track matching the queue's next item.
+    /// Returns true only after a prepared decoder has actually switched to the
+    /// expected track. A resolved URL alone returns false and uses normal load.
     @discardableResult
     func playPrepared(expectedTrackID: UUID) -> Bool
     func play()

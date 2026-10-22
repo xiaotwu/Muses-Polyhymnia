@@ -745,11 +745,14 @@ struct NowPlayingView: View {
 
         var parts: [String] = []
         let codec = quality.codec.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !codec.isEmpty, codec.lowercased() != "native" {
+        if !codec.isEmpty, !["native", "unknown"].contains(codec.lowercased()) {
             parts.append(codec)
         }
         if quality.sampleRate > 0 {
             parts.append(AudioQualityInfo.sampleRateLabel(quality.sampleRate))
+        }
+        if let bitrate = quality.bitrateLabel {
+            parts.append(bitrate)
         }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }

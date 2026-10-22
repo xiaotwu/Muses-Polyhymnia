@@ -61,7 +61,7 @@ The approved visual reconstruction contract is encoded in the source and its gua
 ### Playback and Queue
 
 - `PlaybackService` is the UI- and system-facing playback facade. Views, commands, and system integrations must not manipulate engines independently.
-- Primary engine: `YouTubeStreamEngine` (yt-dlp → stream URL → `AVPlayer` immediate start, then cached file / `AVAudioEngine` when the download finishes).
+- Primary engine: `MpvStreamEngine` (typed yt-dlp audio resolution → app-bundled libmpv). `PlaybackService` retains transport intent, queue, history and restoration authority. `YouTubeStreamEngine` remains a legacy test/control implementation and is not a production fallback.
 - Persist downloaded media under `~/.muses/cache/streams` keyed by `videoId` + quality. Changing quality in Settings re-downloads the current track.
 - Official YouTube IFrame is **not** the playback engine. Do not host a WKWebView as the sound source.
 - Now Playing cover mode shows artwork (square). Vinyl mode shows circular artwork. Do not leave an empty 16:9 video slot.
@@ -89,7 +89,7 @@ The approved visual reconstruction contract is encoded in the source and its gua
 - The unified `Track` row remains and production rows are YouTube-backed (`youTubeId` set). The clean active store and normal runtime contain no retained local rows or local-file read path.
 - YouTube playlist import creates `YouTubeImport` + `YouTubeImportItem` + lazy `.youtube` Track. Local additions to YouTube playlists are removed as a product feature.
 - Preserve explicit deletion semantics: deleting an import and deleting its associated tracks are different operations.
-- yt-dlp remains the stream-resolution path for `YouTubeStreamEngine` and the metadata source for playlist import and fallback search. Do not describe the official IFrame player as the production audio path.
+- yt-dlp remains the typed stream-resolution path for `MpvStreamEngine` and the metadata source for playlist import and fallback search. Public audio uses an independent no-cookie session; configured account playback is explicit and cannot silently downgrade. Do not describe the official IFrame player as the production audio path.
 - Treat cookie settings, timeouts, signing, and personal-use distribution constraints as part of the product boundary.
 
 ## Product Contracts
@@ -260,7 +260,7 @@ Changes touching these areas require narrow scope, explicit reasoning, and propo
 
 - `PlaybackService`
 - `YouTubeVideoStage` and its on-demand WKWebView host
-- `YouTubeStreamEngine` (primary production engine)
+- `MpvStreamEngine`, its libmpv client boundary, and the retained legacy `YouTubeStreamEngine`
 - `QueueService` and queue persistence
 - `NowPlayingManager`
 - `PlayerBar`

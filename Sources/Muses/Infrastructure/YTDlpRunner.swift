@@ -92,7 +92,12 @@ actor YTDlpRunner {
 
     /// Reserve a separate single slot for the user's current selection so
     /// discovery and prefetch cannot queue ahead of first sound.
-    func run(executablePath: String, args: [String], timeout: TimeInterval) async throws -> (stdout: String, stderr: String) {
+    func run(executablePath: String, args: [String], timeout: TimeInterval,
+             stdoutLimit: Int = 64 * 1024 * 1024,
+             stderrLimit: Int = 1024 * 1024) async throws -> (stdout: String, stderr: String) {
+        guard stdoutLimit >= 0, stderrLimit >= 0 else {
+            throw YTDlpBridge.YTDlpError.parseFailed("Invalid subprocess output limit")
+        }
         let interactive = YTDlpRequestPriority.interactive
         let started = Date()
         try await acquire(interactive: interactive, timeout: timeout)
@@ -100,7 +105,8 @@ actor YTDlpRunner {
         try Task.checkCancellation()
         let remaining = timeout - Date().timeIntervalSince(started)
         guard remaining > 0 else { throw YTDlpBridge.YTDlpError.timeout }
-        return try await Self.executeDetached(executablePath: executablePath, args: args, timeout: remaining)
+        return try await Self.executeDetached(executablePath: executablePath, args: args, timeout: remaining,
+            stdoutLimit: stdoutLimit, stderrLimit: stderrLimit)
     }
 
     var inFlightCount: Int { inFlight + interactiveInFlight }
@@ -149,7 +155,9 @@ actor YTDlpRunner {
     /// touches no actor or the main thread.
     private static func executeDetached(executablePath: String,
                                         args: [String],
-                                        timeout: TimeInterval) async throws
+                                        timeout: TimeInterval,
+                                        stdoutLimit: Int,
+                                        stderrLimit: Int) async throws
         -> (stdout: String, stderr: String) {
         let processControl = CancellableYTDlpProcess()
         let worker = Task.detached(priority: .utility) {
@@ -173,11 +181,11 @@ actor YTDlpRunner {
             // pipe buffers and deadlock. Blocking reads must stay off Swift's
             // cooperative pool, including for detached tasks: a background
             // extraction must not occupy the workers needed to launch playback.
-            let outRead = Task.detached(priority: .utility) { () -> Data in
-                await Self.readPipe(outHandle)
+            let outRead = Task.detached(priority: .utility) {
+                await Self.readPipe(outHandle, limit: stdoutLimit, retainTail: false)
             }
-            let errRead = Task.detached(priority: .utility) { () -> Data in
-                await Self.readPipe(errHandle)
+            let errRead = Task.detached(priority: .utility) {
+                await Self.readPipe(errHandle, limit: stderrLimit, retainTail: true)
             }
 
             let deadline = ProcessDeadline()
@@ -206,14 +214,17 @@ actor YTDlpRunner {
 
             let outData = await outRead.value
             let errData = await errRead.value
-            let stdout = String(data: outData, encoding: .utf8)?
+            let stdout = String(data: outData.data, encoding: .utf8)?
                 .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            let stderr = String(data: errData, encoding: .utf8)?
+            let stderr = String(data: errData.data, encoding: .utf8)?
                 .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
 
             try Task.checkCancellation()
             if timedOut {
                 throw YTDlpBridge.YTDlpError.timeout
+            }
+            guard !outData.exceededLimit else {
+                throw YTDlpBridge.YTDlpError.parseFailed("Subprocess output exceeded configured limit")
             }
             let status = process.terminationStatus
             if status != 0 {
@@ -229,10 +240,32 @@ actor YTDlpRunner {
         }
     }
 
-    private static func readPipe(_ handle: FileHandle) async -> Data {
+    private struct CapturedPipe: Sendable {
+        let data: Data
+        let exceededLimit: Bool
+    }
+
+    private static func readPipe(_ handle: FileHandle, limit: Int, retainTail: Bool) async -> CapturedPipe {
         await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .utility).async {
-                continuation.resume(returning: handle.readDataToEndOfFile())
+                var data = Data()
+                var exceeded = false
+                // Continue draining after the cap: abandoning a full stderr pipe
+                // can deadlock a child before its stdout/termination is delivered.
+                while let chunk = try? handle.read(upToCount: 64 * 1024), !chunk.isEmpty {
+                    if retainTail {
+                        data.append(chunk)
+                        if data.count > limit {
+                            exceeded = true
+                            data.removeFirst(data.count - limit)
+                        }
+                    } else {
+                        let remaining = max(0, limit - data.count)
+                        data.append(chunk.prefix(remaining))
+                        if chunk.count > remaining { exceeded = true }
+                    }
+                }
+                continuation.resume(returning: CapturedPipe(data: data, exceededLimit: exceeded))
             }
         }
     }

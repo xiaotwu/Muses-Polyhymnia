@@ -1,70 +1,71 @@
 #!/usr/bin/env bash
-# copy-ytdlp.sh — 下载 arm64 yt-dlp 二进制到 Muses 资源目录,供打包 .app 时随包分发。
-#
-# 幂等:已存在且版本相同则跳过。仅个人使用;不分发音频,不上 App Store。
-# YouTube 内容受 YouTube ToS 约束,下载行为遵守当地法律。
-#
-# 用法:
-#   ./Scripts/copy-ytdlp.sh            # 下载/更新到 Sources/Muses/Resources/yt-dlp
-#   ./Scripts/copy-ytdlp.sh --check    # 仅打印当前与远端版本,不下载
-
+# Bundle exact upstream bytes before build-app.sh applies its existing signature.
+# --check only reads local hashes and prints the pin; it never downloads, creates
+# directories, changes permissions, or executes an existing resolver.
 set -euo pipefail
+cd "$(dirname "$0")/.."
 
+VERSION="2026.10.21"
+SHA256="7a6fe71d7d680f1fb0ac18d4949873d77db2859e90017c0f44bd94b23be4ee40"
+LICENSE_SHA256="7e12e5df4bae12cb21581ba157ced20e1986a0508dd10d0e8a4ab9a4cf94e85c"
+REMOTE_URL="https://github.com/yt-dlp/yt-dlp/releases/download/$VERSION/yt-dlp_macos"
+LICENSE_URL="https://raw.githubusercontent.com/yt-dlp/yt-dlp/$VERSION/LICENSE"
 DEST_DIR="Sources/Muses/Resources"
 DEST="$DEST_DIR/yt-dlp"
-REMOTE_URL="https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos"
-LICENSE_URL="https://raw.githubusercontent.com/yt-dlp/yt-dlp/master/LICENSE"
+LICENSE="$DEST_DIR/yt-dlp-LICENSE"
 
 CHECK_ONLY=0
-[[ "${1:-}" == "--check" ]] && CHECK_ONLY=1
+case "${1:-}" in
+    "") [[ $# -eq 0 ]] || exit 2 ;;
+    --check) [[ $# -eq 1 ]] || exit 2; CHECK_ONLY=1 ;;
+    *) echo "Usage: $0 [--check]" >&2; exit 2 ;;
+esac
 
-mkdir -p "$DEST_DIR"
-
-current_version() {
-    if [[ -x "$DEST" ]]; then
-        "$DEST" --version 2>/dev/null || echo "(none)"
-    else
-        echo "(not installed)"
-    fi
+verify_sha() {
+    [[ -f "$1" ]] && printf '%s  %s\n' "$2" "$1" | shasum -a 256 -c - >/dev/null 2>&1
 }
 
-# 通过 GitHub API 获取最新 release tag(避免下载整个二进制只为查版本)。
-remote_version() {
-    local response
-    response="$(curl -fsSL "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest")" \
-        || return 1
-    # Consume the complete response before parsing. An early-exiting `grep -m1`
-    # makes curl receive SIGPIPE under `set -o pipefail`, which used to append
-    # `(unknown)` to an otherwise valid tag and redownload the same binary.
-    printf '%s\n' "$response" \
-        | sed -nE 's/.*"tag_name"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p'
-}
-
-echo "== yt-dlp bundling =="
-echo "current: $(current_version)"
-REMOTE_TAG="$(remote_version || echo '(unknown)')"
-echo "remote:  $REMOTE_TAG"
-
+BINARY_VALID=0
+LICENSE_VALID=0
+verify_sha "$DEST" "$SHA256" && BINARY_VALID=1
+verify_sha "$LICENSE" "$LICENSE_SHA256" && LICENSE_VALID=1
+printf '== yt-dlp bundling ==\npinned: %s\n' "$VERSION"
+printf 'binary verified: %s\nlicense verified: %s\n' "$BINARY_VALID" "$LICENSE_VALID"
 if [[ $CHECK_ONLY -eq 1 ]]; then
     exit 0
 fi
-
-# 幂等:已安装版本与远端一致则跳过。
-if [[ -x "$DEST" ]] && [[ "$REMOTE_TAG" != "(unknown)" ]]; then
-    INSTALLED="$("$DEST" --version 2>/dev/null | head -1 || echo '')"
-    if [[ "$INSTALLED" == "$REMOTE_TAG" ]]; then
-        echo "已是最新 ($REMOTE_TAG),跳过下载。"
-        exit 0
-    fi
+if [[ $BINARY_VALID -eq 1 && $LICENSE_VALID -eq 1 ]]; then
+    chmod 755 "$DEST"
+    echo "Pinned resolver and license already verified; download skipped."
+    exit 0
 fi
 
-echo "下载 $REMOTE_URL → $DEST"
-curl -fL "$REMOTE_URL" -o "$DEST"
-chmod +x "$DEST"
-
-# 附带 LICENSE。
-if curl -fsSL "$LICENSE_URL" -o "$DEST_DIR/yt-dlp-LICENSE"; then
-    echo "LICENSE → $DEST_DIR/yt-dlp-LICENSE"
+# Stage on the destination filesystem, validate BOTH inputs before replacing
+# either, and rename each verified file atomically. Failed/truncated downloads
+# leave existing resources intact. A matching version string never bypasses SHA.
+mkdir -p "$DEST_DIR"
+STAGING="$(mktemp -d "$DEST_DIR/.yt-dlp-download.XXXXXX")"
+trap 'rm -rf "$STAGING"' EXIT
+if [[ $BINARY_VALID -eq 1 ]]; then
+    cp "$DEST" "$STAGING/yt-dlp"
+else
+    curl -fL --retry 2 "$REMOTE_URL" -o "$STAGING/yt-dlp"
 fi
-
-echo "完成: $("$DEST" --version | head -1)"
+if [[ $LICENSE_VALID -eq 1 ]]; then
+    cp "$LICENSE" "$STAGING/yt-dlp-LICENSE"
+else
+    curl -fsSL --retry 2 "$LICENSE_URL" -o "$STAGING/yt-dlp-LICENSE"
+fi
+if ! verify_sha "$STAGING/yt-dlp" "$SHA256"; then
+    echo "Pinned yt-dlp SHA-256 verification failed; resources were not replaced." >&2
+    exit 1
+fi
+if ! verify_sha "$STAGING/yt-dlp-LICENSE" "$LICENSE_SHA256"; then
+    echo "Pinned yt-dlp LICENSE SHA-256 verification failed; resources were not replaced." >&2
+    exit 1
+fi
+chmod 755 "$STAGING/yt-dlp"
+chmod 644 "$STAGING/yt-dlp-LICENSE"
+mv -f "$STAGING/yt-dlp-LICENSE" "$LICENSE"
+mv -f "$STAGING/yt-dlp" "$DEST"
+echo "Bundled verified yt-dlp $VERSION and pinned LICENSE."

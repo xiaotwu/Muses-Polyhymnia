@@ -7,7 +7,7 @@ enum YTAudioQualityOption: String, CaseIterable {
     var label: String {
         switch self {
         case .bestaudio: return tr("Best audio", "最高音质")
-        case .k256: return tr("High (256k)", "高音质 (256k)")
+        case .k256: return tr("High (best available)", "高音质（最佳可用）", zhHant: "高音質（最佳可用）")
         case .k128: return tr("Medium (128k)", "中等 (128k)")
         case .k64: return tr("Data saver (64k)", "省流 (64k)")
         case .best: return tr("Best video", "最高画质视频")
@@ -51,10 +51,16 @@ struct AudioQualitySettingsView: View {
             }
             DisclosureGroup(tr("Format & source details", "格式与来源详情")) {
                 Picker(tr("Download format", "下载格式"), selection: $ytQuality) {
-                    ForEach(YTAudioQualityOption.allCases, id: \.rawValue) { Text($0.label).tag($0.rawValue) }
+                    ForEach(YTAudioQualityOption.allCases.filter { !$0.isVideo }, id: \.rawValue) {
+                        Text($0.label).tag($0.rawValue)
+                    }
+                    if YTAudioQualityOption(rawValue: ytQuality)?.isVideo == true {
+                        Text(tr("Best available audio", "最佳可用音频", zhHant: "最佳可用音訊")).tag(ytQuality)
+                    }
                 }.pickerStyle(.menu)
-                Text(tr("Automatic uses the best available audio source. Quality depends on YouTube; changing the profile reloads the current track. Codec and bitrate are reported only when known.",
-                        "自动使用可用的最佳音频源。音质取决于 YouTube；更改方案会重新加载当前曲目。仅显示实际已知的编码及码率。"))
+                Text(tr("Automatic and High quality use the best available public audio source. Changing the profile reloads the current track. Codec and bitrate describe the actual source when known.",
+                        "自动和高品质使用最佳可用公开音频源。更改方案会重新加载当前曲目。仅显示实际音源已知的编码及码率。",
+                        zhHant: "自動和高品質使用最佳可用公開音訊來源。更改方案會重新載入目前曲目。僅顯示實際音源已知的編碼及位元率。"))
                     .font(MusesTypography.caption).foregroundStyle(.secondary)
             }
         } header: { Text(tr("Quality", "音质")).font(MusesTypography.headline.weight(.semibold)) }
@@ -124,11 +130,10 @@ struct AudioQualitySettingsView: View {
 
     private func playingLabel(_ q: AudioQualityInfo) -> String {
         var parts: [String] = []
-        if !q.codec.isEmpty { parts.append(q.codec) }
+        if !q.codec.isEmpty, !["native", "unknown"].contains(q.codec.lowercased()) { parts.append(q.codec) }
         if q.sampleRate > 0 { parts.append(AudioQualityInfo.sampleRateLabel(q.sampleRate)) }
         if q.bitDepth > 0 { parts.append("\(q.bitDepth)-bit") }
-        let chosen = YTAudioQualityOption(rawValue: ytQuality)?.label ?? ytQuality
-        parts.append(chosen)
+        if let bitrate = q.bitrateLabel { parts.append(bitrate) }
         return parts.joined(separator: " · ")
     }
 }
