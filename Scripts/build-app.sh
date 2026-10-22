@@ -105,13 +105,8 @@ fi
 # SwiftPM and Xcode's SwiftPM integration generate different accessor names.
 # Both aliases resolve to one copy of the current build's resources.
 ln -s Muses_Muses.bundle "$CONTENTS/Resources/Muses-Polyhymnia_Muses.bundle"
-# SwiftPM can reuse a resource bundle planned by an earlier test/build before
-# copy-ytdlp.sh downloaded the ignored binary. Keep Bundle.module's copy in sync
-# with the source that this packaging run just fetched.
-BUNDLED_RESOURCES="$CONTENTS/Resources/Muses_Muses.bundle/Contents/Resources/Resources"
-mkdir -p "$BUNDLED_RESOURCES"
-cp "$RES_DIR/yt-dlp" "$BUNDLED_RESOURCES/yt-dlp"
-[[ ! -f "$RES_DIR/yt-dlp-LICENSE" ]] || cp "$RES_DIR/yt-dlp-LICENSE" "$BUNDLED_RESOURCES/yt-dlp-LICENSE"
+# Refresh both complete runtimes even if SwiftPM reused older copied resources.
+python3 -B "$REPO_ROOT/Scripts/bundle-ytdlp.py" install --app "$APP"
 
 # Shipping bundles contain only app resources. Catch accidental fixture and
 # acceptance-data copies before signing makes the bundle immutable.
@@ -144,26 +139,12 @@ MUSES_SIGN_IDENTITY="$IDENTITY" MUSES_BUNDLE_PATH="$APP" python3 "$REPO_ROOT/Scr
 # 6) Sign every nested executable before signing the app.
 echo "[5/5] codesign (inside-out, hardened runtime)"
 ENTITLEMENTS="$RES_DIR/Muses.entitlements"
-YTDLP_ENTITLEMENTS="$RES_DIR/YTDLP.entitlements"
 TIMESTAMP_ARGS=(--timestamp=none)
 if [[ "$IDENTITY" != "-" ]]; then
     TIMESTAMP_ARGS=(--timestamp)
 fi
-# SwiftPM also copies yt-dlp into Bundle.module resources. Apple notarization
-# checks both copies independently, including Developer ID, timestamp, and runtime.
-for YTDLP_BINARY in \
-    "$CONTENTS/Resources/yt-dlp" \
-    "$CONTENTS/Resources/Muses_Muses.bundle/Contents/Resources/Resources/yt-dlp"; do
-    if [[ ! -f "$YTDLP_BINARY" ]]; then
-        echo "Missing bundled yt-dlp: $YTDLP_BINARY" >&2
-        exit 1
-    fi
-    # The standalone yt-dlp is a PyInstaller one-file executable. Its Python
-    # library is unpacked at launch and needs this runtime exception.
-    codesign --force --options runtime "${TIMESTAMP_ARGS[@]}" \
-        --entitlements "$YTDLP_ENTITLEMENTS" \
-        --sign "$IDENTITY" "$YTDLP_BINARY"
-done
+# Sign Python, every extension/dylib and the entry point in both resolver copies.
+python3 -B "$REPO_ROOT/Scripts/bundle-ytdlp.py" sign --app "$APP" --identity "$IDENTITY"
 # Deno alone needs JIT; the application and other helpers retain their own
 # entitlements. Sign and execute it under hardened runtime before shipping.
 codesign --force --options runtime "${TIMESTAMP_ARGS[@]}" \
@@ -190,6 +171,7 @@ codesign --force --options runtime "${TIMESTAMP_ARGS[@]}" \
     --sign "$IDENTITY" "$APP"
 
 # 7) 验证。
+python3 -B "$REPO_ROOT/Scripts/bundle-ytdlp.py" verify --app "$APP"
 python3 "$REPO_ROOT/Scripts/bundle-mpv.py" verify --app "$APP"
 codesign --verify --deep --strict "$CONTENTS/Frameworks/Sparkle.framework"
 otool -L "$CONTENTS/MacOS/Muses" | grep -q '@rpath/Sparkle.framework/'

@@ -1,5 +1,7 @@
 # Native playback backend refactor
 
+2026-10-22 update: the [cold-source startup correction](cold-resolution-timing.md#startup-stack-and-controlled-correction--2026-10-22) replaces the same-version one-file resolver with its pinned onedir runtime. A fresh signed candidate passed9/9 cold resolutions (2.937–10.671s), muted real Opus/AAC controls/cache replay and paused-position restart. All1,077 Swift/34 packaging/7 strict-worker checks passed locally. Final distribution/integration gates remain open; earlier failures and evidence boundaries below are retained.
+
 Status: integration in progress, 2026-10-21. No new release or native playback
 acceptance is implied by source, subprocess, or dependency initialization checks.
 The human authorized the backend change and three Muses project chats. The current
@@ -198,7 +200,7 @@ build passed. The native loader/configuration scope has28 passing checks. A fres
 signed application's unfinished-preparation transition remains a separate check;
 source success does not establish its real start time or audible output.
 
-## Remaining cold-source gate
+## Earlier cold-source gate before the onedir correction
 
 The signed candidate atf4e6bfc recorded stage8 before a real Next into an unfinished
 resolution. Its original operation timed out after20.090s; foreground waited only
