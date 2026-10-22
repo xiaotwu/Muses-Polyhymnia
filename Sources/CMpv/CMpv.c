@@ -5,6 +5,36 @@
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
+#include <pthread.h>
+
+// Player destruction does not drain every canceled CoreAudio dispatch block.
+// Own one loader reference for process lifetime, independently of player handles.
+// A fixed path also prevents a later client from replacing the resident image.
+static pthread_mutex_t library_lock = PTHREAD_MUTEX_INITIALIZER;
+static void *process_library;
+static char *process_library_path;
+
+static int retain_process_library(const char *path) {
+    pthread_mutex_lock(&library_lock);
+    int retained = 0;
+    if (process_library) {
+        retained = strcmp(path, process_library_path) == 0;
+    } else {
+        char *copy = strdup(path);
+        if (copy) {
+            void *library = dlopen(path, RTLD_NOW | RTLD_LOCAL);
+            if (library) {
+                process_library = library;
+                process_library_path = copy;
+                retained = 1;
+            } else {
+                free(copy);
+            }
+        }
+    }
+    pthread_mutex_unlock(&library_lock);
+    return retained;
+}
 
 struct muses_mpv {
     void *library;
@@ -37,6 +67,9 @@ muses_mpv *muses_mpv_open(const char *path, int *error) {
     if (!path || path[0] != '/') return NULL;
     muses_mpv *c = calloc(1, sizeof(*c));
     if (!c) return NULL;
+    if (!retain_process_library(path)) goto fail;
+    // The process reference keeps code, descriptors and static data resident.
+    // This per-player reference is still balanced by muses_mpv_close.
     c->library = dlopen(path, RTLD_NOW | RTLD_LOCAL);
     if (!c->library) goto fail;
     *error = -1002;

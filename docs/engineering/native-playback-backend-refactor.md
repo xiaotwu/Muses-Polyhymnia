@@ -137,3 +137,35 @@ negotiation, not extractor quality or the advertised source bit depth. The first
 candidate and diagnostics are retained. A rebuilt signed application must still
 pass real sustained public playback and audible-output acceptance; the muted
 prefix probe alone cannot satisfy that gate.
+
+## Audible public playback and delayed library cleanup
+
+The rebuilt hardened, ad-hoc signed Debug candidate at fa6317a played the original
+thirteenth item through to its natural successor, then another successor. The
+human confirmed continuous audible music. Actual source displays covered
+Opus48kHz/132.4kbps and AAC44.1kHz/129.6kbps. Pause, a changed seek position and
+resumed advancing clock passed. A manually requested prepared next track reached
+FILE_LOADED in0.274s and positive position in0.394s. These are warm/prepared
+measurements: initial public extraction had timed out at20.151s, and the explicit
+retry resolved in14.427s. Fast or uniformly successful cold start is not accepted.
+
+That manual transition exposed a separate SIGSEGV about seven seconds later.
+The system report identifies `io.mpv.coreaudio_stop_during_idle` while disposing
+a dispatch block. The client destroyed each player and immediately dlclosed its
+library; mpv0.41.0 schedules a seven-second CoreAudio idle block whose canceled
+object can remain retained by libdispatch after player destruction.
+
+A deterministic, muted local-WAV control used the exact packaged library and
+three open/load/play/pause/close cycles. The original C boundary crashed with
+SIGSEGV after8.323s. Retaining one process-lifetime library reference survived
+12.279s, including the delayed-cleanup interval, without native errors.
+This separates the unload failure from extraction, networking and UI automation.
+The loader now retains one exact-path library instance for process lifetime,
+while still destroying every player and balancing its per-player references.
+A native subprocess regression uses a fake library with delayed callbacks and
+cumulative create/load/destroy counters, checking both safe code lifetime and
+state reuse across three opens without an inspection reference holding it alive.
+Its unpinned control must fail in an isolated child. It does not retain one new
+player/library reference per song, change the upstream idle timer, or require a
+dependency rebuild. A fresh signed application must recheck transitions and
+cached replay after this correction before the native gate can be accepted.
