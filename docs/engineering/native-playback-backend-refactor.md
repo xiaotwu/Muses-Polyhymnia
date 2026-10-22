@@ -197,3 +197,41 @@ The integrated private-home run passed1,074 tests in145 suites and the applicati
 build passed. The native loader/configuration scope has28 passing checks. A fresh
 signed application's unfinished-preparation transition remains a separate check;
 source success does not establish its real start time or audible output.
+
+## Remaining cold-source gate
+
+The signed candidate atf4e6bfc recorded stage8 before a real Next into an unfinished
+resolution. Its original operation timed out after20.090s; foreground waited only
+16.372s, consistent with retaining that operation and deadline. Explicit Retry
+also timed out after20.119s. These failures remain in the evidence, despite the
+successful handoff regression and cache replay.
+
+After normally quitting the candidate, the same bundled extractor/runtime,
+public video identity and cache produced accessible Opus251 in two CLI controls
+(8.489s and11.717s, media HTTP206). The actual `YTDlpRunner.swift`, compiled into
+an isolated no-GUI control, succeeded in8.882s. Restarting the unchanged signed
+application in the background then resolved that same song in11.934s and reached
+FILE_LOADED in13.986s. Real playback advanced through1:04 to1:22 and displayed
+Opus48kHz/133.2kbps; it was paused and normally quit. No system output setting,
+credential or formal-app state was changed. The final candidate retained535 track
+identities; only playback counters/times, queue/session and listening events
+changed. The full formal-app/data/preferences/shared-build protection audit passed.
+
+Neither background state, utility QoS nor the diagnostics' temporary-directory
+choice is an established cause: successful controls exist without changing them.
+No speculative activity assertion, scheduler rewrite or enlarged timeout was
+added. Next investigation should separate slot wait, process launch, first pipe
+bytes, process exit, pipe EOF and typed parsing using fixed labels/numbers only,
+then interleave repeated app/runner trials with one fixed public identity and
+cache condition. Do not log signed URLs, arguments, raw stderr or cookies.
+
+The backend refactor remains in draft review and0.6.2 remains unpublished.
+Reliable fast cold resolution, the final Developer ID/notarized package and its
+native gate remain open. Authenticated/Premium quality is deferred by the human;
+no256kbps, gapless, real spectrum or complete device-switch acceptance is claimed.
+
+The complete [source CI atf4e6bfc](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/39709566345)
+passed tests, single-worker subprocess progress, disk recovery, App Intents
+metadata, a fresh pinned native dependency build, preview packaging/signature
+checks and artifact upload. Later documentation-only evidence updates do not
+replace that source result or establish release/native acceptance.
