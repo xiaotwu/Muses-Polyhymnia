@@ -1,5 +1,11 @@
 # Muses-Polyhymnia Project Guidance
 
+## Linear project and consolidation
+
+All Muses work belongs exclusively to [Muses](https://linear.app/xiaotwu/project/muses-5e747ca2af19), project `P-XW-2` / UUID `c2f9c252-e1d1-4210-bbd5-15a5366b9d28`, team `XW`. Explicitly scope issue queries and issue/document creation to this project, and confirm existing issue membership before updates. Preserve identifiers, parent relationships, evidence and paused work.
+
+Read `docs/engineering/work-consolidation-2026-10-21.md` alongside current-status.md for the saved playback branches and release hold. A submitted branch or successful CI does not remove that hold.
+
 ## Purpose and Scope
 
 This file defines durable product, engineering, UX, design, performance, and verification rules for all work in this repository. It is persistent agent context, not a roadmap or task list.
