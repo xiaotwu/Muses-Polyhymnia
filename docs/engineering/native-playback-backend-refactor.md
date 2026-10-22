@@ -167,5 +167,33 @@ cumulative create/load/destroy counters, checking both safe code lifetime and
 state reuse across three opens without an inspection reference holding it alive.
 Its unpinned control must fail in an isolated child. It does not retain one new
 player/library reference per song, change the upstream idle timer, or require a
-dependency rebuild. A fresh signed application must recheck transitions and
-cached replay after this correction before the native gate can be accepted.
+dependency rebuild.
+
+The fresh signed candidate at680b9d9 survived four real loads in one process,
+manual Next/Previous and the delayed-cleanup windows. Cache replay reached
+FILE_LOADED in0.110s; a prepared next reached positive position in0.365s. Paused
+seek to100s, resumed clock through126s, application volume25→20→25 and a read-only
+MacBook Pro Speakers selection passed. The new completed cache was produced
+inside that candidate's namespace. A separate muted three-load native probe
+also accepted real EQ/rate/volume controls without decoder errors. This does not
+accept podcast rate UI or a full device-switch matrix. The candidate was normally
+quit and the full formal-app/data/preferences/shared-build guard passed again.
+Cold next still took21.121s; no fast cold-load claim is made.
+
+## Unfinished next-resolution ownership
+
+A behavioral regression on the prior implementation reproduced another avoidable
+wait: pressing Next during an unfinished preparation canceled it and started a
+second extraction (two requests, one cancellation). The facade now claims a
+matching pending preparation synchronously before canceling its old caller.
+The foreground load consumes that original task, retaining its existing deadline.
+Track/video/quality/session identity, explicit cancellation, replacement, expired
+results, unused handoffs and deinitialization retain bounded ownership and cleanup.
+A cache hit cancels the now-unneeded remote task. No scheduler, timeout, client or
+account policy is changed. Safe numeric native stage8 records a claimed handoff.
+
+Eight handoff tests passed, including the formerly failing behavioral regression.
+The integrated private-home run passed1,074 tests in145 suites and the application
+build passed. The native loader/configuration scope has28 passing checks. A fresh
+signed application's unfinished-preparation transition remains a separate check;
+source success does not establish its real start time or audible output.

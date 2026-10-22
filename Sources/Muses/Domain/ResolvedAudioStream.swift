@@ -43,6 +43,12 @@ struct ResolvedAudioStream: Equatable, Sendable, CustomStringConvertible, Custom
 
 @MainActor
 protocol ResolvedStreamProvider: AnyObject, Sendable {
+    /// Opaque current access/session identity. Unknown providers cannot transfer speculative work.
+    var streamContextID: String? { get }
     func resolveStream(videoID: String, quality: String) async throws -> ResolvedAudioStream
     func invalidateStream(videoID: String, quality: String)
+}
+
+extension ResolvedStreamProvider {
+    var streamContextID: String? { nil }
 }

@@ -581,6 +581,8 @@ final class PlaybackService {
     var onForegroundLoad: (() -> Void)?
 
     private func scheduleLoad(_ track: TrackSnapshot, resumeMs: Double? = nil) {
+        // Claim before either canceled task can release the last speculative consumer.
+        let releaseHandoff = engine.handoffPreparedResolution(to: track)
         onForegroundLoad?()
         activeLoadTask?.cancel()
         prepareTask?.cancel()
@@ -596,7 +598,10 @@ final class PlaybackService {
         } else {
             pendingResume = nil
         }
-        activeLoadTask = Task { await load(track, seq: seq, resumeMs: position) }
+        activeLoadTask = Task {
+            defer { releaseHandoff?() }
+            await load(track, seq: seq, resumeMs: position)
+        }
     }
 
     private func load(_ track: TrackSnapshot, seq: UInt64,

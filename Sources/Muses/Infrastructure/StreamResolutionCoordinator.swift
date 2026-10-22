@@ -26,6 +26,8 @@ final class StreamResolutionCoordinator: ResolvedStreamProvider {
         self.contextID = contextID ?? { (bridge as? YTDlpBridge)?.streamContextID ?? "public" }
     }
 
+    var streamContextID: String? { contextID() }
+
     /// Legacy callers still share the same typed extraction; URL-only disk entries
     /// cannot supply its headers/format/session and are deliberately not promoted.
     func resolve(videoID: String, quality: String) async throws -> URL {

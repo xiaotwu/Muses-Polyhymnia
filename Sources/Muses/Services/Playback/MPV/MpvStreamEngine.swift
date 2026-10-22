@@ -1,6 +1,46 @@
 import Foundation
 import os
 
+/// One existing task, with one cancellation owner at a time. The lock lets a
+/// canceled preparation distinguish synchronous transfer from abandonment.
+private final class MpvPendingResolution: @unchecked Sendable {
+    let id = UUID()
+    let trackID: UUID
+    let videoID: String
+    let quality: String
+    let context: String?
+    let prepared: Bool
+    let task: Task<ResolvedAudioStream, Error>
+    private let lock = NSLock()
+    private var transferred = false
+    private var cancelled = false
+
+    init(track: TrackSnapshot, quality: String, context: String?, prepared: Bool,
+         task: Task<ResolvedAudioStream, Error>) {
+        trackID = track.id; videoID = track.youTubeId
+        self.quality = quality; self.context = context
+        self.prepared = prepared; self.task = task
+    }
+    func claim() -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        guard !transferred, !cancelled, !task.isCancelled else { return false }
+        transferred = true
+        return true
+    }
+    func cancelSpeculation() {
+        lock.lock()
+        let shouldCancel = !transferred
+        if shouldCancel { cancelled = true }
+        lock.unlock()
+        if shouldCancel { task.cancel() }
+    }
+    func cancel() {
+        lock.lock(); cancelled = true; lock.unlock()
+        task.cancel()
+    }
+}
+
+
 /// One native audio authority. Resolution stays replaceable and queue ownership stays in PlaybackService.
 @MainActor
 final class MpvStreamEngine: PlayerEngine {
@@ -16,7 +56,7 @@ final class MpvStreamEngine: PlayerEngine {
     private var nativeStageStart = ProcessInfo.processInfo.systemUptime
     private var recordedNativeStages: Set<NativeDiagnosticStage> = []
     private enum NativeDiagnosticStage: Int, Hashable {
-        case loadStarted = 1, typedResolved, cacheSelected, fileLoaded, playbackRestart, positivePosition, failure
+        case loadStarted = 1, typedResolved, cacheSelected, fileLoaded, playbackRestart, positivePosition, failure, preparationHandoff
     }
     private let provider: any ResolvedStreamProvider
     private let client: any MpvClient
@@ -49,7 +89,9 @@ final class MpvStreamEngine: PlayerEngine {
     private var volume: Float = 0.8
     private var rate: Float = 1
     private var bands: [EQBand] = []
-    private var prefetchTask: Task<ResolvedAudioStream, Error>?
+    private var pendingPrefetch: MpvPendingResolution?
+    private var foregroundHandoff: MpvPendingResolution?
+    private var activeResolution: MpvPendingResolution?
     private var prefetchID = UUID()
     private var prefetched: Prefetched?
 
@@ -82,9 +124,14 @@ final class MpvStreamEngine: PlayerEngine {
         let ready = prefetched.flatMap {
             $0.track.youTubeId == track.youTubeId && $0.quality == quality && !$0.stream.isExpired() ? $0.stream : nil
         }
+        let handoff = foregroundHandoff
+        foregroundHandoff = nil
+        let matching = handoff.flatMap { matches($0, track: track, quality: quality) ? $0 : nil }
+        if matching == nil { handoff?.cancel() }
         let token = beginLoad(track, quality: quality)
         let operation = loadOperationID
         invalidatePreparedStream()
+        activeResolution = matching
         try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
                 readiness = (token, continuation)
@@ -93,7 +140,8 @@ final class MpvStreamEngine: PlayerEngine {
                     return
                 }
                 startReadinessTimeout(operation: operation)
-                startLoadTask(track, quality: quality, ready: ready, token: token, allowCache: true)
+                startLoadTask(track, quality: quality, ready: ready, token: token, allowCache: true,
+                              pending: matching)
             }
         } onCancel: {
             Task { @MainActor [weak self] in
@@ -104,6 +152,9 @@ final class MpvStreamEngine: PlayerEngine {
     }
 
     deinit {
+        pendingPrefetch?.cancel()
+        foregroundHandoff?.cancel()
+        activeResolution?.cancel()
         cacheWork?.cancel()
         cacheGate?.close()
         cacheRetirementGate?.close()
@@ -122,7 +173,7 @@ final class MpvStreamEngine: PlayerEngine {
     }
 
     private func startLoadTask(_ track: TrackSnapshot, quality: String, ready: ResolvedAudioStream?,
-                               token: UInt64, allowCache: Bool,
+                               token: UInt64, allowCache: Bool, pending: MpvPendingResolution? = nil,
                                quarantining rejected: MediaFileCache.CompletedEntry? = nil,
                                retirementGate: MediaCachePublicationGate? = nil) {
         let root = cacheDirectory
@@ -143,12 +194,20 @@ final class MpvStreamEngine: PlayerEngine {
                 try Task.checkCancellation()
                 let stream: ResolvedAudioStream
                 if let cached {
+                    pending?.cancel()
                     // File URLs originate solely from the exact trusted cache lookup, never a provider.
                     stream = ResolvedAudioStream(url: cached.url, contextID: "public-cache")
                 } else if let ready { stream = ready }
-                else { stream = try await provider.resolveStream(videoID: track.youTubeId, quality: quality) }
+                else if let pending {
+                    guard pending.context == provider.streamContextID else { throw CancellationError() }
+                    stream = try await pending.task.value
+                    try Task.checkCancellation()
+                    guard pending.context == provider.streamContextID,
+                          stream.contextID == pending.context else { throw CancellationError() }
+                } else { stream = try await provider.resolveStream(videoID: track.youTubeId, quality: quality) }
                 try Task.checkCancellation()
                 guard let self, self.isCurrent(token, track.id) else { return }
+                self.activeResolution = nil
                 if let cached {
                     self.usingCachedFile = true
                     self.cachedEntry = cached
@@ -220,6 +279,8 @@ final class MpvStreamEngine: PlayerEngine {
     }
 
     private func beginLoad(_ track: TrackSnapshot, quality: String) -> UInt64 {
+        activeResolution?.cancel()
+        activeResolution = nil
         cancelCacheWork()
         cacheRetirementGate?.close()
         cacheRetirementGate = nil
@@ -258,6 +319,8 @@ final class MpvStreamEngine: PlayerEngine {
 
     private func cancelLoad(_ token: UInt64) {
         guard generation == token else { return }
+        activeResolution?.cancel()
+        activeResolution = nil
         cacheRetirementGate?.close()
         cacheRetirementGate = nil
         cancelCacheWork()
@@ -359,16 +422,42 @@ final class MpvStreamEngine: PlayerEngine {
         invalidatePreparedStream()
         let token = prefetchID
         let task = Task { try await provider.resolveStream(videoID: track.youTubeId, quality: quality) }
-        prefetchTask = task
+        let pending = MpvPendingResolution(track: track, quality: quality, context: provider.streamContextID,
+                                        prepared: prepared, task: task)
+        pendingPrefetch = pending
+        defer { if prefetchID == token { pendingPrefetch = nil } }
         do {
-            let stream = try await withTaskCancellationHandler { try await task.value } onCancel: { task.cancel() }
+            let stream = try await withTaskCancellationHandler { try await task.value } onCancel: { pending.cancelSpeculation() }
             guard !Task.isCancelled, !task.isCancelled, prefetchID == token, quality == qualityProvider(),
                   !stream.isExpired() else { return }
             try validate(stream)
             prefetched = Prefetched(track: track, quality: quality, stream: stream, prepared: prepared)
-            prefetchTask = nil
         } catch {
-            if prefetchID == token { prefetchTask = nil }
+            // The original owner remains responsible unless the facade claimed it.
+        }
+    }
+
+    private func matches(_ pending: MpvPendingResolution, track: TrackSnapshot, quality: String) -> Bool {
+        pending.prepared && pending.trackID == track.id && pending.videoID == track.youTubeId &&
+            pending.quality == quality && pending.context != nil && pending.context == provider.streamContextID &&
+            !pending.task.isCancelled
+    }
+
+    func handoffPreparedResolution(to track: TrackSnapshot) -> (@MainActor () -> Void)? {
+        foregroundHandoff?.cancel()
+        foregroundHandoff = nil
+        guard let pending = pendingPrefetch,
+              matches(pending, track: track, quality: qualityProvider()), pending.claim() else { return nil }
+        recordNativeStage(.preparationHandoff)
+        // The facade owns this lease until load consumes it; the old preparation
+        // can now cancel without discarding the same underlying extraction.
+        pendingPrefetch = nil
+        prefetchID = UUID()
+        foregroundHandoff = pending
+        return { [weak self] in
+            guard self?.foregroundHandoff?.id == pending.id else { return }
+            self?.foregroundHandoff = nil
+            pending.cancel()
         }
     }
 
@@ -376,8 +465,10 @@ final class MpvStreamEngine: PlayerEngine {
     func invalidatePreparedStream() {
         cancelCacheWork()
         prefetchID = UUID()
-        prefetchTask?.cancel()
-        prefetchTask = nil
+        pendingPrefetch?.cancel()
+        pendingPrefetch = nil
+        foregroundHandoff?.cancel()
+        foregroundHandoff = nil
         prefetched = nil
     }
 
@@ -554,6 +645,8 @@ final class MpvStreamEngine: PlayerEngine {
     }
 
     private func fail(_ error: Error) {
+        activeResolution?.cancel()
+        activeResolution = nil
         readinessTimeout?.cancel()
         readinessTimeout = nil
         cancelCacheWork()

@@ -11,6 +11,9 @@ protocol PlayerEngine: AnyObject {
     func prewarmSelection(_ track: TrackSnapshot) async
     func prewarmSelections(_ tracks: [TrackSnapshot]) async
     func load(_ track: TrackSnapshot) async throws
+    /// Transfer a matching unfinished preparation before its caller is canceled.
+    /// The returned cleanup releases it if the scheduled foreground load never consumes it.
+    func handoffPreparedResolution(to track: TrackSnapshot) -> (@MainActor () -> Void)?
     /// Prepares the next source without granting playback intent. Engines may
     /// resolve only, or additionally prepare a standby decoder when supported.
     func prepare(_ track: TrackSnapshot) async
@@ -30,6 +33,7 @@ protocol PlayerEngine: AnyObject {
 }
 
 extension PlayerEngine {
+    func handoffPreparedResolution(to track: TrackSnapshot) -> (@MainActor () -> Void)? { nil }
     func prewarmSelection(_ track: TrackSnapshot) async {}
     func prewarmSelections(_ tracks: [TrackSnapshot]) async {
         if let track = tracks.first { await prewarmSelection(track) }
