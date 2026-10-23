@@ -11,6 +11,7 @@ final class StreamResolutionCoordinator: ResolvedStreamProvider {
     private struct Request {
         let identity: UUID
         let task: Task<Void, Never>
+        let priority: YTDlpQueuedPriority
         var consumers: [UUID: CheckedContinuation<ResolvedAudioStream, Error>]
     }
     private let bridge: any YTDlpBridgeProtocol
@@ -43,13 +44,22 @@ final class StreamResolutionCoordinator: ResolvedStreamProvider {
         if let stream = cache.getStream(videoId: videoID, quality: quality, contextID: context) { return stream }
         let key = Key(videoID: videoID, quality: quality, context: context)
         let consumer = UUID()
+        // A preparation may be claimed before this consumer registers. Forward
+        // its sticky intent only to this request, never a later matching key.
+        let callerPriority = YTDlpRequestPriority.queuedPriority
+        defer { callerPriority?.stopObserving(id: consumer) }
         return try await withTaskCancellationHandler {
             let stream = try await withCheckedThrowingContinuation { continuation in
                 if var request = requests[key] {
+                    if YTDlpRequestPriority.interactive { request.priority.promote() }
                     request.consumers[consumer] = continuation
                     requests[key] = request
+                    let priority = request.priority
+                    callerPriority?.observe(id: consumer) { priority.promote() }
                 } else {
                     let identity = UUID()
+                    let priority = YTDlpQueuedPriority()
+                    if YTDlpRequestPriority.interactive { priority.promote() }
                     let task = Task { @MainActor [weak self, bridge, log] in
                         let start = ContinuousClock.now
                         let result: Result<ResolvedAudioStream, Error>
@@ -57,15 +67,19 @@ final class StreamResolutionCoordinator: ResolvedStreamProvider {
                             // No identical blind retry: client/session recovery is a
                             // separate, explicit policy, not another background resolver.
                             guard self?.contextID() == key.context else { throw CancellationError() }
-                            let stream = try await bridge.resolveAudioStream(videoId: videoID,
-                                quality: quality, timeout: 20)
+                            let stream = try await YTDlpRequestPriority.$queuedPriority.withValue(priority) {
+                                try await bridge.resolveAudioStream(videoId: videoID,
+                                    quality: quality, timeout: 20)
+                            }
                             try Task.checkCancellation()
                             result = .success(stream)
                         } catch { result = .failure(error) }
                         log.info("Resolution finished in \(start.duration(to: .now).seconds, privacy: .public)s")
                         self?.finish(key: key, identity: identity, result: result)
                     }
-                    requests[key] = Request(identity: identity, task: task, consumers: [consumer: continuation])
+                    requests[key] = Request(identity: identity, task: task, priority: priority,
+                                            consumers: [consumer: continuation])
+                    callerPriority?.observe(id: consumer) { priority.promote() }
                 }
             }
             try Task.checkCancellation()

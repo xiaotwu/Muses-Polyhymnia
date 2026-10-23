@@ -10,16 +10,19 @@ private final class MpvPendingResolution: @unchecked Sendable {
     let quality: String
     let context: String?
     let prepared: Bool
+    let priority: YTDlpQueuedPriority
     let task: Task<ResolvedAudioStream, Error>
     private let lock = NSLock()
     private var transferred = false
     private var cancelled = false
 
     init(track: TrackSnapshot, quality: String, context: String?, prepared: Bool,
+         priority: YTDlpQueuedPriority,
          task: Task<ResolvedAudioStream, Error>) {
         trackID = track.id; videoID = track.youTubeId
         self.quality = quality; self.context = context
         self.prepared = prepared; self.task = task
+        self.priority = priority
     }
     func claim() -> Bool {
         lock.lock(); defer { lock.unlock() }
@@ -421,9 +424,14 @@ final class MpvStreamEngine: PlayerEngine {
         let quality = qualityProvider()
         invalidatePreparedStream()
         let token = prefetchID
-        let task = Task { try await provider.resolveStream(videoID: track.youTubeId, quality: quality) }
+        let priority = YTDlpQueuedPriority()
+        let task = Task {
+            try await YTDlpRequestPriority.$queuedPriority.withValue(priority) {
+                try await provider.resolveStream(videoID: track.youTubeId, quality: quality)
+            }
+        }
         let pending = MpvPendingResolution(track: track, quality: quality, context: provider.streamContextID,
-                                        prepared: prepared, task: task)
+                                        prepared: prepared, priority: priority, task: task)
         pendingPrefetch = pending
         defer { if prefetchID == token { pendingPrefetch = nil } }
         do {
@@ -448,6 +456,7 @@ final class MpvStreamEngine: PlayerEngine {
         foregroundHandoff = nil
         guard let pending = pendingPrefetch,
               matches(pending, track: track, quality: qualityProvider()), pending.claim() else { return nil }
+        pending.priority.promote()
         recordNativeStage(.preparationHandoff)
         // The facade owns this lease until load consumes it; the old preparation
         // can now cancel without discarding the same underlying extraction.
