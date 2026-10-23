@@ -30,6 +30,7 @@ struct PackagingTests {
             "Scripts/make-icon.sh",
             "Scripts/sync-app-icon.sh",
             "Scripts/build-app.sh",
+            "Scripts/build_and_run.sh",
             "Scripts/sign-update.sh",
             "Scripts/notarize.sh",
             "Scripts/make-dmg.sh",
@@ -167,7 +168,7 @@ struct PackagingTests {
         #expect(package.contains("MusesWebHomeHelper"))
         #expect(script.contains("$CONTENTS/Helpers"))
         #expect(script.contains("$RELEASE_DIR/MusesWebHomeHelper"))
-        #expect(script.contains("swift build -c release --show-bin-path"))
+        #expect(script.contains("swift build -c \"$CONFIGURATION\" --show-bin-path"))
         #expect(script.contains("$CONTENTS/Resources/Muses_Muses.bundle"))
         #expect(script.contains("codesign --verify --strict \"$CONTENTS/Helpers/MusesWebHomeHelper\""))
         let helperSign = try #require(script.range(

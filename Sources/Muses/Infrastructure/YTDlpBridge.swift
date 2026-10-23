@@ -3,7 +3,7 @@ import Foundation
 /// Wrapper around the `yt-dlp` binary.
 ///
 /// Invokes the local `yt-dlp` executable via `Process` for two jobs:
-///  1. resolving a single video's direct audio stream URL (`-g` / `--get-url`);
+///  1. resolving selected audio metadata (or the legacy URL-only adapter);
 ///  2. fetching flat-playlist entries as NDJSON (`--flat-playlist --dump-json`).
 ///
 /// This bridge is `@MainActor`, consistent with `StreamURLCache` /
@@ -180,13 +180,16 @@ final class YTDlpBridge {
     /// Background subprocess executor (off the main thread + concurrency throttled).
     /// Injectable for tests.
     private let runner: YTDlpRunner
+    /// Immutable per provider: a pending request cannot silently change access mode.
+    let streamAccessPolicy: StreamPlaybackAccessPolicy
+    private let playbackCookieArguments: (@MainActor () -> [String])?
 
     /// Quality name -> yt-dlp `-f` format selector.
-    private static let qualityMap: [String: String] = [
-        "bestaudio": "bestaudio[ext*=m4a]/bestaudio/best",
-        "256k": "ba[ext=m4a][abr<=256]/ba[abr<=256]/bestaudio[abr<=256]",
-        "128k": "ba[ext=m4a][abr<=128]/ba[abr<=128]",
-        "64k": "ba[ext=m4a][abr<=64]/ba[abr<=64]",
+    internal static let qualityMap: [String: String] = [
+        "bestaudio": "bestaudio",
+        "256k": "bestaudio",
+        "128k": "ba[abr<=128]",
+        "64k": "ba[abr<=64]",
         "best": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
         "1080p": "best[height<=1080][ext=mp4]/best[height<=1080]",
         "720p": "best[height<=720][ext=mp4]/best[height<=720]"
@@ -195,13 +198,17 @@ final class YTDlpBridge {
     init(binaryPath: String? = nil,
          searchCache: YTDlpSearchCache? = .default,
          runner: YTDlpRunner = YTDlpRunner(),
-         javaScriptRuntimePath: String? = nil) {
+         javaScriptRuntimePath: String? = nil,
+         streamAccessPolicy: StreamPlaybackAccessPolicy = .publicAudio,
+         playbackCookieArguments: (@MainActor () -> [String])? = nil) {
         self.binaryPath = binaryPath
         let bundledRuntime = Bundle.main.bundleURL.appending(path: "Contents/Helpers/deno").path
         self.javaScriptRuntimePath = javaScriptRuntimePath
             ?? (FileManager.default.isExecutableFile(atPath: bundledRuntime) ? bundledRuntime : nil)
         self.searchCache = searchCache
         self.runner = runner
+        self.streamAccessPolicy = streamAccessPolicy
+        self.playbackCookieArguments = playbackCookieArguments
     }
 
     // MARK: - Cookie / sign-in
@@ -225,6 +232,93 @@ final class YTDlpBridge {
             guard !path.isEmpty else { return [] }
             return ["--cookies", path]
         }
+    }
+
+    private var sessionCookieArguments: [String]?
+    private var sessionID = UUID().uuidString
+    private var blockedStreamSession: (context: String, until: Date, error: YTDlpError)?
+
+    /// The policy prefix and random identity contain no account or credential data.
+    /// Public mode never even asks for configured cookie arguments.
+    var streamContextID: String { playbackSession().context }
+
+    private func playbackSession() -> (context: String, cookies: [String]) {
+        switch streamAccessPolicy {
+        case .publicAudio:
+            return ("public-\(sessionID)", [])
+        case .configuredAccount:
+            let current = playbackCookieArguments?() ?? cookieArgs()
+            if sessionCookieArguments != current {
+                sessionCookieArguments = current
+                sessionID = UUID().uuidString
+            }
+            return ("account-\(sessionID)", current)
+        }
+    }
+
+    /// Call after explicit account/session renewal, including same-browser account changes.
+    func invalidateStreamSession() {
+        sessionID = UUID().uuidString
+    }
+
+    func resolveAudioStream(videoId: String, quality: String,
+                            timeout: TimeInterval = 20) async throws -> ResolvedAudioStream {
+        let publicProgress = streamAccessPolicy == .publicAudio
+        let trace = YTDlpRunTrace(captureProgress: publicProgress)
+        try Task.checkCancellation()
+        guard YTDlpPlaylistEntry(id: videoId, title: "").resourceKind == .video else {
+            throw YTDlpError.parseFailed("Invalid video identity")
+        }
+        let session = playbackSession()
+        let context = session.context
+        if streamAccessPolicy == .configuredAccount, session.cookies.isEmpty {
+            throw YTDlpError.exitCode(1, "authorized session unavailable")
+        }
+        if let blocked = blockedStreamSession, blocked.context == context, blocked.until > Date() {
+            throw blocked.error
+        }
+        let cookies = session.cookies
+        let bin = try await resolveBinary()
+        try Task.checkCancellation()
+        guard context == streamContextID else { throw CancellationError() }
+        // Retired video profiles can remain in existing preferences. Typed
+        // playback always requests audio; legacy URL/video callers keep their map.
+        let audioProfile = ["best", "1080p", "720p"].contains(quality) ? "bestaudio" : quality
+        // Verbose diagnostics stay on stderr; stdout remains the typed JSON.
+        // Public extraction emits only allowlisted numeric phase events.
+        let args = cookies + (publicProgress ? ["--verbose"] : []) + ["--ignore-config", "--socket-timeout", "5",
+            "--extractor-retries", "0", "--retries", "0", "--skip-download",
+            "--no-playlist", "--dump-single-json", "--check-formats",
+            "--format-sort-force", "-S", "abr,asr",
+            "-f", Self.qualityMap[audioProfile] ?? audioProfile,
+            "https://youtu.be/\(videoId)"]
+        let stdout: String
+        do {
+            (stdout, _) = try await runInternal(executablePath: bin, args: args,
+                timeout: timeout, allowCookieFallback: false,
+                stdoutLimit: AudioStreamJSONParser.maximumBytes, trace: trace)
+        } catch let YTDlpError.exitCode(code, message) {
+            // Raw stderr may contain signed URLs or session material. Only a
+            // fixed category crosses the playback boundary.
+            let text = message.lowercased()
+            let category = ["cookie", "permission", "http error 429", "http error 403",
+                "sign in", "private video", "video unavailable", "age-restricted",
+                "not available in your country", "requested format is not available",
+                "challenge", "timed out", "connection"].first(where: text.contains) ?? "extraction failed"
+            let safeError = YTDlpError.exitCode(code, category)
+            if streamAccessPolicy == .configuredAccount && (category == "cookie" || category == "permission") {
+                // Do not repeat a known-broken browser extraction for every track,
+                // and do not silently downgrade the authorized session to public.
+                blockedStreamSession = (context, Date().addingTimeInterval(60), safeError)
+            }
+            throw safeError
+        }
+        try Task.checkCancellation()
+        guard context == streamContextID else { throw CancellationError() }
+        trace.record(.parseBegin)
+        let stream = try AudioStreamJSONParser.parse(stdout, videoID: videoId, contextID: context)
+        trace.record(.parseEnd)
+        return stream
     }
 
     // MARK: - Binary resolution
@@ -325,6 +419,9 @@ final class YTDlpBridge {
         let bin = try await resolveBinary()
         let format = Self.qualityMap[quality] ?? quality
         var args = cookieArgs()
+        if ["bestaudio", "256k", "128k", "64k"].contains(quality) {
+            args += ["--format-sort-force", "-S", "abr,asr"]
+        }
         args += ["--socket-timeout", "5", "--extractor-retries", "1", "--retries", "1",
                  "--no-warnings", "-f", format, "--no-playlist", "-g",
                  "https://youtu.be/\(videoId)"]
@@ -589,8 +686,8 @@ final class YTDlpBridge {
     /// **Internal** (not private) so tests can inject timeouts; non-test code
     /// should use the higher-level `resolveStreamURL` / `fetchPlaylist` / `version`.
     ///
-    /// stdout and stderr are read concurrently in `Task.detached(priority: .utility)`
-    /// so large outputs (long playlists) cannot fill the pipe buffers and deadlock.
+    /// stdout and stderr drain concurrently outside Swift's cooperative pool,
+    /// so large outputs cannot fill the pipes or starve foreground extraction.
     /// The subprocess races against the timeout; on expiry it is `terminate()`d and
     /// `.timeout` is thrown.
     ///
@@ -618,7 +715,10 @@ final class YTDlpBridge {
     /// semaphore inside the runner (default 2).
     private func runInternal(executablePath: String,
                              args: [String],
-                             timeout: TimeInterval) async throws
+                             timeout: TimeInterval, allowCookieFallback: Bool = true,
+                             stdoutLimit: Int = 64 * 1024 * 1024,
+                             stderrLimit: Int = 1024 * 1024,
+                             trace: YTDlpRunTrace? = nil) async throws
         -> (stdout: String, stderr: String) {
         // Isolate yt-dlp's implicit user config and disk cache for acceptance
         // bundles. Explicit cookie consent remains governed by cookieArgs().
@@ -631,20 +731,21 @@ final class YTDlpBridge {
         let started = Date()
         do {
             return try await runner.run(
-                executablePath: executablePath, args: args, timeout: timeout)
+                executablePath: executablePath, args: args, timeout: timeout,
+                stdoutLimit: stdoutLimit, stderrLimit: stderrLimit, trace: trace)
         } catch let e as YTDlpError {
             switch e {
             case .timeout:
                 log.error("yt-dlp timed out (\(timeout)s), terminated")
             case .exitCode(let code, let stderr):
-                log.error("yt-dlp exit code \(code): \(stderr)")
+                log.error("yt-dlp exit code \(code, privacy: .public)")
                 let isCookieOrConfigError = stderr.localizedCaseInsensitiveContains("cookie")
                     || stderr.localizedCaseInsensitiveContains("permission")
                     || stderr.localizedCaseInsensitiveContains("operation not permitted")
                     || stderr.localizedCaseInsensitiveContains("could not copy")
                 let hasCookieArgs = args.contains("--cookies") || args.contains("--cookies-from-browser")
                 let hasIgnoreConfig = args.contains("--ignore-config")
-                if isCookieOrConfigError && (hasCookieArgs || !hasIgnoreConfig) {
+                if allowCookieFallback && isCookieOrConfigError && (hasCookieArgs || !hasIgnoreConfig) {
                     log.warning("yt-dlp encountered cookie or permission error, automatically falling back: retrying without cookies and with --ignore-config")
                     var fallbackArgs = args
                     var i = 0
@@ -664,9 +765,25 @@ final class YTDlpBridge {
                     do {
                         return try await runner.run(
                             executablePath: executablePath, args: fallbackArgs,
-                            timeout: max(0.05, timeout - Date().timeIntervalSince(started)))
+                            timeout: max(0.05, timeout - Date().timeIntervalSince(started)),
+                            stdoutLimit: stdoutLimit, stderrLimit: stderrLimit)
                     } catch {
-                        throw e
+                        // Recovery's result determines retryability. Keeping the
+                        // initial cookie error would hide a transient timeout or
+                        // replace an accurate permanent-media failure.
+                        if let recoveryError = error as? YTDlpError, recoveryError == .timeout {
+                            log.error("yt-dlp cookie recovery timed out")
+                        } else if case let YTDlpError.exitCode(code, message) = error {
+                            let category = message.localizedCaseInsensitiveContains("page needs to be reloaded") ? "page-reload"
+                                : message.localizedCaseInsensitiveContains("challenge") ? "challenge"
+                                : message.localizedCaseInsensitiveContains("HTTP Error 429") ? "rate-limit"
+                                : message.localizedCaseInsensitiveContains("HTTP Error 403") ? "http-403"
+                                : message.localizedCaseInsensitiveContains("unavailable") ? "unavailable" : "other"
+                            log.error("yt-dlp cookie recovery exit \(code, privacy: .public); category=\(category, privacy: .public)")
+                        } else if !(error is CancellationError) {
+                            log.error("yt-dlp cookie recovery failed")
+                        }
+                        throw error
                     }
                 }
             case .notFound:
@@ -676,7 +793,7 @@ final class YTDlpBridge {
             }
             throw e
         } catch {
-            log.error("yt-dlp runtime error: \(error)")
+            log.error("yt-dlp runtime error")
             throw error
         }
     }

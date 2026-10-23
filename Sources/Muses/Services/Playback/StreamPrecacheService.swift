@@ -8,13 +8,14 @@ import SwiftData
 final class StreamPrecacheService {
     enum Scope: String, CaseIterable { case favorites, recent, both }
     private let defaults: UserDefaults
-    private let resolution: StreamResolutionCoordinator
+    private let resolution: any ResolvedStreamProvider
     private let session: URLSession
     private let directory: URL
     private let candidates: (Scope) -> [TrackSnapshot]
     private let isBusy: () -> Bool
-    private var work: Task<Void, Never>?
+    @ObservationIgnored private var work: Task<Void, Never>?
     private var resource: SharedStreamResource?
+    @ObservationIgnored private var publicationGate: MediaCachePublicationGate?
     private var generation = UUID()
     var completedCount = 0
     private var preparationStatus = PreparationStatus.off
@@ -37,19 +38,27 @@ final class StreamPrecacheService {
         }
     }
 
-    init(resolution: StreamResolutionCoordinator, defaults: UserDefaults = .standard,
+    init(resolution: any ResolvedStreamProvider, defaults: UserDefaults = .standard,
          candidates: @escaping (Scope) -> [TrackSnapshot], isBusy: @escaping () -> Bool,
-         session: URLSession = .shared, directory: URL = MediaFileCache.directory) {
+         session: URLSession? = nil, directory: URL = MediaFileCache.directory) {
         self.resolution = resolution
-        self.session = session
+        self.session = MediaFileCache.ephemeralSession(copying: session)
         self.directory = directory
         self.defaults = defaults
         self.candidates = candidates
         self.isBusy = isBusy
     }
 
+    isolated deinit {
+        work?.cancel()
+        publicationGate?.close()
+        session.invalidateAndCancel()
+    }
+
     func pauseForPlayback() {
         generation = UUID()
+        publicationGate?.close()
+        publicationGate = nil
         work?.cancel()
         work = nil
         if let resource { Task { await resource.cancel() } }
@@ -73,6 +82,7 @@ final class StreamPrecacheService {
                 do { try await Task.sleep(for: .seconds(3)) } catch { return }
                 guard !Task.isCancelled, self.generation == generation else { return }
             }
+            guard MediaFileCache.isSafeDirectory(directory, allowMissing: true) else { return }
             let rows = candidates(scope)
             var seen = Set<String>()
             for track in rows where seen.insert(track.youTubeId).inserted {
@@ -85,13 +95,18 @@ final class StreamPrecacheService {
                 preparationStatus = .preparing(title: track.title)
                 var ownedResource: SharedStreamResource?
                 do {
-                    let url = try await YTDlpRequestPriority.$interactive.withValue(false) {
-                        try await resolution.resolve(videoID: track.youTubeId, quality: quality)
+                    let stream = try await YTDlpRequestPriority.$interactive.withValue(false) {
+                        try await resolution.resolveStream(videoID: track.youTubeId, quality: quality)
                     }
                     try Task.checkCancellation()
-                    guard !isBusy(), self.generation == generation, url.scheme == "https" else { return }
-                    let destination = MediaFileCache.file(videoId: track.youTubeId, quality: quality, ext: "m4a", in: directory)
-                    let resource = SharedStreamResource(source: url, destination: destination, session: session)
+                    guard !isBusy(), self.generation == generation else { return }
+                    guard let ext = MediaFileCache.cacheExtension(for: stream),
+                          MediaFileCache.validKey(videoID: track.youTubeId, quality: quality) else { continue }
+                    let destination = MediaFileCache.file(videoId: track.youTubeId, quality: quality, ext: ext, in: directory)
+                    let gate = MediaCachePublicationGate()
+                    publicationGate = gate
+                    let resource = try SharedStreamResource(stream: stream, destination: destination, session: session,
+                        publicationGate: gate)
                     ownedResource = resource
                     self.resource = resource
                     let info = try await resource.information()
@@ -104,15 +119,23 @@ final class StreamPrecacheService {
                         await resource.cancel(); self.resource = nil
                         continue
                     }
-                    _ = try await resource.finish()
+                    _ = try await resource.finish { [weak self] in
+                        await MainActor.run {
+                            guard let self else { return false }
+                            return self.generation == generation && !self.isBusy() &&
+                                self.defaults.bool(forKey: PrefKey.streamPrecacheEnabled)
+                        }
+                    }
                     await resource.cancel()
                     guard !Task.isCancelled, self.generation == generation else { return }
                     self.resource = nil
+                    self.publicationGate = nil
                     completedCount += 1
                 } catch {
                     await ownedResource?.cancel()
                     if Task.isCancelled || self.generation != generation { return }
                     self.resource = nil
+                    self.publicationGate = nil
                 }
             }
             if self.generation == generation { preparationStatus = .finished(downloaded: completedCount) }

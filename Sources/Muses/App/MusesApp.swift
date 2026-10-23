@@ -104,24 +104,27 @@ struct MusesApp: App {
         let container = storeLoad.container
         let library = LibraryService(modelContainer: container)
         self.libraryService = library
-        let ytdlpBridge = YTDlpBridge()
+        // Public audio has an independent session; browser permissions for
+        // metadata and imports are not prerequisites for starting playback.
+        let ytdlpBridge = YTDlpBridge(streamAccessPolicy: .publicAudio)
         self.ytDlpBridge = ytdlpBridge
         let catalogService = YouTubeCatalogService(modelContainer: container)
         self.youTubeCatalogService = catalogService
         Task { @MainActor in
             catalogService.rebuildFromTrackMetadata()
         }
-        let youtubeEngine = YouTubeStreamEngine(bridge: ytdlpBridge)
+        let streamResolution = StreamResolutionCoordinator(bridge: ytdlpBridge, cache: .default)
+        let audioEngine = MpvStreamEngine(provider: streamResolution)
         let queue = QueueService()
         queue.modelContext = container.mainContext
         queue.restore()
         self.playbackService = PlaybackService(
-            youtubeEngine: youtubeEngine,
+            engine: audioEngine,
             queue: queue,
             library: library
         )
         let playbackForCache = self.playbackService
-        let precache = StreamPrecacheService(resolution: youtubeEngine.streamResolution,
+        let precache = StreamPrecacheService(resolution: streamResolution,
             candidates: { StreamPrecacheService.snapshots(container: container, scope: $0) },
             isBusy: { [weak playbackForCache] in
                 playbackForCache?.state.isPlaying == true || playbackForCache?.state.buffering == true

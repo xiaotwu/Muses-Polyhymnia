@@ -216,7 +216,8 @@ struct SharedStreamResourceTests {
         let track = TrackSnapshot(id: UUID(), title: "Prepared", artist: "Artist", albumTitle: nil,
             durationSeconds: 1, youTubeId: "prepared", artworkUrl: nil,
             sampleRate: 44100, bitDepth: 16, codec: "aac", isLossless: false)
-        let service = StreamPrecacheService(resolution: StreamResolutionCoordinator(bridge: bridge, cache: StreamURLCache()),
+        let provider = PrecacheFixtureProvider(stream: ResolvedAudioStream(url: URL(string: "https://resource.test/audio")!, container: "m4a"))
+        let service = StreamPrecacheService(resolution: provider,
             defaults: defaults, candidates: { _ in [track] }, isBusy: { false },
             session: URLSession(configuration: ResourceMediaStub.makeConfig()), directory: directory)
         service.configure()
@@ -292,4 +293,12 @@ private final class ResourceMediaStub: StubURLProtocolBase, @unchecked Sendable 
     private static let storedLock = NSLock()
     override class var rules: [StubRule] { get { storedRules } set { storedRules = newValue } }
     override class var lock: NSLock { storedLock }
+}
+
+@MainActor
+private final class PrecacheFixtureProvider: ResolvedStreamProvider {
+    let stream: ResolvedAudioStream
+    init(stream: ResolvedAudioStream) { self.stream = stream }
+    func resolveStream(videoID: String, quality: String) async throws -> ResolvedAudioStream { stream }
+    func invalidateStream(videoID: String, quality: String) {}
 }

@@ -12,9 +12,10 @@ let package = Package(
         .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.10.0"),
     ],
     targets: [
+        .target(name: "CMpv", path: "Sources/CMpv"),
         .executableTarget(
             name: "Muses",
-            dependencies: ["MusesWebHomeProtocol", .product(name: "Sparkle", package: "Sparkle")],
+            dependencies: ["CMpv", "MusesWebHomeProtocol", .product(name: "Sparkle", package: "Sparkle")],
             path: "Sources/Muses",
             resources: [
                 .copy("Resources"),

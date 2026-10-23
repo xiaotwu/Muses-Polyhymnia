@@ -316,6 +316,9 @@ struct StreamingEQAvailabilityNote: View {
         switch playback.transportState.audioProcessing {
         case .available:
             return tr("Equalizer and spectrum are available.", "均衡器和频谱可用。", zhHant: "均衡器和頻譜可用。")
+        case .eqOnly:
+            return tr("Equalizer is available. Spectrum is unavailable for this playback backend.",
+                "均衡器可用。当前播放后端暂不支持频谱。", zhHant: "均衡器可用。目前播放後端暫不支援頻譜。")
         case .waitingForDownload:
             return tr("EQ settings will apply when the download finishes.", "下载完成后会应用均衡器设置。", zhHant: "下載完成後會套用均衡器設定。")
         case .streamOnly:

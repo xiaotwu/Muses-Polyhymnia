@@ -1,25 +1,6 @@
 import Foundation
 import AVFoundation
 
-/// Abstraction over `YTDlpBridge` so tests can inject mocks.
-/// Protocol methods carry no default parameters (a protocol cannot); the concrete `YTDlpBridge` provides defaults and satisfies it directly.
-@MainActor
-protocol YTDlpBridgeProtocol: AnyObject {
-    func resolveStreamURL(videoId: String, quality: String, timeout: TimeInterval) async throws -> URL
-    func fetchPlaylist(url: String, timeout: TimeInterval) async throws -> [YTDlpBridge.YTDlpPlaylistEntry]
-    func searchYouTube(query: String, limit: Int, timeout: TimeInterval) async throws -> [YTDlpBridge.YTDlpPlaylistEntry]
-    func version() async -> String?
-    func invalidateSearch(query: String, limit: Int)
-    func fetchSongMetadata(videoId: String, timeout: TimeInterval) async throws -> YTDlpBridge.YTDlpPlaylistEntry?
-}
-
-extension YTDlpBridgeProtocol {
-    func invalidateSearch(query: String, limit: Int) {}
-    func fetchSongMetadata(videoId: String, timeout: TimeInterval) async throws -> YTDlpBridge.YTDlpPlaylistEntry? { nil }
-}
-
-extension YTDlpBridge: YTDlpBridgeProtocol {}
-
 /// YouTube streaming playback engine implementing the `PlayerEngine` protocol.
 ///
 /// The playback graph uses two `AVAudioPlayerNode`s → preMixer →

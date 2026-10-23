@@ -79,6 +79,53 @@ struct YTDlpBridgeTests {
         #expect(url.absoluteString == "https://example.com/recovered.m4a")
     }
 
+    @Test("Cookie recovery surfaces its timeout so transient resolution can retry")
+    func cookieRecoverySurfacesTimeout() async throws {
+        let bin = try makeFakeBinary(script: """
+            #!/bin/sh
+            for arg in "$@"; do
+                if [ "$arg" = "--cookies-from-browser" ]; then
+                    echo "Cookie database not available" >&2
+                    exit 1
+                fi
+            done
+            exec sleep 5
+            """)
+        defer { try? FileManager.default.removeItem(atPath: (bin as NSString).deletingLastPathComponent) }
+        let bridge = YTDlpBridge(binaryPath: bin)
+        do {
+            _ = try await bridge.runProcess(args: ["--cookies-from-browser", "chrome"], timeout: 0.2)
+            Issue.record("Expected recovery to time out")
+        } catch let error as YTDlpBridge.YTDlpError {
+            #expect(error == .timeout)
+            #expect(StreamResolutionPolicy.shouldRetry(error))
+        }
+    }
+
+    @Test("Cookie recovery preserves a permanent media error without enabling retries")
+    func cookieRecoverySurfacesUnavailable() async throws {
+        let bin = try makeFakeBinary(script: """
+            #!/bin/sh
+            for arg in "$@"; do
+                if [ "$arg" = "--cookies-from-browser" ]; then
+                    echo "Cookie database not available" >&2
+                    exit 1
+                fi
+            done
+            echo "Video unavailable" >&2
+            exit 1
+            """)
+        defer { try? FileManager.default.removeItem(atPath: (bin as NSString).deletingLastPathComponent) }
+        let bridge = YTDlpBridge(binaryPath: bin)
+        do {
+            _ = try await bridge.runProcess(args: ["--cookies-from-browser", "chrome"], timeout: 1)
+            Issue.record("Expected unavailable media to fail")
+        } catch let error as YTDlpBridge.YTDlpError {
+            #expect(error == .exitCode(1, "Video unavailable"))
+            #expect(!StreamResolutionPolicy.shouldRetry(error))
+        }
+    }
+
     @Test("resolveStreamURL parses first stdout line as URL")
     func resolveStreamURLParsesFirstStdoutLine() async throws {
         let bin = try makeFakeBinary(script: """

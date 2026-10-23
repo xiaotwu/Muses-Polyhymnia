@@ -83,6 +83,22 @@ struct RepairRegressionTests {
         _ = try? await background.value
     }
 
+    @Test("Both extraction pipes drain beyond pipe capacity without starving each other")
+    func concurrentPipeDraining() async throws {
+        let file = try binary("""
+            exec /usr/bin/awk 'BEGIN {
+                for (i = 0; i < 262144; i++) printf "o";
+                for (i = 0; i < 262144; i++) printf "e" > "/dev/stderr";
+            }'
+            """)
+        defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
+        let runner = YTDlpRunner(maxConcurrent: 1)
+        let result = try await runner.run(executablePath: file.path, args: [], timeout: 5)
+        #expect(result.stdout == String(repeating: "o", count: 262144))
+        #expect(result.stderr == String(repeating: "e", count: 262144))
+        #expect(await runner.inFlightCount == 0)
+    }
+
     @Test("Media keys toggle once and ignore release/repeat/volume")
     func mediaKeyEdges() {
         #expect(MediaKeyPolicy.action(data1: (16 << 16) | 0x0a00) == CommandRegistry.togglePlayback)

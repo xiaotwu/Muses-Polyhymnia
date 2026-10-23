@@ -21,6 +21,25 @@ struct AudioQualityInfo: Equatable, Sendable {
     let bitDepth: Int
     let codec: String
     let isLossless: Bool
+    let bitrateKbps: Double?
+    let formatID: String?
+
+    init(sampleRate: Int, bitDepth: Int, codec: String, isLossless: Bool,
+         bitrateKbps: Double? = nil, formatID: String? = nil) {
+        self.sampleRate = sampleRate
+        self.bitDepth = bitDepth
+        self.codec = codec
+        self.isLossless = isLossless
+        self.bitrateKbps = bitrateKbps.flatMap { $0.isFinite && $0 > 0 ? $0 : nil }
+        self.formatID = formatID
+    }
+
+    var bitrateLabel: String? {
+        bitrateKbps.map {
+            $0.formatted(.number.locale(Locale(identifier: "en_US_POSIX"))
+                .precision(.fractionLength(0...1))) + " kbps"
+        }
+    }
 
     /// Preserve integer-Hz precision when presenting kilohertz across surfaces.
     static func sampleRateLabel(_ hertz: Int) -> String {
@@ -64,5 +83,5 @@ enum PlayerError: LocalizedError, Equatable {
 
 /// Availability of the current audio path, independent of saved EQ preferences.
 enum AudioProcessingAvailability: Equatable, Sendable {
-    case unavailable, waitingForDownload, available, streamOnly
+    case unavailable, waitingForDownload, available, eqOnly, streamOnly
 }
