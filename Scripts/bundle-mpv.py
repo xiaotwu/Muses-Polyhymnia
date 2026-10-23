@@ -49,9 +49,8 @@ def audit_library(path, directory):
             raise RuntimeError(f'Unexpected runtime search path in {path.name}: {rpath}')
 
 
-def install(work, app):
-    if (app / 'Contents/_CodeSignature').exists():
-        raise RuntimeError('Refusing to mutate an already signed app bundle')
+def validate_dependency(work):
+    """Validate every prepared input without copying, relocating or executing it."""
     prefix = work / 'prefix/lib'
     manifest = json.loads((work / 'manifest.json').read_text())
     expected_sources = json.loads((REPO / 'Dependencies/mpv/source-lock.json').read_text())
@@ -70,14 +69,6 @@ def install(work, app):
             raise RuntimeError(f'Dependency changed after preparation: {name}')
     if 'libmpv.2.dylib' not in files:
         raise RuntimeError('Missing libmpv.2.dylib')
-    resources = app / 'Contents/Resources'
-    framework = app / 'Contents/Frameworks'
-    if any(p.is_symlink() for p in (app / 'Contents', resources, framework)):
-        raise RuntimeError('Refusing bundle directory symlinks')
-    framework.mkdir(parents=True, exist_ok=True); resources.mkdir(parents=True, exist_ok=True)
-    for name in files:
-        if (framework / name).exists() or (framework / name).is_symlink():
-            raise RuntimeError(f'Refusing to overwrite an existing bundled library: {name}')
     for item in expected_sources:
         source = work / 'corresponding-source' / item['archive']
         if sha256(source) != item['sha256']:
@@ -89,7 +80,24 @@ def install(work, app):
             target = path.resolve()
             if target.parent != prefix.resolve() or target.name not in real:
                 raise RuntimeError(f'Escaping/untracked library symlink: {name}')
-            (framework / name).symlink_to(target.name)
+    return manifest, files, real
+
+
+def install(work, app):
+    if (app / 'Contents/_CodeSignature').exists():
+        raise RuntimeError('Refusing to mutate an already signed app bundle')
+    _, files, real = validate_dependency(work)
+    resources = app / 'Contents/Resources'
+    framework = app / 'Contents/Frameworks'
+    if any(p.is_symlink() for p in (app / 'Contents', resources, framework)):
+        raise RuntimeError('Refusing bundle directory symlinks')
+    framework.mkdir(parents=True, exist_ok=True); resources.mkdir(parents=True, exist_ok=True)
+    for name in files:
+        if (framework / name).exists() or (framework / name).is_symlink():
+            raise RuntimeError(f'Refusing to overwrite an existing bundled library: {name}')
+    for name, path in files.items():
+        if path.is_symlink():
+            (framework / name).symlink_to(path.resolve().name)
         else:
             shutil.copy2(path, framework / name)
     for name in real:
@@ -150,11 +158,18 @@ def sign_or_verify(app, identity):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=['install', 'sign', 'verify'])
-    parser.add_argument('--app', type=Path, required=True)
+    parser.add_argument('action', choices=['check', 'install', 'sign', 'verify'])
+    parser.add_argument('--app', type=Path)
     parser.add_argument('--dependency-dir', type=Path)
     parser.add_argument('--identity')
     args = parser.parse_args()
+    if args.action == 'check':
+        if args.dependency_dir is None:
+            parser.error('check requires --dependency-dir (run prepare-mpv.py first)')
+        validate_dependency(args.dependency_dir.resolve())
+        return
+    if args.app is None:
+        parser.error(args.action + ' requires --app')
     app = args.app.resolve()
     if app.suffix != '.app' or app.is_relative_to(Path('/Applications')):
         parser.error('Use a newly staged .app, never the installed application')
