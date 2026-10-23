@@ -8,10 +8,12 @@ private final class ControlledTypedBridge: YTDlpBridgeProtocol {
     var cancellations = 0
     var context = "public"
     var pending: [Int: CheckedContinuation<ResolvedAudioStream, Error>] = [:]
+    var priorities: [Int: YTDlpQueuedPriority] = [:]
 
     func resolveAudioStream(videoId: String, quality: String, timeout: TimeInterval) async throws -> ResolvedAudioStream {
         calls += 1
         let call = calls
+        priorities[call] = YTDlpRequestPriority.queuedPriority
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { pending[call] = $0 }
         } onCancel: {
@@ -25,6 +27,10 @@ private final class ControlledTypedBridge: YTDlpBridgeProtocol {
         pending.removeValue(forKey: call)?.resume(returning: ResolvedAudioStream(
             url: URL(string: "https://media.example/audio")!, codec: "opus", bitrateKbps: 151, contextID: context))
     }
+    func cancelAll() {
+        let old = pending; pending.removeAll()
+        for continuation in old.values { continuation.resume(throwing: CancellationError()) }
+    }
     func resolveStreamURL(videoId: String, quality: String, timeout: TimeInterval) async throws -> URL {
         Issue.record("Coordinator must dispatch typed protocol requirement")
         throw CancellationError()
@@ -37,6 +43,63 @@ private final class ControlledTypedBridge: YTDlpBridgeProtocol {
 @MainActor
 @Suite("Typed stream lifecycle")
 struct TypedStreamResolutionTests {
+    @Test("A coalesced foreground consumer promotes the same extraction")
+    func foregroundConsumerPromotesSharedRequest() async throws {
+        let bridge = ControlledTypedBridge()
+        let resolver = StreamResolutionCoordinator(bridge: bridge, cache: StreamURLCache())
+        let original = Task { try await resolver.resolveStream(videoID: "video", quality: "bestaudio") }
+        defer { original.cancel(); bridge.cancelAll() }
+        try await waitForPromotion { bridge.calls == 1 }
+        let priority = try #require(bridge.priorities[1])
+        #expect(!priority.isInteractive)
+        let foreground = Task {
+            try await YTDlpRequestPriority.$interactive.withValue(true) {
+                try await resolver.resolveStream(videoID: "video", quality: "bestaudio")
+            }
+        }
+        defer { foreground.cancel() }
+        try await waitForPromotion { priority.isInteractive }
+        #expect(bridge.calls == 1)
+        bridge.complete(1)
+        let first = try await original.value
+        let second = try await foreground.value
+        #expect(first == second)
+    }
+
+    @Test("An obsolete caller handle cannot promote a replacement request", arguments: [false, true])
+    func obsoletePromotionIsRequestScoped(changesContext: Bool) async throws {
+        let bridge = ControlledTypedBridge()
+        let resolver = StreamResolutionCoordinator(bridge: bridge, cache: StreamURLCache(), contextID: { bridge.context })
+        let caller = YTDlpQueuedPriority()
+        let original = Task {
+            try await YTDlpRequestPriority.$queuedPriority.withValue(caller) {
+                try await resolver.resolveStream(videoID: "video", quality: "bestaudio")
+            }
+        }
+        defer { original.cancel(); bridge.cancelAll() }
+        try await waitForPromotion { bridge.calls == 1 }
+        if changesContext { bridge.context = "new-session" }
+        else { resolver.invalidateStream(videoID: "video", quality: "bestaudio") }
+        let replacement = Task { try await resolver.resolveStream(videoID: "video", quality: "bestaudio") }
+        defer { replacement.cancel() }
+        try await waitForPromotion { bridge.calls == 2 }
+        _ = try? await original.value
+        let current = try #require(bridge.priorities[2])
+        caller.promote()
+        #expect(!current.isInteractive)
+        #expect(bridge.calls == 2)
+        bridge.complete(2, context: bridge.context)
+        _ = try await replacement.value
+    }
+
+    private func waitForPromotion(_ predicate: () -> Bool) async throws {
+        let end = ContinuousClock.now.advanced(by: .seconds(2))
+        while !predicate() {
+            guard ContinuousClock.now < end else { throw TypedPromotionTimeout() }
+            try await Task.sleep(for: .milliseconds(1))
+        }
+    }
+
     @Test("One canceled consumer returns before another finishes in each access mode", arguments: ["public-session", "account-session"])
     func sharedCancellation(context: String) async throws {
         let bridge = ControlledTypedBridge()
@@ -108,3 +171,5 @@ struct TypedStreamResolutionTests {
         #expect(bridge.cancellations == 1)
     }
 }
+
+private struct TypedPromotionTimeout: Error {}

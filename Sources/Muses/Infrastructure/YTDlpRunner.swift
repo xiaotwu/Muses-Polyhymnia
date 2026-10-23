@@ -141,8 +141,8 @@ actor YTDlpRunner {
     private var interactiveInFlight = 0
     private struct Waiter {
         let id: UUID
-        let interactive: Bool
-        let continuation: CheckedContinuation<Void, Error>
+        var interactive: Bool
+        let continuation: CheckedContinuation<Bool, Error>
     }
     private var waiters: [Waiter] = []
 
@@ -160,9 +160,12 @@ actor YTDlpRunner {
         guard stdoutLimit >= 0, stderrLimit >= 0 else {
             throw YTDlpBridge.YTDlpError.parseFailed("Invalid subprocess output limit")
         }
-        let interactive = YTDlpRequestPriority.interactive
         let started = Date()
-        do { try await acquire(interactive: interactive, timeout: timeout) }
+        let interactive: Bool
+        do {
+            interactive = try await acquire(interactive: YTDlpRequestPriority.interactive,
+                priority: YTDlpRequestPriority.queuedPriority, timeout: timeout)
+        }
         catch {
             trace.record(error is CancellationError ? .cancelled : .timeout)
             throw error
@@ -178,17 +181,24 @@ actor YTDlpRunner {
 
     var inFlightCount: Int { inFlight + interactiveInFlight }
     var waitingCount: Int { waiters.count }
+    var interactiveWaitingCount: Int { waiters.filter(\.interactive).count }
 
-    private func acquire(interactive: Bool, timeout: TimeInterval) async throws {
+    private func acquire(interactive requestedInteractive: Bool, priority: YTDlpQueuedPriority?,
+                         timeout: TimeInterval) async throws -> Bool {
         try Task.checkCancellation()
+        let interactive = requestedInteractive || priority?.isInteractive == true
         if interactive ? interactiveInFlight < 1 : inFlight < maxConcurrent {
             if interactive { interactiveInFlight += 1 } else { inFlight += 1 }
-            return
+            return interactive
         }
         let id = UUID()
-        try await withTaskCancellationHandler {
+        defer { priority?.stopObserving(id: id) }
+        return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
                 waiters.append(Waiter(id: id, interactive: interactive, continuation: continuation))
+                priority?.observe(id: id) {
+                    Task { await self.promoteWaiter(id) }
+                }
                 Task {
                     try? await Task.sleep(for: .seconds(max(0, timeout)))
                     self.timeoutWaiter(id)
@@ -196,6 +206,17 @@ actor YTDlpRunner {
             }
         } onCancel: {
             Task { await self.cancelWaiter(id) }
+        }
+    }
+
+    private func promoteWaiter(_ id: UUID) {
+        guard let index = waiters.firstIndex(where: { $0.id == id }),
+              !waiters[index].interactive else { return }
+        if interactiveInFlight < 1 {
+            interactiveInFlight += 1
+            waiters.remove(at: index).continuation.resume(returning: true)
+        } else {
+            waiters[index].interactive = true
         }
     }
 
@@ -211,7 +232,7 @@ actor YTDlpRunner {
 
     private func release(interactive: Bool) {
         if let index = waiters.firstIndex(where: { $0.interactive == interactive }) {
-            waiters.remove(at: index).continuation.resume()
+            waiters.remove(at: index).continuation.resume(returning: interactive)
         } else if interactive { interactiveInFlight -= 1 }
         else { inFlight -= 1 }
     }
@@ -364,10 +385,46 @@ actor YTDlpRunner {
     }
 }
 
-/// Task-local intent follows protocol-based engine calls without changing the
-/// playback engine or yt-dlp test doubles' public interfaces.
+/// A request-scoped handle lets foreground ownership promote an existing queued
+/// extraction. It carries no media identity and never restarts an active process.
+final class YTDlpQueuedPriority: @unchecked Sendable {
+    private struct State {
+        var interactive = false
+        var observer: (id: UUID, action: @Sendable () -> Void)?
+    }
+    private let state = OSAllocatedUnfairLock(initialState: State())
+
+    var isInteractive: Bool { state.withLock { $0.interactive } }
+
+    func promote() {
+        let action = state.withLock { state -> (@Sendable () -> Void)? in
+            guard !state.interactive else { return nil }
+            state.interactive = true
+            return state.observer?.action
+        }
+        action?()
+    }
+
+    func observe(id: UUID, action: @escaping @Sendable () -> Void) {
+        let promoted = state.withLock { state in
+            state.observer = (id, action)
+            return state.interactive
+        }
+        if promoted { action() }
+    }
+
+    func stopObserving(id: UUID) {
+        state.withLock { state in
+            if state.observer?.id == id { state.observer = nil }
+        }
+    }
+}
+
+/// Initial intent and the request's promotion handle follow protocol-based
+/// extraction calls. Later foreground owners can promote the original waiter.
 enum YTDlpRequestPriority {
     @TaskLocal static var interactive = false
+    @TaskLocal static var queuedPriority: YTDlpQueuedPriority?
 }
 
 private final class CancellableYTDlpProcess: @unchecked Sendable {
