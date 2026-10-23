@@ -61,6 +61,37 @@ private actor InterruptedCatalogFixture: MusicCatalogProviding {
     }
 }
 
+private actor InterruptedDetailCatalogFixture: MusicCatalogProviding {
+    private(set) var browseCount = 0
+    private(set) var searchCount = 0
+    private var first: CheckedContinuation<MusicCatalogPage, Never>?
+    let failsFirst: Bool
+
+    init(failsFirst: Bool = false) { self.failsFirst = failsFirst }
+
+    func search(_ query: String, kind: MusicCatalogKind?) async throws -> MusicCatalogPage {
+        searchCount += 1
+        return page(query)
+    }
+    func browse(_ id: String) async throws -> MusicCatalogPage {
+        browseCount += 1
+        if browseCount == 1 {
+            if failsFirst { throw MusicCatalogError.unavailable }
+            return await withCheckedContinuation { first = $0 }
+        }
+        return page("resumed")
+    }
+    func releaseFirst() { first?.resume(returning: page("late")); first = nil }
+    func next(_ cursor: MusicCatalogCursor) async throws -> MusicCatalogPage { page("next") }
+    func reset() {}
+    private func page(_ id: String) -> MusicCatalogPage {
+        .init(items: [.init(id: id, kind: .song, title: id, subtitle: "", artwork: nil,
+                           artists: [], releases: [], channels: [])],
+              filters: [], next: nil, fetchedAt: Date(), region: "US",
+              metadata: .init(title: id, subtitle: "Album", artists: []))
+    }
+}
+
 private actor LocaleCatalogFixture: MusicCatalogProviding {
     let scope: LocaleScopedMusicCatalogProvider.Scope
     let session = UUID()
@@ -87,6 +118,85 @@ private actor LocaleCatalogFixture: MusicCatalogProviding {
 
 @Suite("Structured catalog browser state") @MainActor
 struct MusicCatalogBrowserTests {
+    @Test(arguments: [false, true])
+    func reentryResumesInterruptedDetailWithoutReplacingItsIdentity(savedBrowse: Bool) async {
+        let provider = InterruptedDetailCatalogFixture()
+        let browser = MusicCatalogBrowser(provider: provider)
+        let detail = MusicCatalogItem(id: "browse:album", kind: .album, title: "Album",
+            subtitle: "", artwork: nil, artists: [], releases: [], channels: [])
+        if savedBrowse { browser.browse(detail) }
+        else {
+            browser.search("first", kind: .album)
+            await settle(browser)
+            browser.open(detail)
+        }
+        for _ in 0..<500 where await provider.browseCount == 0 { await Task.yield() }
+        browser.cancel()
+        #expect(browser.detail == detail)
+        #expect(browser.items.isEmpty && browser.fetchedAt == nil)
+        #expect(!browser.loading && !browser.failed)
+
+        browser.resumeIfNeeded()
+        await settle(browser)
+        #expect(browser.detail == detail)
+        #expect(browser.items.map(\.id) == ["resumed"])
+        #expect(browser.metadata?.title == "resumed")
+        #expect(browser.canGoBack == !savedBrowse)
+        #expect(browser.kind == (savedBrowse ? nil : .album))
+        #expect(await provider.browseCount == 2)
+        #expect(await provider.searchCount == (savedBrowse ? 0 : 1))
+
+        await provider.releaseFirst()
+        for _ in 0..<20 { await Task.yield() }
+        #expect(browser.detail == detail)
+        #expect(browser.items.map(\.id) == ["resumed"])
+        #expect(browser.metadata?.title == "resumed")
+    }
+
+    @Test func resumingLoadedDetailRetainsRowsMetadataAndCursorWithoutRefetching() async {
+        let provider = CatalogBrowserFixture()
+        let browser = MusicCatalogBrowser(provider: provider)
+        browser.search("first", kind: .album)
+        await settle(browser)
+        let detail = MusicCatalogItem(id: "browse:album", kind: .album, title: "Album",
+            subtitle: "", artwork: nil, artists: [], releases: [], channels: [])
+        browser.open(detail)
+        await settle(browser)
+        let rows = browser.items
+        let cursor = browser.nextCursor
+        let fetchedAt = browser.fetchedAt
+        browser.cancel()
+        browser.resumeIfNeeded()
+        #expect(browser.detail == detail && browser.kind == .album)
+        #expect(browser.items == rows)
+        #expect(browser.metadata?.title == detail.id)
+        #expect(browser.nextCursor?.session == cursor?.session)
+        #expect(browser.nextCursor?.endpoint == cursor?.endpoint)
+        #expect(browser.nextCursor?.token == cursor?.token)
+        #expect(browser.fetchedAt == fetchedAt)
+        #expect(!browser.loading)
+        #expect(await provider.browseCount == 1)
+    }
+
+    @Test func failedInitialDetailRequiresExplicitRetryAfterReentry() async {
+        let provider = InterruptedDetailCatalogFixture(failsFirst: true)
+        let browser = MusicCatalogBrowser(provider: provider)
+        let detail = MusicCatalogItem(id: "browse:album", kind: .album, title: "Album",
+            subtitle: "", artwork: nil, artists: [], releases: [], channels: [])
+        browser.browse(detail)
+        await settle(browser)
+        #expect(browser.failed && browser.items.isEmpty)
+        browser.cancel()
+        browser.resumeIfNeeded()
+        #expect(browser.failed && !browser.loading && browser.detail == detail)
+        #expect(await provider.browseCount == 1)
+        browser.retry()
+        await settle(browser)
+        #expect(!browser.failed && browser.detail == detail)
+        #expect(browser.items.map(\.id) == ["resumed"])
+        #expect(await provider.browseCount == 2)
+    }
+
     @Test func reentryResumesInterruptedInitialRequestAndRejectsLateResult() async {
         let provider = InterruptedCatalogFixture()
         let browser = MusicCatalogBrowser(provider: provider)

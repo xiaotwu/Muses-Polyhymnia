@@ -121,12 +121,12 @@ final class GlobalSearchService {
     }
 
     func retrySearch() {
+        // Cancellation can interrupt an initial catalog detail as well as a
+        // query. Resume that presentation without replacing its destination.
+        if wasCancelled && scope.searchesYouTube { musicCatalog.resumeIfNeeded() }
         if retryingMore { loadMore(); return }
         let text = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
-        // Retrying the supplemental source must not clear a successful catalog.
-        // Cancellation affects both sources, so explicitly restart the catalog then.
-        if wasCancelled && scope.searchesYouTube { musicCatalog.search(text) }
         searchTask?.cancel()
         searchTask = Task { [weak self] in
             guard !Task.isCancelled else { return }
