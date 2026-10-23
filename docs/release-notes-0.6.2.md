@@ -1,6 +1,6 @@
 # Muses 0.6.2 — release candidate notes
 
-**Unpublished candidate plan.** The next integrated candidate is planned as build `20261023.3`. Its final package, signing, notarization and native acceptance checks remain pending. These notes do not announce an available update.
+**Unpublished release candidate.** Integrated build `20261023.3` has completed signed/notarized packaging and bounded public-playback validation. Its remaining acceptance conditions are recorded in the [candidate report](engineering/release-candidate-2026-10-23.md). No update is being published.
 
 ## Included changes
 
