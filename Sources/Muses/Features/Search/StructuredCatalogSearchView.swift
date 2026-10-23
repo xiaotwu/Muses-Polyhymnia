@@ -118,8 +118,12 @@ struct StructuredCatalogSearchView: View {
             Divider().padding(.vertical, 8)
         }
         .task(id: search.query + "|" + search.scope.rawValue + "|" + L10n.languageCode) {
-            guard browser.detail == nil else { return }
-            guard search.scope.searchesYouTube, !search.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+            guard search.scope.searchesYouTube else { return }
+            if browser.detail != nil {
+                browser.resumeIfNeeded()
+                return
+            }
+            guard !search.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
             do { try await Task.sleep(for: .milliseconds(300)) } catch { return }
             guard !Task.isCancelled, !search.wasCancelled, browser.detail == nil else { return }
             browser.searchIfNeeded(search.query)

@@ -59,6 +59,80 @@ struct GlobalSearchStateTests {
         }
     }
 
+    @Test(arguments: [false, true])
+    func cancelledSupplementalRetryPreservesDetailCategoryAndFailedCursor(extending: Bool) async throws {
+        let provider = RetryCatalogPresentationFixture()
+        let browser = MusicCatalogBrowser(provider: provider)
+        var attempts = 0
+        var held: CheckedContinuation<[YTDlpBridge.YTDlpPlaylistEntry], Never>?
+        let heldAttempt = extending ? 2 : 1
+        let service = GlobalSearchService(library: try library(), debounceMs: 60_000,
+            musicCatalog: browser, remoteSearch: { _, limit in
+                attempts += 1
+                let attempt = attempts
+                if attempt == heldAttempt {
+                    return await withCheckedContinuation { held = $0 }
+                }
+                return (0..<limit).map {
+                    .init(id: String(format: "%011d", $0 + attempt * 100), title: "Song")
+                }
+            })
+        defer { service.reset() }
+        service.scope = .youtube
+        service.query = "song"
+        var initialRequest: Task<Void, Never>?
+        if extending {
+            await service.performSearch(query: "song")
+            service.loadMore()
+        } else {
+            initialRequest = Task { await service.performSearch(query: "song") }
+        }
+        for _ in 0..<500 where held == nil { await Task.yield() }
+        let pending = try #require(held)
+        #expect(service.isSearchingYouTube)
+
+        browser.search("song", kind: .album)
+        for _ in 0..<500 where browser.loading { await Task.yield() }
+        let detail = MusicCatalogItem(id: "browse:album", kind: .album, title: "Album",
+            subtitle: "", artwork: nil, artists: [], releases: [], channels: [])
+        browser.open(detail)
+        for _ in 0..<500 where browser.loading { await Task.yield() }
+        browser.more()
+        for _ in 0..<500 where browser.loading { await Task.yield() }
+        let rows = browser.items
+        let cursor = browser.nextCursor
+        let fetchedAt = browser.fetchedAt
+        let metadata = browser.metadata
+        #expect(browser.failed && cursor != nil)
+
+        service.cancelSearch()
+        service.retrySearch()
+        for _ in 0..<500 where attempts <= heldAttempt || service.isSearchingYouTube {
+            await Task.yield()
+        }
+        #expect(attempts == heldAttempt + 1)
+        #expect(!service.wasCancelled && !service.isSearchingYouTube)
+        #expect(browser.detail == detail && browser.kind == .album)
+        #expect(browser.items == rows && browser.metadata == metadata)
+        #expect(browser.fetchedAt == fetchedAt && browser.failed)
+        #expect(browser.nextCursor?.session == cursor?.session)
+        #expect(browser.nextCursor?.endpoint == cursor?.endpoint)
+        #expect(browser.nextCursor?.token == cursor?.token)
+        #expect(await provider.searchCount == 1)
+        #expect(await provider.browseCount == 1)
+
+        pending.resume(returning: [.init(id: "late0000000", title: "Late")])
+        if let initialRequest { await initialRequest.value }
+        for _ in 0..<20 { await Task.yield() }
+        #expect(!service.youtubeResults.contains(where: { $0.id == "late0000000" }))
+        #expect(browser.detail == detail && browser.items == rows)
+        browser.retry()
+        for _ in 0..<500 where browser.loading { await Task.yield() }
+        #expect(!browser.failed && browser.detail == detail && browser.kind == .album)
+        #expect(browser.items.map(\.id) == ["video:abcdefghijk", "video:next0000000"])
+        #expect(browser.metadata == metadata && browser.nextCursor == nil)
+    }
+
     @Test("Changing query immediately removes stale selectable results")
     func queryClearsResults() async throws {
         let service = GlobalSearchService(library: try library(), debounceMs: 60_000,
@@ -267,4 +341,33 @@ private actor SearchStatusCatalogFixture: MusicCatalogProviding {
     func browse(_ id: String) async throws -> MusicCatalogPage { try await search(id, kind: nil) }
     func next(_ cursor: MusicCatalogCursor) async throws -> MusicCatalogPage { throw MusicCatalogError.unavailable }
     func reset() {}
+}
+
+private actor RetryCatalogPresentationFixture: MusicCatalogProviding {
+    private(set) var searchCount = 0
+    private(set) var browseCount = 0
+    private var nextCount = 0
+    private let session = UUID()
+    func search(_ query: String, kind: MusicCatalogKind?) async throws -> MusicCatalogPage {
+        searchCount += 1
+        return page("video:search00000", next: true)
+    }
+    func browse(_ id: String) async throws -> MusicCatalogPage {
+        browseCount += 1
+        var result = page("video:abcdefghijk", next: true)
+        result.metadata = .init(title: id, subtitle: "Album", artists: [])
+        return result
+    }
+    func next(_ cursor: MusicCatalogCursor) async throws -> MusicCatalogPage {
+        nextCount += 1
+        if nextCount == 1 { throw MusicCatalogError.unavailable }
+        return page("video:next0000000", next: false)
+    }
+    func reset() {}
+    private func page(_ id: String, next: Bool) -> MusicCatalogPage {
+        .init(items: [.init(id: id, kind: .song, title: id, subtitle: "", artwork: nil,
+                           artists: [], releases: [], channels: [])],
+              filters: [], next: next ? .init(session: session, endpoint: "browse", token: "fixture") : nil,
+              fetchedAt: Date(), region: "US")
+    }
 }
