@@ -49,9 +49,15 @@ final class MusicCatalogBrowser {
         guard !text.isEmpty else { return }
         if query != text || searchLocale != currentSearchLocale {
             search(text, kind: query == text ? kind : nil)
-        } else if fetchedAt == nil && !loading && !failed {
-            start(extending: false)
-        }
+        } else { resumeIfNeeded() }
+    }
+
+    /// Resumes only an interrupted first page of the current presentation.
+    /// Loaded pages and explicit failures retain their rows, cursor and Retry.
+    func resumeIfNeeded() {
+        guard !query.isEmpty || detail != nil,
+              fetchedAt == nil, !loading, !failed else { return }
+        start(extending: false)
     }
 
     private var currentSearchLocale: String {
