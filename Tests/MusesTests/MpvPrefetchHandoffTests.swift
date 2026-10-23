@@ -46,6 +46,23 @@ struct MpvPrefetchHandoffTests {
         try await waitFor { f.provider.pending.isEmpty && f.provider.cancelledSecond == 1 }
     }
 
+    @Test("Settled focus warmup cannot replace an unfinished prepared next resolution")
+    func pendingPreparationOutranksFocusWarmup() async throws {
+        let f = try HandoffFixture()
+        defer { f.close() }
+        try await start(f)
+        // B is still held by the provider when browsing settles its focus on C.
+        await f.engine.prewarmSelections([f.third])
+        #expect(!f.provider.requests.contains { $0.video == "third" })
+        f.playback.next()
+        try await waitFor { f.engine.state.track?.id == f.second.id && !f.provider.pending.isEmpty }
+        f.provider.finishPending()
+        try await waitFor { f.engine.state.isPlaying && f.engine.state.track?.id == f.second.id }
+        #expect(f.provider.secondRequests.count == 1)
+        #expect(f.provider.cancelledSecond == 0)
+        #expect(f.client.loadedVideos == ["first", "second"])
+    }
+
     @Test("Replacing a scheduled handoff before its load runs releases the unconsumed task")
     func abandonedScheduledHandoff() async throws {
         let f = try HandoffFixture()

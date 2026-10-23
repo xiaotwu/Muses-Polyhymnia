@@ -12,7 +12,7 @@
 #   --bundle-id <com.muses.acceptance.*>  Isolated application without updates or account authority
 #   --output <path.app>  Refuse replacement while this exact bundle is running
 #   MUSES_VERSION     Override CFBundleShortVersionString (default 0.6.2)
-#   MUSES_BUILD       Override CFBundleVersion (default 20261021.2)
+#   MUSES_BUILD       Override CFBundleVersion (default 20261023.3)
 #   MUSES_GOOGLE_OAUTH_CLIENT_ID       Muses 项目持有的 Desktop OAuth client ID
 #   MUSES_GOOGLE_OAUTH_CLIENT_SECRET   Matching Desktop OAuth field when required by the issuer
 #   MUSES_GOOGLE_OAUTH_REDIRECT_URI    可选；默认 http://127.0.0.1:0/（Desktop loopback 随机端口）
@@ -78,7 +78,7 @@ if app.suffix != '.app' or app.is_relative_to(Path('/Applications').resolve()):
 PY
 
 VERSION="${MUSES_VERSION:-0.6.2}"
-BUILD="${MUSES_BUILD:-20261021.2}"
+BUILD="${MUSES_BUILD:-20261023.3}"
 
 CONTENTS="$APP/Contents"
 

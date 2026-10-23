@@ -1,5 +1,7 @@
 # 当前修复与验收状态
 
+2026-10-23，整合复审单列 XW-120：焦点预热误取消尚在解析的 Next 准备。旧实现的 held B→warm C→Next B 回归失败三项：错误预热 C、B 两次请求及一次取消；增加 pending prepared guard 后 22 项／2 套件通过。仅修正预热所有权，截止时间／重试／账号策略保持。新 RC 固定 build `20261023.3`，新最终成品及精确整合 CI 继续验证，暂不发布。
+
 2026-10-23，用户授权先审阅合并 PR #18，再整合 PR #17 并验证发行候选，**暂不发布**。PR #18 已经独立复审、精确 head CI 40014778884 全通过，以 `c8c7863` 合入 main；merge tree 与 `82eaade` 相同。XW-119 窄修复 Done，XW-73 的真实首次请求中断格仍开放。PR #17 正保留历史地整合该 main；下述旧失败与验证边界继续保留，新的完整 Release／Developer ID／公证／原生结果另行记录。
 
 2026-10-23，[XW-118 开发入口修复](development-bundle-repair.md)统一完整 Debug 装配、独立 helper 签名、acceptance namespace、精确运行路径保护和无 GUI 的验证入口。实际 Deno 深度重签故障已红复现，新完整包的 Deno／双解析器／libmpv 及签名校验通过；50 项打包检查与包含独立 XW-119 搜索补丁的私有整合树 1,081 项回归通过。精确 PR-head CI 单独跟踪。正式应用／资料偏好及旧证据等七根保留；一条误落 canonical cwd 的命令改写了共享编译缓存，差异已归档，未声称原字节恢复。PR #17 仍 Draft，0.6.2 hold、Premium deferred、XW-74 暂停保持。

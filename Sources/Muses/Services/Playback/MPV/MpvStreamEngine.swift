@@ -408,7 +408,7 @@ final class MpvStreamEngine: PlayerEngine {
 
     /// Only one speculative resolution is owned by this engine. Focus warmup never replaces a prepared next slot.
     func prewarmSelection(_ track: TrackSnapshot) async {
-        guard prefetched?.prepared != true else { return }
+        guard prefetched?.prepared != true, pendingPrefetch?.prepared != true else { return }
         await prefetch(track, prepared: false)
     }
     func prewarmSelections(_ tracks: [TrackSnapshot]) async {
