@@ -2,7 +2,7 @@
 
 October 23, 2026 · [XW-121](https://linear.app/xiaotwu/issue/XW-121)
 
-PR #19 was independently re-reviewed and merged as `34fa44c`. Exact-head CI 40039614760, merge CI 40041957655 and frozen release-source `73f1dbe` CI 40042082311 all passed. The new [0.6.2 / 20261023.4 candidate](release-candidate-pr19-2026-10-23.md) includes this repair and has new package, numeric native and data-preservation evidence; its human listening answer is still pending. This does not transfer old candidate acceptance or claim saturated background slots were observed natively. The following investigation and submission sections retain their original evidence scope.
+PR #19 was independently re-reviewed and merged as `34fa44c`. Exact-head CI 40039614760, merge CI 40041957655 and frozen release-source `73f1dbe` CI 40042082311 all passed. The new [0.6.2 / 20261023.4 candidate](release-candidate-pr19-2026-10-23.md) includes this repair and has new package, numeric native and data-preservation evidence; the user confirmed continuous normal music for this exact build and it is now published as stable [v0.6.2](https://github.com/xiaotwu/Muses-Polyhymnia/releases/tag/v0.6.2). This does not transfer old candidate acceptance or claim saturated background slots were observed natively. The following investigation and submission sections retain their original evidence scope.
 
 This follow-up is separate from the completed [0.6.2 / 20261023.3 candidate](release-candidate-2026-10-23.md). Its source finding does not establish the cause of historical native cold-resolution timeouts, and its changes are not present in that frozen candidate.
 
