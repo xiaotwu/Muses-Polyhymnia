@@ -10,7 +10,9 @@ struct PlaylistMembershipUXTests {
     func unionIncludesLazyItems() throws {
         let container = try makeModelContainer(inMemory: true)
         let context = ModelContext(container)
-        let track = Track(title: "Alpha", artist: "Artist", youTubeId: "shared")
+        let trackAddedAt = Date(timeIntervalSince1970: 1_600_000_000)
+        let track = Track(title: "Alpha", artist: "Artist", year: 2020, genre: "Jazz",
+                          youTubeId: "shared", addedAt: trackAddedAt, playCount: 5)
         let orphan = Track(title: "Orphan", artist: "Artist", youTubeId: "orphan")
         let local = Playlist(name: "Local")
         context.insert(track)
@@ -30,6 +32,10 @@ struct PlaylistMembershipUXTests {
         let union = CollectionTrackRow.playlistUnion(playlists: [local], imports: [imported])
         #expect(union.map(\.snapshot.youTubeId) == ["shared", "lazy"])
         #expect(union.map(\.canonicalIndex) == [0, 1])
+        #expect(union.first?.year == 2020)
+        #expect(union.first?.genre == "Jazz")
+        #expect(union.first?.playCount == 5)
+        #expect(union.first?.addedAt == trackAddedAt)
         imported.deletedAt = .now
         #expect(CollectionTrackRow.playlistUnion(playlists: [local], imports: [imported])
             .map(\.snapshot.youTubeId) == ["shared"])
@@ -46,6 +52,73 @@ struct PlaylistMembershipUXTests {
         library.toggleLike(snapshot: lazySnapshot)
         #expect(library.likedSnapshotIDs(for: [lazySnapshot]).isEmpty)
         #expect(try ModelContext(container).fetchCount(FetchDescriptor<Track>()) == 3)
+    }
+
+    @Test("Materialized import metadata survives Songs projection and visual sorting")
+    func materializedImportMetadataSurvivesProjectionAndSorting() throws {
+        let container = try makeModelContainer(inMemory: true)
+        let context = ModelContext(container)
+        let trackAddedAt = Date(timeIntervalSince1970: 1_600_000_000)
+        let importedAt = Date(timeIntervalSince1970: 1_700_000_000)
+        let alpha = Track(title: "Alpha", artist: "Artist", year: 2020, genre: "Jazz",
+                          youTubeId: "alpha", addedAt: trackAddedAt, playCount: 4)
+        let zulu = Track(title: "Zulu", artist: "Artist", year: 2024, genre: "Rock",
+                         youTubeId: "zulu", addedAt: trackAddedAt, playCount: 11)
+        let imported = YouTubeImport(playlistId: "PL-materialized",
+            url: "https://youtube.com/playlist?list=PL-materialized",
+            title: "Imported", channel: "Importer", importedAt: importedAt)
+        context.insert(alpha)
+        context.insert(zulu)
+        context.insert(imported)
+        let zuluItem = YouTubeImportItem(youTubeId: "zulu", title: "Import Zulu",
+                                         artist: "Uploader", order: 0)
+        let lazyItem = YouTubeImportItem(youTubeId: "bravo", title: "Bravo",
+                                         artist: "Artist", durationMs: 180_000, order: 1)
+        let alphaItem = YouTubeImportItem(youTubeId: "alpha", title: "Import Alpha",
+                                          artist: "Uploader", order: 2)
+        for item in [zuluItem, lazyItem, alphaItem] {
+            context.insert(item)
+            item.import_ = imported
+        }
+        zuluItem.track = zulu
+        alphaItem.track = alpha
+        imported.items = [zuluItem, lazyItem, alphaItem]
+        try context.save()
+
+        let projectionContext = ModelContext(container)
+        let savedImport = try #require(try projectionContext.fetch(FetchDescriptor<YouTubeImport>()).first)
+        let rows = CollectionTrackRow.playlistUnion(playlists: [], imports: [savedImport])
+        #expect(rows.map(\.title) == ["Alpha", "Bravo", "Zulu"])
+        #expect(rows.map(\.canonicalIndex) == [0, 1, 2])
+        #expect(rows.map(\.snapshot.id) == [alpha.id, lazyItem.id, zulu.id])
+        #expect(rows.map(\.snapshot.youTubeId) == ["alpha", "bravo", "zulu"])
+        #expect(rows.map(\.year) == [2020, nil, 2024])
+        #expect(rows.map(\.genre) == ["Jazz", nil, "Rock"])
+        #expect(rows.map(\.playCount) == [4, 0, 11])
+        #expect(rows.allSatisfy {
+            $0.addedAt == importedAt && $0.collectionOwner == "Importer"
+                && $0.collectionTitle == "Imported" && $0.collectionItemID == nil
+        })
+        let lazyRow = try #require(rows.first(where: { $0.snapshot.youTubeId == "bravo" }))
+        #expect(lazyRow.snapshot.durationSeconds == 180)
+
+        let sorted = CollectionTrackSort.rows(rows, using: [
+            KeyPathComparator(\CollectionTrackRow.playCount, order: .reverse)
+        ])
+        #expect(sorted.map(\.title) == ["Zulu", "Alpha", "Bravo"])
+        #expect(sorted.map(\.canonicalIndex) == [2, 0, 1])
+        #expect(rows.map(\.title) == ["Alpha", "Bravo", "Zulu"])
+        #expect(!projectionContext.hasChanges)
+
+        let verify = ModelContext(container)
+        let savedTracks = try verify.fetch(FetchDescriptor<Track>())
+        #expect(savedTracks.count == 2)
+        #expect(Dictionary(uniqueKeysWithValues: savedTracks.map { ($0.id, $0.playCount) })
+            == [alpha.id: 4, zulu.id: 11])
+        let savedItems = try verify.fetch(FetchDescriptor<YouTubeImportItem>(sortBy: [SortDescriptor(\.order)]))
+        #expect(savedItems.map(\.id) == [zuluItem.id, lazyItem.id, alphaItem.id])
+        #expect(savedItems.map(\.order) == [0, 1, 2])
+        #expect(savedItems.map { $0.track?.id } == [zulu.id, nil, alpha.id])
     }
 
     @Test("Clearing deleted playlists removes recovery records while retaining tracks")
