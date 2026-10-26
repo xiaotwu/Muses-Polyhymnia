@@ -322,10 +322,7 @@ struct RootView: View {
         navigationWired
             .onReceive(NotificationCenter.default.publisher(for: .musesOpenSettings)) { note in
                 guard acceptsBrowseCommands else { return }
-                openIntegratedSettings()
-                if let category = note.object as? SettingsCategory {
-                    settingsPane = category.destination.rawValue
-                }
+                openIntegratedSettings(note.object as? SettingsCategory ?? .general)
             }
             .dropDestination(for: URL.self, action: handleDroppedURLs)
             .onAppear(perform: handleAppear)
@@ -506,11 +503,10 @@ struct RootView: View {
         }
     }
 
-    private func openIntegratedSettings() {
-        settingsPane = SettingsCategory.general.rawValue
+    private func openIntegratedSettings(_ category: SettingsCategory = .general) {
+        settingsPane = category.destination.rawValue
         settingsPath = []
-        MusesSingleInstance.pendingSettings = false
-        settingsPath = []
+        MusesSingleInstance.pendingSettings = nil
         showNowPlaying = false
         showYouTubeVideo = false
         showQueue = false
@@ -528,7 +524,7 @@ struct RootView: View {
             applyBrowseRoute(.section(.home))
             navigationHistory = BrowseNavigationHistory(initial: .section(.home))
         }
-        if MusesSingleInstance.pendingSettings { openIntegratedSettings() }
+        if let category = MusesSingleInstance.pendingSettings { openIntegratedSettings(category) }
         if let route = MusesSingleInstance.pendingSearchRoute { applySearchRoute(route) }
         if libraryStoreFallback { showStoreFallbackAlert = true }
         DispatchQueue.main.async {
