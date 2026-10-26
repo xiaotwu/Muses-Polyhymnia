@@ -92,7 +92,10 @@ extension HomeView {
         } else if discovery.isRefreshing || visibleDiscoverySections.contains(where: isLoading) {
             portraitSkeletons
         } else {
-            HomeDiscoveryEmptyState(onSearch: {
+            HomeDiscoveryEmptyState(presentation: .init(
+                source: homeSourceSelection,
+                lastRefreshError: discovery.lastRefreshError,
+                sections: visibleDiscoverySections), onSearch: {
                 NotificationCenter.default.post(name: .musesFocusSearch, object: nil)
             }, onRetry: discovery.reload)
             .padding(.horizontal, AppleMusicTokens.contentPaddingX)

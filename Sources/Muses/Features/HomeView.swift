@@ -185,7 +185,42 @@ struct YouTubeHomeMood: Identifiable {
     ]
 }
 
+enum HomeDiscoveryEmptyPresentation: Equatable {
+    case library, account, failure
+
+    init(source: HomeSourceSelection, lastRefreshError: String?, sections: [HomeSection]) {
+        if lastRefreshError != nil || sections.contains(where: {
+            if case .failed = $0.status { return true }
+            return false
+        }) {
+            self = .failure
+        } else {
+            self = source == .recommended ? .library : .account
+        }
+    }
+
+    var showsRetry: Bool { self != .library }
+
+    var message: String {
+        switch self {
+        case .library:
+            tr("Search for music to play. Muses recommends from your library and listening history.",
+               "搜索并聆听音乐。Muses 会根据你的资料库和聆听记录提供推荐。",
+               zhHant: "搜尋並聆聽音樂。Muses 會根據你的資料庫與聆聽記錄提供推薦。")
+        case .account:
+            tr("Search for music or try your account recommendations again.",
+               "搜索音乐，或重新加载来自你账号的推荐。",
+               zhHant: "搜尋音樂，或重新載入來自你帳號的推薦。")
+        case .failure:
+            tr("Recommendations could not be loaded. Please try again.",
+               "暂时无法加载推荐内容，请重试。",
+               zhHant: "暫時無法載入推薦內容，請再試一次。")
+        }
+    }
+}
+
 struct HomeDiscoveryEmptyState: View {
+    let presentation: HomeDiscoveryEmptyPresentation
     let onSearch: () -> Void
     let onRetry: () -> Void
 
@@ -194,17 +229,18 @@ struct HomeDiscoveryEmptyState: View {
             Text(tr("Start your next listen", "开始下一次聆听"))
                 .font(MusesTypography.headline)
                 .foregroundStyle(BrandColors.textPrimary)
-            Text(tr("Search YouTube Music or retry discovery to fill this page.",
-                    "搜索 YouTube Music，或重试发现内容来丰富此页面。"))
+            Text(presentation.message)
                 .font(MusesTypography.subheadline)
                 .foregroundStyle(BrandColors.textSecondary)
             HStack(spacing: 10) {
                 Button(tr("Search", "搜索"), systemImage: "magnifyingglass", action: onSearch)
                 .labelStyle(ActionIconLabelStyle())
                 .help(tr("Search", "搜索"))
-                Button(tr("Retry", "重试"), systemImage: "arrow.clockwise", action: onRetry)
-                .labelStyle(ActionIconLabelStyle())
-                .help(tr("Retry", "重试"))
+                if presentation.showsRetry {
+                    Button(tr("Retry", "重试", zhHant: "重試"), systemImage: "arrow.clockwise", action: onRetry)
+                        .labelStyle(ActionIconLabelStyle())
+                        .help(tr("Retry", "重试", zhHant: "重試"))
+                }
             }
             .musesAction()
             .tint(BrandColors.accent)

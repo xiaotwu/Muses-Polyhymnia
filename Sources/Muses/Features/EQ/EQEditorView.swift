@@ -217,6 +217,7 @@ struct EQEditorView: View {
                 Text(tr("Presets", "预设")).font(MusesTypography.headline).foregroundStyle(BrandColors.textPrimary)
                 Spacer()
                 Button {
+                    presetError = nil
                     showSaveDialog = true
                 } label: { Label(tr("Save As", "另存为"), systemImage: "plus") }
                     .labelStyle(.iconOnly)
@@ -260,12 +261,37 @@ struct EQEditorView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .alert(tr("Save Preset", "保存预设"), isPresented: $showSaveDialog) {
-            TextField(tr("Name", "名称"), text: $newPresetName)
-            Button(tr("Save", "保存")) { savePreset() }
-                .disabled(newPresetName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            Button(tr("Cancel", "取消"), role: .cancel) {}
+        .sheet(isPresented: $showSaveDialog) {
+            savePresetForm
         }
+    }
+
+    private var savePresetForm: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text(tr("Save Preset", "保存预设"))
+                .font(MusesTypography.headline)
+                .foregroundStyle(BrandColors.textPrimary)
+            TextField(tr("Name", "名称"), text: $newPresetName)
+                .textFieldStyle(.roundedBorder)
+            if let presetError {
+                Text(presetError)
+                    .font(MusesTypography.callout)
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            HStack {
+                Spacer()
+                Button(tr("Cancel", "取消"), role: .cancel) { showSaveDialog = false }
+                    .keyboardShortcut(.cancelAction)
+                Button(tr("Save", "保存")) { savePreset() }
+                    .musesAction(prominent: true)
+                    .tint(BrandColors.accent)
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(newPresetName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        .padding(24)
+        .frame(width: 400)
     }
 
     private func presetChip(name: String, isActive: Bool, action: @escaping () -> Void) -> some View {
@@ -295,10 +321,11 @@ struct EQEditorView: View {
             activePresetIdRaw = id.uuidString
             newPresetName = ""
             presetError = nil
+            showSaveDialog = false
         } catch {
-            presetError = tr("The preset could not be saved. Your name and equalizer settings are unchanged. Try Save As again.",
-                             "无法保存预设，名称和均衡器设置已保留。请再次尝试另存为。",
-                             zhHant: "無法儲存預設，名稱和均衡器設定已保留。請再次嘗試另存為。")
+            presetError = tr("The preset could not be saved. Your name and equalizer settings are unchanged. Try again.",
+                             "无法保存预设，名称和均衡器设置已保留。请重试。",
+                             zhHant: "無法儲存預設，名稱和均衡器設定已保留。請重試。")
         }
     }
 
