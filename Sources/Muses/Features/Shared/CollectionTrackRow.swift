@@ -128,14 +128,16 @@ struct CollectionTrackRow: Identifiable, Equatable, Sendable {
             for item in (imported.items ?? []).sorted(by: { $0.order < $1.order }) {
                 SongCreditCache.shared.recordOwner(imported.channel, videoID: item.youTubeId)
                 guard !item.youTubeId.isEmpty, unique[item.youTubeId] == nil else { continue }
-                let snapshot = item.track.map { TrackSnapshot(from: $0) } ?? TrackSnapshot(
+                let track = item.track
+                let snapshot = track.map { TrackSnapshot(from: $0) } ?? TrackSnapshot(
                     id: item.id, title: item.title, artist: item.artist,
                     albumTitle: nil, durationSeconds: Double(item.durationMs) / 1000,
                     youTubeId: item.youTubeId,
                     artworkUrl: YouTubeThumbnail.urlString(videoId: item.youTubeId),
                     sampleRate: nil, bitDepth: nil, codec: nil, isLossless: false)
                 unique[item.youTubeId] = CollectionTrackRow(snapshot: snapshot,
-                    canonicalIndex: 0, addedAt: imported.importedAt,
+                    canonicalIndex: 0, year: track?.year, genre: track?.genre,
+                    addedAt: imported.importedAt, playCount: track?.playCount ?? 0,
                     collectionOwner: imported.channel,
                     collectionTitle: YouTubePlaylistID.isMusicAlbum(imported.playlistId) ? nil : imported.title)
             }
