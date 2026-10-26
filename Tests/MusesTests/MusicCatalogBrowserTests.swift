@@ -116,8 +116,163 @@ private actor LocaleCatalogFixture: MusicCatalogProviding {
     }
 }
 
+private actor CatalogLocaleTransitionFixture: MusicCatalogProviding {
+    let locale: CatalogLocaleBox
+    let session = UUID()
+    private(set) var browseLanguages: [String] = []
+    private(set) var nextLanguages: [String] = []
+    private var shouldFailBrowse = false
+    private var shouldHoldBrowse = false
+    private var held: (LocaleScopedMusicCatalogProvider.Scope,
+                       CheckedContinuation<MusicCatalogPage, Never>)?
+    var hasHeldBrowse: Bool { held != nil }
+
+    init(locale: CatalogLocaleBox) { self.locale = locale }
+    func failNextBrowse() { shouldFailBrowse = true }
+    func holdNextBrowse() { shouldHoldBrowse = true }
+    func releaseHeldBrowse() {
+        guard let (scope, continuation) = held else { return }
+        held = nil
+        continuation.resume(returning: page(scope: scope))
+    }
+    func search(_ query: String, kind: MusicCatalogKind?) async throws -> MusicCatalogPage {
+        page(scope: locale.get())
+    }
+    func browse(_ id: String) async throws -> MusicCatalogPage {
+        let scope = locale.get()
+        browseLanguages.append(scope.language)
+        if shouldFailBrowse {
+            shouldFailBrowse = false
+            throw MusicCatalogError.unavailable
+        }
+        if shouldHoldBrowse {
+            shouldHoldBrowse = false
+            return await withCheckedContinuation { held = (scope, $0) }
+        }
+        return page(scope: scope)
+    }
+    func next(_ cursor: MusicCatalogCursor) async throws -> MusicCatalogPage {
+        nextLanguages.append(cursor.language)
+        let scope = locale.get()
+        guard cursor.region == scope.region, cursor.language == scope.language else {
+            throw MusicCatalogError.expiredCursor
+        }
+        return page(scope: scope, next: false)
+    }
+    func reset() {}
+    private func page(scope: LocaleScopedMusicCatalogProvider.Scope,
+                      next: Bool = true) -> MusicCatalogPage {
+        .init(items: [.init(id: next ? "video:first000001" : "video:second00001",
+                           kind: .song, title: scope.language, subtitle: "", artwork: nil,
+                           artists: [], releases: [], channels: [])],
+              filters: [], next: next ? .init(session: session, endpoint: "browse", token: "fixture",
+                                              region: scope.region, language: scope.language) : nil,
+              fetchedAt: Date(), region: scope.region, language: scope.language,
+              metadata: .init(title: scope.language, subtitle: "Album", artists: []))
+    }
+}
+
 @Suite("Structured catalog browser state") @MainActor
 struct MusicCatalogBrowserTests {
+    @Test(arguments: ["resume", "more", "retry"])
+    func localeChangeReloadsSameDetailAndReplacesItsCursor(entryPoint: String) async {
+        let locale = CatalogLocaleBox(.init(region: "US", language: "en"))
+        let provider = CatalogLocaleTransitionFixture(locale: locale)
+        let browser = MusicCatalogBrowser(provider: provider, localeKeyProvider: {
+            let scope = locale.get()
+            return scope.region + "|" + scope.language
+        })
+        let detail = MusicCatalogItem(id: "browse:album", kind: .album, title: "Album",
+            subtitle: "", artwork: nil, artists: [], releases: [], channels: [])
+        browser.search("album", kind: .album)
+        await settle(browser)
+        browser.open(detail)
+        await settle(browser)
+        #expect(browser.nextCursor?.language == "en")
+
+        locale.set(.init(region: "TW", language: "zh-Hant"))
+        switch entryPoint {
+        case "more": browser.more()
+        case "retry": browser.retry()
+        default: browser.resumeIfNeeded()
+        }
+        #expect(browser.detail == detail && browser.kind == .album && browser.canGoBack)
+        #expect(browser.items.isEmpty && browser.nextCursor == nil && browser.loading)
+        await settle(browser)
+        #expect(browser.items.map(\.title) == ["zh-Hant"])
+        #expect(browser.metadata?.title == "zh-Hant")
+        #expect(browser.region == "TW" && browser.language == "zh-Hant")
+        #expect(browser.nextCursor?.region == "TW" && browser.nextCursor?.language == "zh-Hant")
+        #expect(await provider.browseLanguages == ["en", "zh-Hant"])
+        #expect(await provider.nextLanguages.isEmpty)
+
+        browser.cancel()
+        browser.resumeIfNeeded()
+        #expect(!browser.loading)
+        #expect(await provider.browseLanguages == ["en", "zh-Hant"])
+        browser.more()
+        await settle(browser)
+        #expect(!browser.failed && browser.items.count == 2 && browser.nextCursor == nil)
+        #expect(await provider.nextLanguages == ["zh-Hant"])
+        #expect(browser.detail == detail && browser.canGoBack)
+    }
+
+    @Test func changedLocaleFailureRequiresExplicitRetryAndKeepsDetailHistory() async {
+        let locale = CatalogLocaleBox(.init(region: "US", language: "en"))
+        let provider = CatalogLocaleTransitionFixture(locale: locale)
+        let browser = MusicCatalogBrowser(provider: provider, localeKeyProvider: { locale.get().language })
+        let detail = MusicCatalogItem(id: "browse:album", kind: .album, title: "Album",
+            subtitle: "", artwork: nil, artists: [], releases: [], channels: [])
+        browser.search("album", kind: .album)
+        await settle(browser)
+        browser.open(detail)
+        await settle(browser)
+        locale.set(.init(region: "TW", language: "zh-Hant"))
+        await provider.failNextBrowse()
+        browser.resumeIfNeeded()
+        await settle(browser)
+        #expect(browser.failed && browser.items.isEmpty && browser.nextCursor == nil)
+        #expect(browser.detail == detail && browser.kind == .album && browser.canGoBack)
+
+        browser.cancel()
+        browser.resumeIfNeeded()
+        #expect(browser.failed && !browser.loading)
+        #expect(await provider.browseLanguages == ["en", "zh-Hant"])
+        browser.retry()
+        await settle(browser)
+        #expect(!browser.failed && browser.items.map(\.title) == ["zh-Hant"])
+        #expect(browser.nextCursor?.language == "zh-Hant")
+        #expect(await provider.browseLanguages == ["en", "zh-Hant", "zh-Hant"])
+        browser.back()
+        await settle(browser)
+        #expect(browser.detail == nil && browser.kind == .album && browser.canGoForward)
+        #expect(browser.items.map(\.title) == ["zh-Hant"])
+    }
+
+    @Test func oldLocaleDetailResponseCannotReplaceReloadedDestination() async {
+        let locale = CatalogLocaleBox(.init(region: "US", language: "en"))
+        let provider = CatalogLocaleTransitionFixture(locale: locale)
+        let browser = MusicCatalogBrowser(provider: provider, localeKeyProvider: { locale.get().language })
+        let detail = MusicCatalogItem(id: "browse:album", kind: .album, title: "Album",
+            subtitle: "", artwork: nil, artists: [], releases: [], channels: [])
+        await provider.holdNextBrowse()
+        browser.browse(detail)
+        for _ in 0..<500 where !(await provider.hasHeldBrowse) { await Task.yield() }
+        #expect(await provider.hasHeldBrowse)
+        locale.set(.init(region: "TW", language: "zh-Hant"))
+        browser.resumeIfNeeded()
+        await settle(browser)
+        #expect(browser.items.map(\.title) == ["zh-Hant"])
+        await provider.releaseHeldBrowse()
+        for _ in 0..<20 { await Task.yield() }
+        #expect(!browser.loading && !browser.failed && browser.detail == detail)
+        #expect(browser.items.map(\.title) == ["zh-Hant"])
+        #expect(browser.metadata?.title == "zh-Hant")
+        #expect(browser.nextCursor?.language == "zh-Hant")
+        #expect(!browser.canGoBack && !browser.canGoForward)
+        #expect(await provider.browseLanguages == ["en", "zh-Hant"])
+    }
+
     @Test(arguments: [false, true])
     func reentryResumesInterruptedDetailWithoutReplacingItsIdentity(savedBrowse: Bool) async {
         let provider = InterruptedDetailCatalogFixture()

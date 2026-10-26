@@ -22,19 +22,23 @@ final class MusicCatalogBrowser {
     var canGoBack: Bool { historyIndex > 0 }
     var canGoForward: Bool { historyIndex + 1 < detailHistory.count }
     private var query = ""
-    private var searchLocale = ""
+    private var presentationLocale = ""
     private var task: Task<Void, Never>?
     private var requestID = UUID()
     private var retryingMore = false
     private let provider: any MusicCatalogProviding
+    private let localeKeyProvider: () -> String
 
-    init(provider: any MusicCatalogProviding = LocaleScopedMusicCatalogProvider()) {
+    init(provider: any MusicCatalogProviding = LocaleScopedMusicCatalogProvider(),
+         localeKeyProvider: @escaping () -> String = {
+             (Locale.current.region?.identifier ?? "US") + "|" + L10n.languageCode
+         }) {
         self.provider = provider
+        self.localeKeyProvider = localeKeyProvider
     }
 
     func search(_ value: String, kind: MusicCatalogKind? = nil) {
         query = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        searchLocale = currentSearchLocale
         self.kind = kind
         detail = nil
         detailHistory = [nil]; historyIndex = 0
@@ -47,22 +51,24 @@ final class MusicCatalogBrowser {
         guard detail == nil else { return }
         let text = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
-        if query != text || searchLocale != currentSearchLocale {
+        if query != text || presentationLocale != currentSearchLocale {
             search(text, kind: query == text ? kind : nil)
         } else { resumeIfNeeded() }
     }
 
-    /// Resumes only an interrupted first page of the current presentation.
-    /// Loaded pages and explicit failures retain their rows, cursor and Retry.
+    /// Resumes an interrupted first page or reloads the same destination after
+    /// a locale change. Same-locale pages and failures retain their Retry state.
     func resumeIfNeeded() {
-        guard !query.isEmpty || detail != nil,
-              fetchedAt == nil, !loading, !failed else { return }
+        guard !query.isEmpty || detail != nil else { return }
+        if presentationLocale != currentSearchLocale {
+            start(extending: false)
+            return
+        }
+        guard fetchedAt == nil, !loading, !failed else { return }
         start(extending: false)
     }
 
-    private var currentSearchLocale: String {
-        (Locale.current.region?.identifier ?? "US") + "|" + L10n.languageCode
-    }
+    private var currentSearchLocale: String { localeKeyProvider() }
 
     func open(_ item: MusicCatalogItem) {
         guard item.id.hasPrefix("browse:") else { return }
@@ -107,11 +113,18 @@ final class MusicCatalogBrowser {
         detailHistory = [nil]; historyIndex = 0
         items = []; relatedItems = []; nextCursor = nil; detail = nil; kind = nil
         metadata = nil
-        fetchedAt = nil; query = ""; searchLocale = ""; failed = false; isStale = false
+        fetchedAt = nil; query = ""; presentationLocale = ""; failed = false; isStale = false
     }
 
     private func start(extending: Bool, preserving: Bool = false) {
         cancel()
+        let locale = currentSearchLocale
+        let localeChanged = presentationLocale != locale
+        // Neither Retry nor Load more can reuse a previous locale's cursor.
+        // Reload the current detail without resetting its navigation history.
+        let extending = extending && !localeChanged
+        let preserving = preserving && !localeChanged
+        presentationLocale = locale
         if !extending && !preserving {
             items = []; relatedItems = []; metadata = nil; nextCursor = nil
             fetchedAt = nil; isStale = false
