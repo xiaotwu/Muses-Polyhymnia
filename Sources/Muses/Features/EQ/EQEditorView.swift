@@ -2,8 +2,8 @@ import SwiftUI
 import SwiftData
 
 /// 10-band graphic EQ editor: vertical slider bars + a smooth curve + preset management (built-in + custom).
-/// Changes are pushed to PlaybackService.setEQ in real time. During AVPlayer streaming
-/// the engine treats setEQ as a no-op until playback switches to the local file.
+/// Changes are pushed to PlaybackService.setEQ in real time; the active backend
+/// reports whether processing is available for the current stream.
 struct EQEditorView: View {
     @Binding var lyricsSearchRequest: LyricsSearchRequest?
     let lyricsSearchHost: @MainActor () -> LyricsSearchHost
@@ -16,6 +16,7 @@ struct EQEditorView: View {
     @State private var bands: [EQBand] = EQPresets.flat
     @State private var showSaveDialog = false
     @State private var newPresetName = ""
+    @State private var presetError: String?
     @State private var pendingRemoval: ActionConfirmation?
     @State private var selectedFrequency: Double = 1000
 
@@ -252,6 +253,12 @@ struct EQEditorView: View {
                     }
                 }
             }
+            if let presetError {
+                Text(presetError)
+                    .font(MusesTypography.callout)
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .alert(tr("Save Preset", "保存预设"), isPresented: $showSaveDialog) {
             TextField(tr("Name", "名称"), text: $newPresetName)
@@ -283,20 +290,32 @@ struct EQEditorView: View {
     private func savePreset() {
         let name = newPresetName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return }
-        let preset = EQPreset(name: name, bandsJSON: EQPreset.encode(bands))
-        modelContext.insert(preset)
-        try? modelContext.save()
-        activePresetIdRaw = preset.id.uuidString
-        newPresetName = ""
+        do {
+            let id = try EQPresetStore(container: modelContext.container).save(name: name, bands: bands)
+            activePresetIdRaw = id.uuidString
+            newPresetName = ""
+            presetError = nil
+        } catch {
+            presetError = tr("The preset could not be saved. Your name and equalizer settings are unchanged. Try Save As again.",
+                             "无法保存预设，名称和均衡器设置已保留。请再次尝试另存为。",
+                             zhHant: "無法儲存預設，名稱和均衡器設定已保留。請再次嘗試另存為。")
+        }
     }
 
     private func deletePreset(_ preset: EQPreset) {
-        modelContext.delete(preset)
-        try? modelContext.save()
-        if activePresetIdRaw == preset.id.uuidString {
-            bands = EQPresets.flat
-            applyBands()
-            activePresetIdRaw = "Flat"
+        let id = preset.id
+        do {
+            try EQPresetStore(container: modelContext.container).delete(id: id)
+            presetError = nil
+            if activePresetIdRaw == id.uuidString {
+                bands = EQPresets.flat
+                applyBands()
+                activePresetIdRaw = "Flat"
+            }
+        } catch {
+            presetError = tr("The preset could not be deleted. Your preset and equalizer settings are unchanged. Try again.",
+                             "无法删除预设，预设和均衡器设置未改变。请重试。",
+                             zhHant: "無法刪除預設，預設和均衡器設定未改變。請重試。")
         }
     }
 
