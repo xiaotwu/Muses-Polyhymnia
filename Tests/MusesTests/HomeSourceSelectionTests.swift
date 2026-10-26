@@ -12,6 +12,38 @@ struct HomeSourceSelectionTests {
         #expect(HomeSourceSelection.account.mode == .youtubeMusic)
     }
 
+    @Test("successful empty Muses Home offers Search without a no-op Retry")
+    func emptyLibraryPresentation() {
+        let presentation = HomeDiscoveryEmptyPresentation(
+            source: .recommended, lastRefreshError: nil, sections: [])
+        #expect(presentation == .library)
+        #expect(!presentation.showsRetry)
+    }
+
+    @Test("empty account recommendations retain their own recovery action")
+    func emptyAccountPresentation() {
+        let presentation = HomeDiscoveryEmptyPresentation(
+            source: .account, lastRefreshError: nil, sections: [])
+        #expect(presentation == .account)
+        #expect(presentation.showsRetry)
+    }
+
+    @Test("both sources retain Retry for a feed failure or an unlabelled failed section")
+    func emptyFailurePresentation() {
+        let failed = HomeSection(id: "failed", title: "Failed", kind: .quickPicks,
+                                 items: [], status: .failed(nil), source: .localLibrary)
+        for source in HomeSourceSelection.allCases {
+            let feedFailure = HomeDiscoveryEmptyPresentation(
+                source: source, lastRefreshError: "Unavailable", sections: [])
+            let sectionFailure = HomeDiscoveryEmptyPresentation(
+                source: source, lastRefreshError: nil, sections: [failed])
+            #expect(feedFailure == .failure)
+            #expect(feedFailure.showsRetry)
+            #expect(sectionFailure == .failure)
+            #expect(sectionFailure.showsRetry)
+        }
+    }
+
     @Test("Muses hides both live and cached account content")
     func musesContainsOnlyLibraryRecommendations() {
         let sections = [section("local", source: .localLibrary),
