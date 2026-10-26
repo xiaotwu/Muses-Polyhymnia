@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 /// Audio information panel (Audio Nerd Mode).
 ///
@@ -12,6 +13,7 @@ struct AudioInfoPanel: View {
     @Environment(PlaybackService.self) private var playback
     @Environment(AudioDeviceService.self) private var deviceService
     @AppStorage(PrefKey.eqActivePresetId) private var eqPresetId: String = "Flat"
+    @Query private var customPresets: [EQPreset]
     @State private var showTechnicalDetails = false
     @Environment(\.dismiss) private var dismiss
 
@@ -75,8 +77,10 @@ struct AudioInfoPanel: View {
 
     private var informationRows: [AudioInfoModel.Row] {
         AudioInfoModel.rows(track: playback.transportState.track, defaultDeviceName: currentDeviceName,
-            eqPresetId: playback.eqBypassed ? tr("Bypassed", "已旁路") : eqPresetId,
-            volume: Double(playback.volume), playbackQuality: playback.transportState.quality)
+            eqPresetId: eqPresetId, volume: Double(playback.volume),
+            playbackQuality: playback.transportState.quality,
+            customPresetNames: Dictionary(uniqueKeysWithValues: customPresets.map { ($0.id, $0.name) }),
+            eqBypassed: playback.eqBypassed)
     }
 
     private var currentDeviceName: String? {
@@ -104,12 +108,15 @@ struct AudioInfoPanel: View {
 enum AudioInfoModel {
     struct Row: Equatable, Sendable { let label: String; let value: String }
 
-    static let unknown = tr("Unknown", "未知")
+    static var unknown: String { tr("Unknown", "未知") }
 
-    /// Builds ordered info rows from a track snapshot + output device name + EQ preset id + volume. nil fields render as "Unknown".
+    /// Builds ordered info rows from real metadata and resolves the stored preset
+    /// identity against the current names. Missing fields render as "Unknown".
     static func rows(track: TrackSnapshot?, defaultDeviceName: String?,
                      eqPresetId: String, volume: Double,
-                     playbackQuality: AudioQualityInfo? = nil) -> [Row] {
+                     playbackQuality: AudioQualityInfo? = nil,
+                     customPresetNames: [UUID: String] = [:],
+                     eqBypassed: Bool = false) -> [Row] {
         let src = track == nil ? unknown : "YouTube"
         let actual = track == nil ? nil : playbackQuality
         let codec: String? = actual.map { $0.codec.trimmingCharacters(in: .whitespacesAndNewlines) } ?? track?.codec
@@ -138,8 +145,20 @@ enum AudioInfoModel {
             Row(label: tr("Output Device", "输出设备"), value: defaultDeviceName ?? unknown),
             Row(label: tr("ReplayGain", "回放增益"),
                 value: track?.replayGain.map { String(format: "%+.1f dB", $0) } ?? unknown),
-            Row(label: tr("EQ Preset", "EQ 预设"), value: eqPresetId.isEmpty ? unknown : eqPresetId),
+            Row(label: tr("EQ Preset", "EQ 预设"), value: eqPresetName(
+                id: eqPresetId, customNames: customPresetNames, bypassed: eqBypassed)),
             Row(label: tr("Volume", "音量"), value: String(format: "%.0f%%", volume * 100))
         ]
+    }
+
+    /// A custom preset ID is storage identity, never a user-facing name. A
+    /// missing/deleted row cannot imply Flat because the applied bands may remain.
+    static func eqPresetName(id: String, customNames: [UUID: String], bypassed: Bool) -> String {
+        if bypassed { return tr("Bypassed", "已旁路", zhHant: "已旁路") }
+        if BuiltinEQPresets.all.contains(where: { $0.name == id }) { return id }
+        if id == "Custom" { return tr("Custom", "自定义", zhHant: "自訂") }
+        guard let identity = UUID(uuidString: id), let name = customNames[identity] else { return unknown }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? unknown : trimmed
     }
 }
