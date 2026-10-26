@@ -52,7 +52,8 @@ struct EQPresetPersistenceTests {
         #expect(after.count == 2)
         #expect(after.first { $0.id == existingID } == before.first)
         #expect(after.first { $0.id == savedID }?.name == "Draft")
-        #expect(after.first { $0.id == savedID }?.bandsJSON == EQPreset.encode(bands))
+        let savedJSON = try #require(after.first { $0.id == savedID }?.bandsJSON)
+        #expect(try JSONDecoder().decode([EQBand].self, from: Data(savedJSON.utf8)) == bands)
     }
 
     @Test("failed deletion preserves the exact saved row and can retry by identity")
