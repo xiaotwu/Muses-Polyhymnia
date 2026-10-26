@@ -51,7 +51,7 @@ enum MusesSingleInstance {
     @MainActor private static let configuredMainWindows = NSHashTable<NSWindow>.weakObjects()
     @MainActor private static let mainWindowPresentation = MainWindowPresentationCoordinator()
     @MainActor private static var mainWindowBootstrapScheduled = false
-    @MainActor static var pendingSettings = false
+    @MainActor static var pendingSettings: SettingsCategory?
     @MainActor static var pendingVideoPresentation = false
     @MainActor static var pendingSearchRoute: GlobalSearchRoute?
     @MainActor static var pendingLyricsQuery: String?
@@ -63,18 +63,24 @@ enum MusesSingleInstance {
     }
 
     @MainActor
-    static func requestSettings(_ category: SettingsCategory? = nil) {
-        if let category {
-            UserDefaults.standard.set(category.destination.rawValue, forKey: PrefKey.settingsLastPane)
+    static func requestSettings(
+        _ category: SettingsCategory? = nil,
+        presentMainWindow: @MainActor () -> Void = { _ = MusesSingleInstance.orderFrontMainWindow() },
+        notify: @MainActor (SettingsCategory) -> Void = {
+            NotificationCenter.default.post(name: .musesOpenSettings, object: $0)
         }
+    ) {
         pendingSearchRoute = nil
-        pendingSettings = true
-        orderFrontMainWindow()
-        NotificationCenter.default.post(name: .musesOpenSettings, object: category)
+        // The main view may not exist yet. Retain the requested destination
+        // until it can open Settings instead of changing its saved pane early.
+        let destination = (category ?? .general).destination
+        pendingSettings = destination
+        presentMainWindow()
+        notify(destination)
     }
     @MainActor
     static func requestSearchNavigation(_ route: GlobalSearchRoute) {
-        pendingSettings = false
+        pendingSettings = nil
         pendingSearchRoute = route
         orderFrontMainWindow()
         NotificationCenter.default.post(name: .musesNavigateFromSearch, object: route)

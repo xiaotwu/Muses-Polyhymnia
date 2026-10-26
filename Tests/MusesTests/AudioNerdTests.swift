@@ -74,7 +74,7 @@ struct AudioNerdTests {
             liked: false, lyrics: nil, replayGain: nil,
             bitRate: 128_000, channels: 1, lyricsOffsetMs: nil)
         let rows = AudioInfoModel.rows(track: t, defaultDeviceName: nil,
-                                       eqPresetId: "Rock", volume: 1.0)
+                                       eqPresetId: "Vocal", volume: 1.0)
         let byLabel = Dictionary(uniqueKeysWithValues: rows.map { ($0.label, $0.value) })
         #expect(byLabel[tr("Source", "来源")] == "YouTube")
         #expect(byLabel[tr("Lossless", "无损")] == tr("No", "否"))
@@ -83,7 +83,7 @@ struct AudioNerdTests {
         #expect(byLabel[tr("Sample Rate", "采样率")] == "44.1 kHz")
         #expect(byLabel[tr("Bit Rate", "比特率")] == "128 kbps")
         #expect(byLabel[tr("ReplayGain", "回放增益")] == unknown)
-        #expect(byLabel[tr("EQ Preset", "EQ 预设")] == "Rock")
+        #expect(byLabel[tr("EQ Preset", "EQ 预设")] == "Vocal")
         #expect(byLabel[tr("Volume", "音量")] == "100%")
     }
 
@@ -111,6 +111,59 @@ struct AudioNerdTests {
                                        eqPresetId: "", volume: 0.0)
         let byLabel = Dictionary(uniqueKeysWithValues: rows.map { ($0.label, $0.value) })
         #expect(byLabel[tr("EQ Preset", "EQ 预设")] == unknown)
+    }
+
+    @Test("Audio Info displays the selected custom preset name instead of its stored UUID")
+    func customEQPresetName() {
+        let selectedID = UUID()
+        let otherID = UUID()
+        let names = [selectedID: "Listening", otherID: "Other preset"]
+        let rows = AudioInfoModel.rows(track: nil, defaultDeviceName: nil,
+            eqPresetId: selectedID.uuidString.lowercased(), volume: 0,
+            customPresetNames: names)
+        let displayed = rows.first { $0.label == tr("EQ Preset", "EQ 预设") }?.value
+        #expect(displayed == "Listening")
+        #expect(displayed != selectedID.uuidString)
+        #expect(AudioInfoModel.eqPresetName(id: otherID.uuidString, customNames: names, bypassed: false)
+                == "Other preset")
+    }
+
+    @Test("built-in and unsaved custom EQ names retain their distinct meanings")
+    func builtInAndCustomEQPresetNames() {
+        for preset in BuiltinEQPresets.all {
+            #expect(AudioInfoModel.eqPresetName(id: preset.name, customNames: [:], bypassed: false)
+                    == preset.name)
+        }
+        #expect(AudioInfoModel.eqPresetName(id: "Custom", customNames: [:], bypassed: false)
+                == tr("Custom", "自定义", zhHant: "自訂"))
+    }
+
+    @Test("deleted, empty and invalid preset identities never appear as names or imply Flat")
+    func unresolvedEQPresetNames() {
+        let selectedID = UUID()
+        let replacementID = UUID()
+        let names = [selectedID: "Listening", replacementID: "Listening"]
+        #expect(AudioInfoModel.eqPresetName(id: selectedID.uuidString, customNames: names, bypassed: false)
+                == "Listening")
+        // A same-named row with another identity cannot replace the deleted selection.
+        #expect(AudioInfoModel.eqPresetName(id: selectedID.uuidString,
+            customNames: [replacementID: "Listening"], bypassed: false) == unknown)
+        for invalidID in ["", " ", "not-a-preset"] {
+            #expect(AudioInfoModel.eqPresetName(id: invalidID, customNames: names, bypassed: false) == unknown)
+        }
+        #expect(AudioInfoModel.eqPresetName(id: selectedID.uuidString,
+            customNames: [selectedID: " \n "], bypassed: false) == unknown)
+    }
+
+    @Test("bypass is reported ahead of named or unavailable EQ presets")
+    func bypassedEQPresetName() {
+        let selectedID = UUID()
+        for id in [selectedID.uuidString, "Flat", "Custom", ""] {
+            let rows = AudioInfoModel.rows(track: nil, defaultDeviceName: nil,
+                eqPresetId: id, volume: 0, customPresetNames: [selectedID: "Listening"], eqBypassed: true)
+            #expect(rows.first { $0.label == tr("EQ Preset", "EQ 预设") }?.value
+                    == tr("Bypassed", "已旁路", zhHant: "已旁路"))
+        }
     }
 
     @Test("Row count is fixed at 11 and labels are unique")
