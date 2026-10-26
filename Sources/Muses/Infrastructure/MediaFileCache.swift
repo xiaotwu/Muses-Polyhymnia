@@ -232,12 +232,14 @@ enum MediaFileCache {
         }
     }
 
-    static func clearAll() {
-        let root = directory
-        guard isSafeDirectory(root, allowMissing: false) else { return }
-        try? FileManager.default.removeItem(at: root)
-        try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true,
-                                                 attributes: [.posixPermissions: 0o700])
+    static func clearAll(in root: URL? = nil) throws {
+        let root = root ?? directory
+        guard isSafeDirectory(root, allowMissing: true) else { throw CocoaError(.fileWriteNoPermission) }
+        if FileManager.default.fileExists(atPath: root.path) {
+            try FileManager.default.removeItem(at: root)
+        }
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true,
+                                                attributes: [.posixPermissions: 0o700])
     }
 }
 
