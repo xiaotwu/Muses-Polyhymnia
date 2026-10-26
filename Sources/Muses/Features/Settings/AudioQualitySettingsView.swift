@@ -28,8 +28,9 @@ struct AudioQualitySettingsView: View {
     @AppStorage(PrefKey.ytAudioQuality) private var ytQuality: String = "bestaudio"
     @AppStorage(PrefKey.streamPrecacheLimitGB) private var cacheLimitGB = 2
     @State private var cacheReadGeneration = UUID()
-    @State private var cacheSummary = SettingsMediaCacheSummary()
-    @State private var cacheBytes: Int64 = 0
+    @State private var cacheSummary: SettingsMediaCacheSummary?
+    @State private var cacheClearFailed = false
+    @State private var cacheReadFailed = false
     @State private var pendingRemoval: ActionConfirmation?
 
     var body: some View {
@@ -70,15 +71,9 @@ struct AudioQualitySettingsView: View {
                 Button(role: .destructive) {
                     pendingRemoval = ActionConfirmation(
                         title: tr("Clear media cache?", "清除媒体缓存？"),
-                        message: tr("Remove \(ByteCountFormatter.string(fromByteCount: cacheBytes, countStyle: .file)) of downloaded media from this app's stream cache. The current track reloads. Playlists, likes, history, artwork and saved Home remain; media can be downloaded again.", "从应用媒体缓存移除 \(ByteCountFormatter.string(fromByteCount: cacheBytes, countStyle: .file)) 已下载媒体。当前曲目会重新加载。歌单、收藏、历史、封面与首页快照保留；媒体可再次下载。"),
+                        message: cacheClearMessage,
                         actionTitle: tr("Clear", "清除"),
-                        action: {
-                            MediaFileCache.clearAll()
-                            cacheReadGeneration = UUID()
-                            cacheBytes = 0
-                            cacheSummary = SettingsMediaCacheSummary()
-                            playback.reloadCurrent()
-                        }
+                        action: clearCache
                     )
                 } label: {
                     Image(systemName: "trash").frame(width: 18, height: 18)
@@ -88,19 +83,36 @@ struct AudioQualitySettingsView: View {
                 .help(tr("Clear media cache", "清除媒体缓存"))
             } label: {
                 Text(tr("Downloaded media", "已下载媒体"))
-                Text(ByteCountFormatter.string(fromByteCount: cacheBytes, countStyle: .file))
+                Text(cacheSizeLabel)
                     .font(MusesTypography.caption)
                     .foregroundStyle(.secondary)
             }
-            ProgressView(value: min(1, Double(cacheBytes) / (Double(max(1, cacheLimitGB)) * 1_073_741_824)))
-                .accessibilityLabel(tr("Stream cache relative to pre-download budget", "媒体缓存占预下载预算"))
-                .accessibilityValue(ByteCountFormatter.string(fromByteCount: cacheBytes, countStyle: .file))
+            if let cacheSummary {
+                ProgressView(value: min(1, Double(cacheSummary.total) / (Double(max(1, cacheLimitGB)) * 1_073_741_824)))
+                    .accessibilityLabel(tr("Stream cache relative to pre-download budget", "媒体缓存占预下载预算"))
+                    .accessibilityValue(cacheSizeLabel)
+            }
+            if cacheClearFailed {
+                Label(tr("Could not clear the media cache. Some files may remain. Check storage access, then try Clear again.",
+                         "无法清除媒体缓存，部分文件可能仍然保留。请检查存储访问权限，然后再次选择清除。",
+                         zhHant: "無法清除媒體快取，部分檔案可能仍然保留。請檢查儲存存取權限，然後再次選擇清除。"),
+                      systemImage: "exclamationmark.triangle")
+                    .font(MusesTypography.caption).foregroundStyle(.red)
+            }
+            if cacheReadFailed {
+                Label(cacheReadFailureMessage, systemImage: "exclamationmark.triangle")
+                    .font(MusesTypography.caption).foregroundStyle(.red)
+                Button(tr("Retry cache size", "重试读取缓存大小", zhHant: "重試讀取快取大小")) {
+                    Task { await refreshCache() }
+                }
+                .settingsAction()
+            }
             Text(tr("Pre-download budget: \(cacheLimitGB) GB. Playback downloads may exceed this budget; existing cache is retained.", "预下载预算：\(cacheLimitGB) GB。播放下载可超过此预算；保留已有缓存。"))
                 .font(.caption).foregroundStyle(.secondary)
             DisclosureGroup(tr("Cache categories", "缓存分类")) {
-                LabeledContent(tr("Audio file formats", "音频文件格式"), value: byteLabel(cacheSummary.audio))
-                LabeledContent(tr("MP4 / WebM / video containers", "MP4／WebM／视频容器"), value: byteLabel(cacheSummary.video))
-                LabeledContent(tr("Other / partial files", "其他／未完成文件"), value: byteLabel(cacheSummary.other))
+                LabeledContent(tr("Audio file formats", "音频文件格式"), value: byteLabel(cacheSummary?.audio))
+                LabeledContent(tr("MP4 / WebM / video containers", "MP4／WebM／视频容器"), value: byteLabel(cacheSummary?.video))
+                LabeledContent(tr("Other / partial files", "其他／未完成文件"), value: byteLabel(cacheSummary?.other))
                 Text(tr("Only the stream cache is cleared here. Artwork, Home snapshots, your library and account credentials are retained.", "此处仅清理媒体缓存。封面、首页快照、资料库及账号凭据保留。"))
                     .font(MusesTypography.caption).foregroundStyle(.secondary)
             }
@@ -114,18 +126,61 @@ struct AudioQualitySettingsView: View {
         .task { await refreshCache() }
     }
 
-    private func byteLabel(_ bytes: Int64) -> String {
-        ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+    private var cacheSizeLabel: String { byteLabel(cacheSummary?.total) }
+
+    private var cacheClearMessage: String {
+        if let cacheSummary, !cacheReadFailed {
+            return tr("Remove \(byteLabel(cacheSummary.total)) of downloaded media from this app's stream cache. The current track reloads. Playlists, likes, history, artwork and saved Home remain; media can be downloaded again.",
+                      "从应用媒体缓存移除 \(byteLabel(cacheSummary.total)) 已下载媒体。当前曲目会重新加载。歌单、收藏、历史、封面与首页快照保留；媒体可再次下载。")
+        }
+        return tr("Remove downloaded media from this app's stream cache. Its current size is unavailable. The current track reloads after clearing succeeds. Playlists, likes, history, artwork and saved Home remain; media can be downloaded again.",
+                  "移除应用媒体缓存中已下载的媒体。当前缓存大小不可用。清除成功后会重新加载当前曲目。歌单、收藏、历史、封面与首页快照保留；媒体可再次下载。",
+                  zhHant: "移除應用程式媒體快取中已下載的媒體。目前快取大小無法取得。清除成功後會重新載入目前曲目。歌單、收藏、歷史、封面與首頁快照保留；媒體可再次下載。")
+    }
+
+    private var cacheReadFailureMessage: String {
+        if cacheSummary != nil {
+            return tr("Could not refresh the cache size. The last known size is shown. Check storage access and retry.",
+                      "无法刷新缓存大小，当前显示上次读取的数值。请检查存储访问权限后重试。",
+                      zhHant: "無法重新整理快取大小，目前顯示上次讀取的數值。請檢查儲存存取權限後重試。")
+        }
+        return tr("Could not read the cache size. Check storage access and retry.",
+                  "无法读取缓存大小。请检查存储访问权限后重试。",
+                  zhHant: "無法讀取快取大小。請檢查儲存存取權限後重試。")
+    }
+
+    private func byteLabel(_ bytes: Int64?) -> String {
+        guard let bytes else { return tr("Unavailable", "不可用", zhHant: "無法取得") }
+        return ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+    }
+
+    private func clearCache() {
+        cacheReadGeneration = UUID()
+        do {
+            try MediaFileCache.clearAll()
+            cacheClearFailed = false
+            playback.reloadCurrent()
+        } catch {
+            cacheClearFailed = true
+        }
+        Task { await refreshCache() }
     }
 
     private func refreshCache() async {
         let generation = UUID()
         cacheReadGeneration = generation
         let root = MediaFileCache.directory
-        let summary = await Task.detached(priority: .utility) { SettingsMediaCacheSummary.read(root) }.value
+        let result = await Task.detached(priority: .utility) {
+            Result { try SettingsMediaCacheSummary.read(root) }
+        }.value
         guard !Task.isCancelled, cacheReadGeneration == generation else { return }
-        cacheSummary = summary
-        cacheBytes = summary.audio + summary.video + summary.other
+        switch result {
+        case .success(let summary):
+            cacheSummary = summary
+            cacheReadFailed = false
+        case .failure:
+            cacheReadFailed = true
+        }
     }
 
     private func playingLabel(_ q: AudioQualityInfo) -> String {
@@ -139,16 +194,22 @@ struct AudioQualitySettingsView: View {
 }
 
 /// Immutable display metadata; no media content is opened or changed.
-private struct SettingsMediaCacheSummary: Sendable {
+struct SettingsMediaCacheSummary: Equatable, Sendable {
     var audio: Int64 = 0
     var video: Int64 = 0
     var other: Int64 = 0
-    static func read(_ root: URL) -> Self {
-        guard let files = try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey]) else { return .init() }
+    var total: Int64 { audio + video + other }
+
+    static func read(_ root: URL) throws -> Self {
+        guard MediaFileCache.isSafeDirectory(root, allowMissing: false) else { throw CocoaError(.fileReadNoPermission) }
+        let files = try FileManager.default.contentsOfDirectory(at: root,
+            includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey, .isSymbolicLinkKey])
         var result = Self()
         for file in files {
-            guard let values = try? file.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey]), values.isRegularFile == true else { continue }
-            let bytes = Int64(values.fileSize ?? 0)
+            let values = try file.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey, .isSymbolicLinkKey])
+            guard values.isRegularFile == true, values.isSymbolicLink != true else { continue }
+            guard let size = values.fileSize, size >= 0 else { throw CocoaError(.fileReadUnknown) }
+            let bytes = Int64(size)
             switch file.pathExtension.lowercased() {
             case "m4a", "mp3", "aac", "opus", "ogg", "flac", "wav": result.audio += bytes
             case "mp4", "webm", "mkv", "mov": result.video += bytes
