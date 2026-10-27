@@ -1,5 +1,7 @@
 # Playlist drafts and history follow-up
 
+October 26 follow-up: the previously open **compact Dark History** cell now has actual 840×804pt screenshots for genuine Today/This Week empty ranges and the populated All Time overview. Horizontal range controls, navigation and PlayerBar remain visible. The 40 original events were retained, without changing the clock or clearing history. Physical input, accessibility and OS-specific conditions remain separate. See [the new bounded acceptance record](populated-cache-reload-2026-10-26.md); earlier dated checkpoints below retain their historical scope.
+
 2026-10-08 through 2026-10-10, round 2 of XW-79 under XW-26. Both isolated phases are cleaned. The fresh canonical-tail follow-up passed real tail playback, natural Repeat Off stop and Repeat All wrap; XW-79 is Done within its scope. XW-26 retains the separate provider, persistence-failure and external acceptance conditions. This report supplements the [64-area reconciliation](../ui-ux-acceptance-reconciliation.md) and reuses accepted flows from the [native ledger](../ui-ux-redesign-acceptance.md). A phase-completion marker means cleanup of this executable subset, not full acceptance.
 
 ## Scope and candidate
