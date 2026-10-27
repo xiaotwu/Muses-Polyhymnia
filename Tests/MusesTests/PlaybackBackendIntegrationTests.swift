@@ -91,6 +91,55 @@ struct PlaybackBackendIntegrationTests {
         #expect(queue.current()?.track.id == second.id)
     }
 
+    @Test("Reloading the current native track retains its position, occurrence and playback intent",
+          arguments: [false, true])
+    func reloadRetainsPositionAndIntent(shouldPlay: Bool) async throws {
+        let client = FacadeMpvDriver()
+        let engine = MpvStreamEngine(provider: FacadeStreamProvider(), clientFactory: { client })
+        let queue = QueueService()
+        let suite = "com.muses.tests.mpv-reload.\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let playback = PlaybackService(engine: engine, queue: queue, volumeDefaults: defaults)
+        var starts = 0
+        let subscription = playback.eventBus.subscribe { event in
+            if case .trackStarted = event { starts += 1 }
+        }
+        defer { playback.pause(); playback.eventBus.unsubscribe(subscription) }
+        let current = track("reload-current")
+        queue.play(current, context: [current], from: .search)
+        let occurrence = try #require(queue.current()?.id)
+        playback.restoreCurrentPaused(atMs: 71_000)
+        try await waitFor { client.loads.count == 1 }
+        client.send(.loaded)
+        try await waitFor { client.seeks.count == 1 }
+        #expect(client.seeks == [71])
+        client.send(.position(71))
+        try #require(!engine.state.buffering)
+        try #require(playback.checkpointPositionMs == 71_000)
+        if shouldPlay { playback.play() }
+        try #require(engine.state.isPlaying == shouldPlay)
+        try #require(starts == (shouldPlay ? 1 : 0))
+
+        playback.reloadCurrent()
+        try await waitFor { client.loads.count == 2 }
+        #expect(playback.checkpointPositionMs == 71_000)
+        #expect(queue.current()?.id == occurrence)
+        #expect(playback.primaryAction == (shouldPlay ? .pause : .play))
+        client.send(.loaded)
+        try await waitFor { client.seeks.count == 2 }
+        client.send(.position(71))
+
+        // Check the new seek, rather than accepting the previous load's seek.
+        #expect(client.seeks == [71, 71])
+        #expect(playback.checkpointPositionMs == 71_000)
+        #expect(engine.state.isPlaying == shouldPlay)
+        #expect(queue.current()?.id == occurrence)
+        #expect(queue.current()?.track.id == current.id)
+        #expect(queue.history.isEmpty)
+        #expect(starts == (shouldPlay ? 1 : 0))
+    }
+
     @Test("Natural mpv EOF advances the collection once and rejects the old decoder's late events")
     func completionUsesCollectionQueue() async throws {
         let client = FacadeMpvDriver()

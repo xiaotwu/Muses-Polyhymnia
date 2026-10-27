@@ -206,7 +206,8 @@ final class PlaybackService {
     func reloadCurrent() {
         retireVideoSession()
         guard let track = state.track else { return }
-        scheduleLoad(track)
+        // Keep the pending checkpoint when another reload is still loading.
+        scheduleLoad(track, resumeMs: checkpointPositionMs)
     }
 
     func playTrack(_ track: TrackSnapshot, context: [TrackSnapshot], from: QueueSource,
