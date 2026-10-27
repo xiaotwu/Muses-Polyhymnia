@@ -1,5 +1,13 @@
 # Muses UI/UX reconstruction acceptance — 2026-10-02
 
+## Background cache failure and controlled metadata — October 26, 2026
+
+The [fourth October 26 continuation](engineering/cache-clear-and-metadata-2026-10-26.md) confirms and repairs XW-129: failed media-cache deletion no longer falsely displays zero. Frozen source `bebadc3`, merged in PR #23 as `74c8782`, passed 22 focused tests and exact-source CI (1,116 tests/151 suites, nine explicit conditional skips, strict-thread/disk-recovery/release/packaging checks). The separately identified isolated Release `20261026.2` proves actual 53 KB failure/error, successful native Clear retry and no-prior-summary count failure/Retry recovery.
+
+Additional narrow cells are the genuine empty Music Videos page's own Open Search route and one test-only imported Track's controlled nonempty Year/Genre rendering. These do not accept metadata Save, real-source provenance or sorting. Accepted expansion/scroll/appearance cells are not counted again. Nine retained databases have complete 27-table evidence; 535 tracks, 1,064 members and 534 queue occurrences retain their recorded business/semantic boundaries, with five changed state/ORM tables and a tiny position floating-point difference explicitly listed.
+
+All three candidates exited; complete archives, raw stores and earlier failure receipts are retained. Initial two-key preferences were restored and strictly read back, then the 14 allowlisted owned paths were removed; five protected roots remain unchanged. Eight related Linear issues and both Muses documents were updated and read back, preserving previous text, states and parents except XW-129 → Done. Current inventory is 115 issues: 92 Done and the original 23 open. XW-74/Premium/Erato pauses and no-publication instructions remain. Earlier dated evidence below retains its historical scope.
+
 The approved choices have broad production coverage, with mature service/data workflows retained where they satisfy the selected contract. The exact-choice follow-up audit identified small omitted implementation branches; the completion pass below precedes the eight new screenshot fixes. Current executable source and guardrail tests retain the approved choices; historical plans are not the active product contract. **Comprehensive acceptance is not complete.** A production implementation, a passing test and an exercised live workflow are different evidence categories.
 
 Implementation commits: `782f633` (production surfaces and meaningful service/guardrail tests) and `6df4cf2` (rendered music-video overflow and oversized mini-window repairs).
