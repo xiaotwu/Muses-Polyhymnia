@@ -321,6 +321,55 @@ struct ListeningSessionTests {
         #expect(!playback.transportState.isPlaying)
     }
 
+    @Test("Repeated reloads retain a pending position through checkpoints and eventual completion",
+          arguments: [true, false])
+    func repeatedReloadRetainsPendingPosition(statisticsEnabled: Bool) async throws {
+        let container = try makeContainer()
+        let track = snap("Repeated reload")
+        seedRestorable(container: container, track: track, positionMs: 71_000)
+        let queue = makeQueue(container: container)
+        queue.restore()
+        let occurrence = try #require(queue.current()?.id)
+        let (playback, engine) = makePlayback(queue: queue)
+        var pendingLoads: [CheckedContinuation<Void, Never>] = []
+        engine.beforeLoadCompletes = { _ in
+            await withCheckedContinuation { pendingLoads.append($0) }
+            try Task.checkCancellation()
+        }
+        defer { for load in pendingLoads { load.resume() } }
+        let service = SessionService(modelContainer: container, eventBus: playback.eventBus,
+                                     playback: playback, queue: queue, enabledProvider: { statisticsEnabled })
+        for _ in 0..<100 where pendingLoads.count < 1 { await Task.yield() }
+        try #require(pendingLoads.count == 1)
+
+        for expectedLoads in 2...3 {
+            playback.reloadCurrent()
+            for _ in 0..<100 where pendingLoads.count < expectedLoads { await Task.yield() }
+            try #require(pendingLoads.count == expectedLoads)
+            #expect(engine.state.position == 0)
+            #expect(playback.checkpointPositionMs == 71_000)
+            #expect(queue.current()?.id == occurrence)
+            #expect(playback.primaryAction == .play)
+            try service.prepareForUpdate()
+            #expect(queueStateRow(container)?.lastPositionMs == 71_000)
+            #expect(fetchSessions(container).first?.currentPositionMs == 71_000)
+        }
+
+        pendingLoads.removeLast().resume()
+        for _ in 0..<100 where engine.state.duration == 0 { await Task.yield() }
+        try #require(engine.state.duration == 200)
+        #expect(engine.loadCallCount == 3)
+        #expect(engine.seekCallCount == 1)
+        #expect(engine.lastSeekTime == 71)
+        #expect(engine.playCallCount == 0)
+        #expect(!playback.state.isPlaying)
+        #expect(queue.current()?.id == occurrence)
+        try service.prepareForUpdate()
+        #expect(queueStateRow(container)?.lastPositionMs == 71_000)
+        #expect(fetchSessions(container).first?.currentPositionMs == 71_000)
+        #expect(fetchSessions(container).count == 1)
+    }
+
     @Test("An explicit seek replaces a pending restore and completed loads use the engine clock",
           arguments: [0.0, 12.0])
     func pendingRestoreSeekAndCompletion(position: Double) async throws {
