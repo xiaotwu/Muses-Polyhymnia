@@ -52,6 +52,8 @@ Linear XW-130/17/11/10/26/19/12/27/5 and both existing Muses project documents w
 
 ## Next conversation
 
+The user subsequently requested [disk hygiene and cache-budget repair](disk-hygiene-and-cache-budget-2026-10-28.md) before this handoff, including Menu Bar, Spotlight and privacy-setting residues. That work takes precedence over opening the next conversation. Its new product source must not be assigned this record's old candidate identity or native passes without appropriate provenance.
+
 After the data audit, cleanup and record synchronization, create the requested fresh conversation for foreground acceptance. The user's October 28 instruction authorizes necessary visible input on the isolated candidate in that follow-up. It does not resume XW-74/Premium/Erato, authorize publication, mutate normal data or protected playlists, grant account/credential/system permission changes, invoke Siri or install updates.
 
 First work through remaining native table-header descending/paging-toggle input, real multi-bookmark text submission/cancel isolation, temporary owned EQ-preset deletion/Flat and physical Escape, then no-main-window Settings/About and Diagnostics preview/Cancel. Reuse accepted setup and do not count it again. Old ineffective background input is a reason to change the method in the foreground, not to replay the same rejected action blindly.

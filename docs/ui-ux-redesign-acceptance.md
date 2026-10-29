@@ -1,5 +1,9 @@
 # Muses UI/UX reconstruction acceptance — 2026-10-02
 
+## Disk hygiene and bounded cache source — October 28, 2026
+
+The [maintenance record](engineering/disk-hygiene-and-cache-budget-2026-10-28.md) records separately approved cleanup of 69 obsolete/duplicate artifacts, retained evidence and bounded local tests for XW-131/132. Shared media and metadata budgets are source repairs, not newly accepted native UI cells. Keep the old candidate's playing-reload results below within their actual scope; the new foreground conversation must identify a candidate containing the cache changes. Menu Bar, Spotlight and privacy residues require their own exact cleanup evidence. Existing pauses and no-publication instructions remain.
+
 ## Playing-current reload — October 28, 2026
 
 The [background closeout](engineering/playing-reload-acceptance-2026-10-28.md) adds actual playing-current Clear and Data saver quality reload with advancing clocks, retained Pause intent and post-play Quit/cold retention. The candidate is reused without source/build changes; normal play-count/time changes are audited separately. This does not establish audibility, seamless sound, concurrent pre-download or a complete matrix. The next requested conversation concentrates on remaining foreground input.
