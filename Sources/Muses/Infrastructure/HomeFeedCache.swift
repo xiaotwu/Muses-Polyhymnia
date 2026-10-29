@@ -31,6 +31,7 @@ final class HomeFeedCache {
     }
 
     private let directory: URL
+    private let diskCache: RebuildableJSONCache
     private var caches: [Partition: SWRCache<HomeSnapshot>] = [:]
     nonisolated static let baselineFreshWindow: TimeInterval = 30 * 60
     nonisolated static let webFreshWindow: TimeInterval = 15 * 60
@@ -42,8 +43,11 @@ final class HomeFeedCache {
     init(directory: URL? = nil,
          baselineFreshWindow: TimeInterval = HomeFeedCache.baselineFreshWindow,
          webFreshWindow: TimeInterval = HomeFeedCache.webFreshWindow,
-         webStaleLimit: TimeInterval = HomeFeedCache.webStaleLimit) {
-        self.directory = directory ?? HomeFeedCache.defaultDirectory
+         webStaleLimit: TimeInterval = HomeFeedCache.webStaleLimit,
+         diskLimits: JSONCacheLimits = .home) {
+        let root = directory ?? HomeFeedCache.defaultDirectory
+        self.directory = root
+        diskCache = RebuildableJSONCache(root: root, limits: diskLimits)
         self.baselineFreshWindow = baselineFreshWindow
         self.webFreshWindow = webFreshWindow
         self.webStaleLimit = webStaleLimit
@@ -76,6 +80,7 @@ final class HomeFeedCache {
            now.timeIntervalSince(cached.value.fetchedAt) > webStaleLimit {
             return nil
         }
+        protectFallback(for: input, layer: layer, mode: mode)
         return cached
     }
 
@@ -93,6 +98,7 @@ final class HomeFeedCache {
              layer: Layer,
              mode: HomeRecommendationMode = .muses) -> Bool {
         guard accepts(snapshot, for: input, layer: layer, mode: mode) else { return false }
+        protectFallback(for: input, layer: layer, mode: mode)
         cache(for: input, layer: layer, mode: mode).set(
             Self.key(for: input, mode: mode), value: snapshot, fetchedAt: snapshot.fetchedAt)
         return true
@@ -121,6 +127,7 @@ final class HomeFeedCache {
             let scopeDirectory = directory
                 .appendingPathComponent(mode.cacheNamespace, isDirectory: true)
                 .appendingPathComponent(scope.cacheNamespace, isDirectory: true)
+            diskCache.revokePublications(in: scopeDirectory, onlyParentName: layer.directoryName)
             // Remove the pre-locale layout for this exact layer as well. It is
             // never readable by the new cache, but privacy deletion must not
             // strand normalized snapshots from the previous layout.
@@ -165,13 +172,21 @@ final class HomeFeedCache {
         let partition = Partition(
             mode: mode, scope: input.scope, layer: layer,
             language: input.language, region: input.region)
+        let partitionDirectory = directoryURL(
+            for: input.scope, layer: layer, mode: mode,
+            language: input.language, region: input.region)
         if let cache = caches[partition] { return cache }
         let cache = SWRCache<HomeSnapshot>(
-            directory: directoryURL(
-                for: input.scope, layer: layer, mode: mode,
-                language: input.language, region: input.region))
+            directory: partitionDirectory, diskCache: diskCache)
         caches[partition] = cache
         return cache
+    }
+
+    private func protectFallback(for input: HomeDiscoveryInput, layer: Layer, mode: HomeRecommendationMode) {
+        guard layer == .web, mode == .youtubeMusic, input.scope != .guest else { return }
+        diskCache.protectFallback(at: directoryURL(for: input.scope, layer: layer, mode: mode,
+            language: input.language, region: input.region)
+            .appendingPathComponent(SHA256Hex(Self.key(for: input, mode: mode)) + ".json"))
     }
 
     private func localeNamespace(language: String, region: String) -> String {

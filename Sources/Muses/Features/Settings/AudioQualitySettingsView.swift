@@ -67,6 +67,14 @@ struct AudioQualitySettingsView: View {
         } header: { Text(tr("Quality", "音质")).font(MusesTypography.headline.weight(.semibold)) }
 
         Section {
+            Picker(tr("Media cache capacity", "媒体缓存容量"), selection: $cacheLimitGB) {
+                ForEach([1, 2, 5, 10], id: \.self) { Text("\($0) GB").tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .onChange(of: cacheLimitGB) { _, _ in
+                precache.configure()
+                Task { await refreshCache() }
+            }
             LabeledContent {
                 Button(role: .destructive) {
                     pendingRemoval = ActionConfirmation(
@@ -88,8 +96,8 @@ struct AudioQualitySettingsView: View {
                     .foregroundStyle(.secondary)
             }
             if let cacheSummary {
-                ProgressView(value: min(1, Double(cacheSummary.total) / (Double(max(1, cacheLimitGB)) * 1_073_741_824)))
-                    .accessibilityLabel(tr("Stream cache relative to pre-download budget", "媒体缓存占预下载预算"))
+                ProgressView(value: min(1, Double(cacheSummary.total) / Double(MediaCacheBudget.bytes(forGigabytes: cacheLimitGB))))
+                    .accessibilityLabel(tr("Media cache capacity used", "已用媒体缓存容量"))
                     .accessibilityValue(cacheSizeLabel)
             }
             if cacheClearFailed {
@@ -107,7 +115,9 @@ struct AudioQualitySettingsView: View {
                 }
                 .settingsAction()
             }
-            Text(tr("Pre-download budget: \(cacheLimitGB) GB. Playback downloads may exceed this budget; existing cache is retained.", "预下载预算：\(cacheLimitGB) GB。播放下载可超过此预算；保留已有缓存。"))
+            Text(tr("This capacity applies to playback downloads and pre-downloads, even when pre-download is off. Older unused media is removed as needed. Files in use are kept; new downloads wait if those files fill the capacity. Your library is unchanged.",
+                    "此容量同时限制播放下载与预下载，关闭预下载时也有效。需要时会清理较早未使用的媒体。正在使用的文件保留；若其已占满容量，则暂停新增缓存。资料库不受影响。",
+                    zhHant: "此容量同時限制播放下載與預下載，關閉預下載時也有效。需要時會清理較早未使用的媒體。使用中的檔案會保留；若已占滿容量，則暫停新增快取。資料庫不受影響。"))
                 .font(.caption).foregroundStyle(.secondary)
             DisclosureGroup(tr("Cache categories", "缓存分类")) {
                 LabeledContent(tr("Audio file formats", "音频文件格式"), value: byteLabel(cacheSummary?.audio))

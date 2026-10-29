@@ -24,8 +24,10 @@ final class YTDlpSearchCache {
     /// without spawning.
     let freshWindow: TimeInterval
 
-    init(directory: URL, freshWindow: TimeInterval = 30 * 60) {
-        self.backing = SWRCache(directory: directory)
+    init(directory: URL, freshWindow: TimeInterval = 30 * 60,
+         diskLimits: JSONCacheLimits = .search) {
+        self.backing = SWRCache(directory: directory,
+            diskCache: RebuildableJSONCache(root: directory, limits: diskLimits))
         self.freshWindow = freshWindow
     }
 

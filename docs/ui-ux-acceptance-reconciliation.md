@@ -1,5 +1,7 @@
 # Current UI/UX acceptance reconciliation — 2026-10-11
 
+October 28 [disk hygiene and XW-131/132 cache budgets](engineering/disk-hygiene-and-cache-budget-2026-10-28.md) add source/component evidence only: shared media capacity, aggregate discovery metadata limits and removal of unused artwork warm writes. Those changes do not add a native capacity-control/eviction, account, audibility or whole-matrix pass. The prior playing-reload cells below retain their exact old candidate identity; a candidate containing the new source needs its own provenance. System Settings residue cleanup is distinct from Launch Services unregistration. The original 23 matrices and pauses remain.
+
 October 28 adds [playing-current Clear and quality-reload clock/intent retention](engineering/playing-reload-acceptance-2026-10-28.md), followed by pause/Quit/cold checkpoints. This is a new native state cell on the exact reused candidate; paused-state and earlier accepted checks are not recounted. Remaining foreground input and external prerequisites retain their boundaries.
 
 October 26 adds [populated cache/search/history checks and XW-130 reload preservation](engineering/populated-cache-reload-2026-10-26.md): last-known nonzero cache size/Retry, populated Library → public catalog → Library search, compact Dark History, and a repaired paused-current cache/quality reload with normal Quit and cold retention. PR #24 is merged with exact-source CI and independent native/data/cleanup audits; only XW-130 closes. The original 23 matrices and existing pauses remain open; no publication.

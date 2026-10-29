@@ -67,6 +67,8 @@ final class MpvStreamEngine: PlayerEngine {
     private let cacheDirectory: URL
     private let cacheSession: URLSession
     private let cacheDelay: Duration
+    private let cacheBudget: MediaCacheBudget
+    private var cachedFileLease: MediaCacheBudget.Lease?
     private var cacheWork: Task<Void, Never>?
     private var cacheResource: SharedStreamResource?
     private var cacheGate: MediaCachePublicationGate?
@@ -111,7 +113,7 @@ final class MpvStreamEngine: PlayerEngine {
              UserDefaults.standard.string(forKey: PrefKey.ytAudioQuality) ?? "bestaudio"
          }, readinessTimeoutDuration: Duration = .seconds(35),
          cacheDirectory: URL? = nil, cacheSession: URLSession? = nil,
-         cacheDelay: Duration = .seconds(1)) {
+         cacheDelay: Duration = .seconds(1), cacheBudget: MediaCacheBudget = .shared) {
         self.provider = provider
         self.client = clientFactory()
         self.qualityProvider = qualityProvider
@@ -119,6 +121,7 @@ final class MpvStreamEngine: PlayerEngine {
         self.cacheDirectory = cacheDirectory ?? MusesDataPaths.caches.appendingPathComponent("streams", isDirectory: true)
         self.cacheSession = MediaFileCache.ephemeralSession(copying: cacheSession)
         self.cacheDelay = cacheDelay
+        self.cacheBudget = cacheBudget
         client.onEvent = { [weak self] generation, event in self?.receive(event, generation: generation) }
     }
 
@@ -154,7 +157,7 @@ final class MpvStreamEngine: PlayerEngine {
         }
     }
 
-    deinit {
+    isolated deinit {
         pendingPrefetch?.cancel()
         foregroundHandoff?.cancel()
         activeResolution?.cancel()
@@ -162,6 +165,8 @@ final class MpvStreamEngine: PlayerEngine {
         cacheGate?.close()
         cacheRetirementGate?.close()
         cacheSession.invalidateAndCancel()
+        client.stop()
+        cachedFileLease?.releaseAfterUse()
     }
 
     private func startReadinessTimeout(operation: UUID) {
@@ -188,12 +193,14 @@ final class MpvStreamEngine: PlayerEngine {
                         try retirementGate.whileOpen { _ = MediaFileCache.quarantine(rejected, in: root) }
                     }.value
                 }
-                let cached: MediaFileCache.CompletedEntry?
+                let selection: MediaCacheBudget.PinnedEntry?
                 if allowCache {
-                    cached = await Task.detached(priority: .utility) {
-                        MediaFileCache.completedEntry(videoID: track.youTubeId, quality: quality, in: root)
+                    let budget = self?.cacheBudget ?? .shared
+                    selection = await Task.detached(priority: .utility) {
+                        budget.existing(videoID: track.youTubeId, quality: quality, in: root)
                     }.value
-                } else { cached = nil }
+                } else { selection = nil }
+                let cached = selection?.entry
                 try Task.checkCancellation()
                 let stream: ResolvedAudioStream
                 if let cached {
@@ -214,6 +221,7 @@ final class MpvStreamEngine: PlayerEngine {
                 if let cached {
                     self.usingCachedFile = true
                     self.cachedEntry = cached
+                    self.cachedFileLease = selection?.lease
                     guard MediaFileCache.matches(cached, in: root) else {
                         throw MpvFailure(stage: .load, code: -1014)
                     }
@@ -249,6 +257,8 @@ final class MpvStreamEngine: PlayerEngine {
         generation &+= 1
         beginNativeDiagnostics()
         client.stop()
+        cachedFileLease?.releaseAfterUse()
+        cachedFileLease = nil
         loaded = false
         controlsApplied = false
         reachedEnd = false
@@ -298,6 +308,8 @@ final class MpvStreamEngine: PlayerEngine {
         generation &+= 1
         beginNativeDiagnostics()
         client.stop()
+        cachedFileLease?.releaseAfterUse()
+        cachedFileLease = nil
         playbackRequested = false
         loaded = false
         controlsApplied = false
@@ -332,6 +344,8 @@ final class MpvStreamEngine: PlayerEngine {
         loadTask = nil
         generation &+= 1
         client.stop()
+        cachedFileLease?.releaseAfterUse()
+        cachedFileLease = nil
         playbackRequested = false
         loaded = false
         state.isPlaying = false
@@ -507,7 +521,7 @@ final class MpvStreamEngine: PlayerEngine {
         let token = generation, identity = cacheWorkID, quality = currentQualityKey
         let gate = MediaCachePublicationGate()
         cacheGate = gate
-        let root = cacheDirectory, session = cacheSession, delay = cacheDelay
+        let root = cacheDirectory, session = cacheSession, delay = cacheDelay, budget = cacheBudget
         cacheWork = Task { [weak self] in
             defer {
                 if let self, self.cacheWorkID == identity {
@@ -528,7 +542,7 @@ final class MpvStreamEngine: PlayerEngine {
                       quality == self.qualityProvider() else { return }
                 let destination = MediaFileCache.file(videoId: track.youTubeId, quality: quality, ext: ext, in: root)
                 let resource = try SharedStreamResource(stream: stream, destination: destination,
-                    session: session, publicationGate: gate, renewStream: { [weak self] in
+                    session: session, publicationGate: gate, cacheBudget: budget, renewStream: { [weak self] in
                         guard let self else { throw CancellationError() }
                         return try await self.renewPausedCache(videoID: track.youTubeId, quality: quality, token: token)
                     })
@@ -694,6 +708,8 @@ final class MpvStreamEngine: PlayerEngine {
         recordNativeStage(.failure, code: lastFailure?.code ?? -1099)
         settleReadiness(.failure(state.error ?? PlayerError.sourceUnavailable))
         client.stop()
+        cachedFileLease?.releaseAfterUse()
+        cachedFileLease = nil
         loaded = false
         playbackRequested = false
         state.isPlaying = false

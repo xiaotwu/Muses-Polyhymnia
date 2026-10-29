@@ -438,6 +438,134 @@ struct MpvMediaCacheTests {
         }
     }
 
+    @Test("Ordinary paused playback obeys the aggregate capacity without enabling pre-download")
+    func pausedDownloadBudget() async throws {
+        CacheMediaStub.reset()
+        defer { CacheMediaStub.reset() }
+        let root = try root()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let older = try file(root, video: "older")
+        let recent = try file(root, video: "recent")
+        let budget = MediaCacheBudget { 16_384 }
+        // Explicit reuse makes recent the most recently used entry without
+        // changing its content, persisted model or captured fingerprint.
+        let reuse = try #require(budget.existing(videoID: "recent", quality: "bestaudio", in: root))
+        reuse.lease.release()
+        CacheMediaStub().respond(forHostContaining: "cache.test") { _ in
+            StubResponse(statusCode: 206, body: Data(repeating: 5, count: 8192),
+                headers: ["Content-Range": "bytes 0-8191/8192", "Content-Type": "audio/webm"])
+        }
+        let provider = CacheFixtureProvider()
+        provider.stream = ResolvedAudioStream(url: URL(string: "https://cache.test/audio")!, container: "webm")
+        let client = CacheFixtureClient()
+        let engine = MpvStreamEngine(provider: provider, clientFactory: { client }, cacheDirectory: root,
+            cacheSession: URLSession(configuration: CacheMediaStub.makeConfig()), cacheDelay: .zero, cacheBudget: budget)
+        let selected = track("new")
+        try await engine.load(selected)
+        await engine.awaitCacheWorkForTests()
+        #expect(!FileManager.default.fileExists(atPath: older.path))
+        #expect(try Data(contentsOf: recent) == Data(repeating: 42, count: 8192))
+        #expect(MediaFileCache.existing(videoId: "new", quality: "bestaudio", in: root) != nil)
+        #expect(MediaFileCache.totalBytes(in: root) == 16_384)
+        #expect(engine.state.track?.id == selected.id)
+        #expect(!engine.state.isPlaying && engine.state.error == nil)
+        #expect(client.streams.last?.url.scheme == "https")
+    }
+
+    @Test("An active cached decoder is retained; another paused stream refuses caching until it stops")
+    func activeDecoderBudgetLease() async throws {
+        CacheMediaStub.reset()
+        defer { CacheMediaStub.reset() }
+        let root = try root()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let active = try file(root, video: "active")
+        let budget = MediaCacheBudget { 8192 }
+        CacheMediaStub().respond(forHostContaining: "cache.test") { _ in
+            StubResponse(statusCode: 206, body: Data(repeating: 6, count: 8192),
+                headers: ["Content-Range": "bytes 0-8191/8192", "Content-Type": "audio/webm"])
+        }
+        let provider = CacheFixtureProvider()
+        provider.stream = ResolvedAudioStream(url: URL(string: "https://cache.test/audio")!, container: "webm")
+        let firstClient = CacheFixtureClient()
+        let first = MpvStreamEngine(provider: provider, clientFactory: { firstClient }, cacheDirectory: root,
+            cacheDelay: .seconds(60), cacheBudget: budget)
+        try await first.load(track("active"))
+        first.play()
+        let secondClient = CacheFixtureClient()
+        let second = MpvStreamEngine(provider: provider, clientFactory: { secondClient }, cacheDirectory: root,
+            cacheSession: URLSession(configuration: CacheMediaStub.makeConfig()), cacheDelay: .zero, cacheBudget: budget)
+        try await second.load(track("new"))
+        await second.awaitCacheWorkForTests()
+        #expect(try Data(contentsOf: active) == Data(repeating: 42, count: 8192))
+        #expect(first.state.isPlaying)
+        #expect(second.state.error == nil)
+        #expect(MediaFileCache.existing(videoId: "new", quality: "bestaudio", in: root) == nil)
+
+        try await first.load(track("remote")) // client.stop precedes releasing the file lease
+        second.pause()
+        await second.awaitCacheWorkForTests()
+        #expect(!FileManager.default.fileExists(atPath: active.path))
+        #expect(MediaFileCache.existing(videoId: "new", quality: "bestaudio", in: root) != nil)
+        #expect(MediaFileCache.totalBytes(in: root) == 8192)
+    }
+
+    @Test("Disabled pre-download still reconciles legacy excess media and quarantine bytes")
+    func disabledPrecacheMaintenance() async throws {
+        let root = try root()
+        defer { try? FileManager.default.removeItem(at: root) }
+        _ = try file(root, video: "first")
+        _ = try file(root, video: "second")
+        _ = try file(root, video: "bad")
+        let bad = try #require(MediaFileCache.completedEntry(videoID: "bad", quality: "bestaudio", in: root))
+        let quarantine = try #require(MediaFileCache.quarantine(bad, in: root))
+        let domain = "com.muses.tests.maintenance.\(UUID())"
+        let defaults = UserDefaults(suiteName: domain)!
+        defer { defaults.removePersistentDomain(forName: domain) }
+        let provider = CacheFixtureProvider()
+        let budget = MediaCacheBudget { 8192 }
+        for video in ["first", "second"] {
+            let used = try #require(budget.existing(videoID: video, quality: "bestaudio", in: root))
+            used.lease.release()
+        }
+        let service = StreamPrecacheService(resolution: provider, defaults: defaults,
+            candidates: { _ in Issue.record("Disabled prediction requested candidates"); return [] }, isBusy: { false },
+            directory: root, cacheBudget: budget)
+        service.configure()
+        await service.awaitWorkForTests()
+        #expect(service.completedCount == 0 && provider.qualities.isEmpty)
+        #expect(MediaFileCache.totalBytes(in: root) == 8192)
+        #expect(!FileManager.default.fileExists(atPath: quarantine.path))
+    }
+
+    @Test("Concurrent real resource publications reserve one shared capacity and never evict the other writer")
+    func concurrentCacheAdmission() async throws {
+        CacheMediaStub.reset()
+        defer { CacheMediaStub.reset() }
+        let root = try root()
+        defer { try? FileManager.default.removeItem(at: root) }
+        CacheMediaStub().respond(forHostContaining: "cache.test") { _ in
+            StubResponse(statusCode: 206, body: Data(repeating: 8, count: 8192),
+                headers: ["Content-Range": "bytes 0-8191/8192", "Content-Type": "audio/webm"])
+        }
+        let budget = MediaCacheBudget { 8192 }
+        let stream = ResolvedAudioStream(url: URL(string: "https://cache.test/audio")!, container: "webm")
+        let session = URLSession(configuration: CacheMediaStub.makeConfig())
+        let a = try SharedStreamResource(stream: stream,
+            destination: MediaFileCache.file(videoId: "first", quality: "bestaudio", ext: "webm", in: root),
+            session: session, cacheBudget: budget)
+        let b = try SharedStreamResource(stream: stream,
+            destination: MediaFileCache.file(videoId: "second", quality: "bestaudio", ext: "webm", in: root),
+            session: session, cacheBudget: budget)
+        async let first = try? a.finish()
+        async let second = try? b.finish()
+        let results = await (first, second)
+        let completed = [results.0, results.1].compactMap { $0 }
+        #expect(completed.count == 1)
+        #expect(MediaFileCache.totalBytes(in: root) == 8192)
+        await a.cancel(); await b.cancel()
+        #expect(try FileManager.default.contentsOfDirectory(atPath: root.path).count == 1)
+    }
+
 }
 
 @MainActor
