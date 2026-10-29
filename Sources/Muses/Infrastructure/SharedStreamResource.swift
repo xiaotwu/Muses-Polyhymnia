@@ -18,6 +18,9 @@ actor SharedStreamResource {
     private let destination: URL
     private let staging: URL
     private let session: URLSession
+    private let cacheBudget: MediaCacheBudget
+    private let mayEvictCache: Bool
+    private var cacheLease: MediaCacheBudget.Lease?
     private var metadata: Metadata?
     private var completed: Set<Int64> = []
     private struct Request { let id: UUID; let task: Task<Chunk, Error> }
@@ -27,7 +30,8 @@ actor SharedStreamResource {
     private var handle: FileHandle?
 
     init(source: URL, destination: URL, session: URLSession,
-         renew: (@Sendable () async throws -> URL)? = nil) {
+         renew: (@Sendable () async throws -> URL)? = nil,
+         cacheBudget: MediaCacheBudget = .shared) {
         self.source = source
         if let renew { self.renew = { @Sendable in ResolvedAudioStream(url: try await renew()) } }
         else { self.renew = nil }
@@ -36,12 +40,15 @@ actor SharedStreamResource {
         self.publicationGate = MediaCachePublicationGate()
         self.destination = destination
         self.session = MediaFileCache.ephemeralSession(copying: session)
+        self.cacheBudget = cacheBudget
+        self.mayEvictCache = true
         staging = destination.deletingLastPathComponent().appendingPathComponent(".\(UUID().uuidString).partial")
     }
 
     /// The public full-cache route preserves request headers and selected representation identity.
     init(stream: ResolvedAudioStream, destination: URL, session: URLSession? = nil,
          publicationGate: MediaCachePublicationGate = MediaCachePublicationGate(),
+         cacheBudget: MediaCacheBudget = .shared, mayEvictCache: Bool = true,
          renewStream: (@Sendable () async throws -> ResolvedAudioStream)? = nil) throws {
         guard let ext = MediaFileCache.cacheExtension(for: stream), destination.pathExtension.lowercased() == ext,
               MediaFileCache.isSafeDestination(destination, in: destination.deletingLastPathComponent()) else {
@@ -54,16 +61,15 @@ actor SharedStreamResource {
         self.renew = renewStream
         self.destination = destination
         self.session = MediaFileCache.ephemeralSession(copying: session)
+        self.cacheBudget = cacheBudget
+        self.mayEvictCache = mayEvictCache
         staging = destination.deletingLastPathComponent().appendingPathComponent(".\(UUID().uuidString).partial")
     }
 
     deinit {
         session.invalidateAndCancel()
         try? handle?.close()
-        // Do not follow a root that has since become a symlink during cleanup.
-        if MediaFileCache.isSafeDestination(staging, in: staging.deletingLastPathComponent()) {
-            try? FileManager.default.removeItem(at: staging)
-        }
+        cacheLease?.releaseAfterUse()
     }
 
     func information() async throws -> Metadata {
@@ -105,21 +111,12 @@ actor SharedStreamResource {
         try checkActive()
         if !published {
             try handle?.synchronize()
-            try publicationGate.whileOpen {
-                try Task.checkCancellation()
-                let root = destination.deletingLastPathComponent()
-                guard MediaFileCache.isSafeDestination(destination, in: root),
-                      MediaFileCache.isSafeDestination(staging, in: root) else { throw URLError(.noPermissionsToReadFile) }
-                if !FileManager.default.fileExists(atPath: destination.path) {
-                    try FileManager.default.moveItem(at: staging, to: destination)
-                } else {
-                    // A concurrent complete writer wins. Never replace or delete an existing user-owned file.
-                    guard let size = try? destination.resourceValues(forKeys: [.fileSizeKey]).fileSize,
-                          Int64(size) == info.size else { throw URLError(.cannotWriteToFile) }
-                    try? FileManager.default.removeItem(at: staging)
-                }
-                published = true
-            }
+            try handle?.close()
+            handle = nil
+            guard let cacheLease else { throw URLError(.cannotWriteToFile) }
+            let reader = try cacheBudget.publish(cacheLease, gate: publicationGate)
+            handle = reader
+            published = true
         }
         return destination
     }
@@ -132,9 +129,8 @@ actor SharedStreamResource {
         requests.removeAll()
         try? handle?.close()
         handle = nil
-        if !published, MediaFileCache.isSafeDestination(staging, in: staging.deletingLastPathComponent()) {
-            try? FileManager.default.removeItem(at: staging)
-        }
+        cacheLease?.release()
+        cacheLease = nil
     }
 
     private func checkActive() throws {
@@ -187,13 +183,15 @@ actor SharedStreamResource {
                 throw URLError(.badServerResponse)
             }
             if handle == nil {
-                let root = staging.deletingLastPathComponent()
-                guard MediaFileCache.isSafeDestination(staging, in: root) else { throw URLError(.noPermissionsToReadFile) }
-                try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true,
-                                                       attributes: [.posixPermissions: 0o700])
-                guard MediaFileCache.isSafeDestination(staging, in: root) else { throw URLError(.noPermissionsToReadFile) }
-                guard FileManager.default.createFile(atPath: staging.path, contents: nil, attributes: [.posixPermissions: 0o600]) else { throw URLError(.cannotCreateFile) }
-                handle = try FileHandle(forUpdating: staging)
+                let transfer = try cacheBudget.begin(destination: destination, staging: staging,
+                                                     bytes: result.metadata.size, mayEvict: mayEvictCache)
+                do { try checkActive() }
+                catch {
+                    try? transfer.handle.close(); transfer.lease.release()
+                    throw error
+                }
+                cacheLease = transfer.lease
+                handle = transfer.handle
             }
             if !completed.contains(offset) {
                 try handle?.seek(toOffset: UInt64(offset))

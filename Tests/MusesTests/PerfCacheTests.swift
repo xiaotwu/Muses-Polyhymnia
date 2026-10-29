@@ -151,6 +151,52 @@ struct PerfCacheTests {
 
     // MARK: - YTDlpSearchCache
 
+    @Test("cold Home privacy invalidation revokes a partition whose first write is still encoding")
+    func coldHomeInvalidationRevokesUnopenedPartition() async throws {
+        let dir = tmpDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let home = HomeFeedCache(directory: dir)
+        let partition = home.directoryURL(for: .account(channelID: "UC_one"), layer: .web, mode: .youtubeMusic,
+            language: "en", region: "US")
+        let disk = RebuildableJSONCache(root: dir, limits: .home)
+        let writer = SWRCache<GatedCacheValue>(directory: partition, diskCache: disk)
+        let gate = CacheEncodingGate()
+        defer { gate.release() }
+        writer.set("feed", value: GatedCacheValue(text: "old-account", gate: gate))
+        for _ in 0..<100 where !gate.started { try await Task.sleep(for: .milliseconds(10)) }
+        try #require(gate.started)
+        home.invalidate(scope: .account(channelID: "UC_one"), layer: .web, mode: .youtubeMusic)
+        gate.release()
+        await writer.flushPendingWrites()
+        #expect(SWRCache<GatedCacheValue>(directory: partition, diskCache: disk).get("feed") == nil)
+        #expect(!FileManager.default.fileExists(atPath: partition.path))
+    }
+
+    @Test("a different SWR instance revokes delayed disk writes for the same partition",
+          arguments: ["invalidate", "clear", "replace"])
+    func crossInstanceDelayedWriteIsRevoked(action: String) async throws {
+        let dir = tmpDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let gate = CacheEncodingGate()
+        defer { gate.release() }
+        let first = SWRCache<GatedCacheValue>(directory: dir)
+        first.set("k", value: GatedCacheValue(text: "old", gate: gate))
+        for _ in 0..<100 where !gate.started { try await Task.sleep(for: .milliseconds(10)) }
+        try #require(gate.started)
+        let second = SWRCache<GatedCacheValue>(directory: dir)
+        if action == "replace" {
+            second.set("k", value: GatedCacheValue(text: "new"))
+            await second.flushPendingWrites()
+        } else if action == "clear" { second.clearAll() }
+        else { second.invalidate("k") }
+        gate.release()
+        await first.flushPendingWrites()
+        let cold = SWRCache<GatedCacheValue>(directory: dir)
+        #expect(cold.get("k")?.value.text == (action == "replace" ? "new" : nil))
+        #expect(try FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)
+            .allSatisfy { $0.pathExtension == "json" })
+    }
+
     @Test("YTDlpSearchCache: fresh hit skips process spawn determination")
     func searchCacheFreshness() {
         let cache = YTDlpSearchCache(directory: tmpDir(), freshWindow: 60)

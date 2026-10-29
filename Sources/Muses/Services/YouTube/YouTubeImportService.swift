@@ -55,19 +55,18 @@ struct YouTubeImportCollectionSnapshot: Equatable, Sendable {
 ///
 /// Mirrors the `MetadataEnricherService` pattern: `@MainActor`, a fresh
 /// `ModelContext(modelContainer)` per operation, networking through an injected `URLSession`,
-/// covers persisted via `ArtworkCache`, and logging through `AppLog`.
+/// cover URLs retained in user truth, and logging through `AppLog`.
 ///
 /// Responsibilities:
 ///  - `importPlaylist(url:)` — fetches playlist entries via yt-dlp `--flat-playlist --dump-json`,
 ///   creating `YouTubeImport` + `YouTubeImportItem` + lazily created `.youtube`
-///   `Track`s, and downloads the playlist cover (the first video's thumbnail).
+///   `Track`s, retaining the provider's cover URL.
 @Observable
 @MainActor
 final class YouTubeImportService {
     private(set) var activeOperations = 0
     private let bridge: any YTDlpBridgeProtocol
     private let modelContainer: ModelContainer
-    private let artworkCache: ArtworkCache
     private let session: URLSession
     private let saveLocalEdit: (ModelContext) throws -> Void
     private weak var catalog: YouTubeCatalogService?
@@ -207,13 +206,14 @@ final class YouTubeImportService {
 
     init(bridge: any YTDlpBridgeProtocol,
          modelContainer: ModelContainer,
-         artworkCache: ArtworkCache = .default,
+         // Existing callers may still inject the retired warm cache. No file
+         // from it is deleted; provider artwork URLs remain authoritative.
+         artworkCache _: ArtworkCache? = nil,
          session: URLSession = .shared,
          catalog: YouTubeCatalogService? = nil,
          saveLocalEdit: @escaping (ModelContext) throws -> Void = { try $0.save() }) {
         self.bridge = bridge
         self.modelContainer = modelContainer
-        self.artworkCache = artworkCache
         self.session = session
         self.catalog = catalog
         self.saveLocalEdit = saveLocalEdit
@@ -304,10 +304,8 @@ final class YouTubeImportService {
         let oembedArtwork = preview.artworkURL
         // Finish awaits before creating a mutation context; concurrent imports may have committed meanwhile.
         let artworkURLString = oembedArtwork ?? entries.first.map { thumbnailURL(forVideoId: $0.id) }
-        if let artworkURLString, let artworkURL = URL(string: artworkURLString),
-           let imageData = await get(artworkURL) {
-            _ = try? artworkCache.store(imageData)
-        }
+        // Rendering uses this provider URL and the bounded HTTP cache. The old
+        // duplicate hash-file warm write had no reader or stored hash reference.
         try Task.checkCancellation()
         if let existing = fetchImportByPlaylistId(playlistId, context: ModelContext(modelContainer)) { return existing.id }
 
@@ -371,7 +369,7 @@ final class YouTubeImportService {
 
     /// Imports a single YouTube video as a `.youtube` track (returns the existing one for a known youTubeId).
     ///
-    /// Fetches title/channel/cover via YouTube oEmbed (falling back to placeholders), creates the lazy track, and caches the cover.
+    /// Fetches title/channel/cover URL via YouTube oEmbed and creates the lazy track.
     /// - Returns: the id of the new or existing track.
     @discardableResult
     func importVideo(url: String, saveToLibrary: Bool = true) async throws -> UUID {
@@ -417,12 +415,6 @@ final class YouTubeImportService {
         )
         fresh.insert(track)
         try fresh.save()
-
-        // Cache the cover (non-blocking).
-        if let url = URL(string: artworkURLString),
-           let imageData = await get(url) {
-            _ = try? artworkCache.store(imageData)
-        }
 
         catalog?.rebuildFromTrackMetadata()
         log.info("Imported single video \(videoId) (\(title))")

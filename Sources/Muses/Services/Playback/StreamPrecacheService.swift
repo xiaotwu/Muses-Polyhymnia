@@ -3,6 +3,7 @@ import SwiftData
 
 /// Opt-in idle downloads. It never changes the queue, history, or playback state,
 /// and never evicts previously played files to make room for predictions.
+/// The shared media budget also governs ordinary paused-playback downloads.
 @Observable
 @MainActor
 final class StreamPrecacheService {
@@ -11,6 +12,7 @@ final class StreamPrecacheService {
     private let resolution: any ResolvedStreamProvider
     private let session: URLSession
     private let directory: URL
+    private let cacheBudget: MediaCacheBudget
     private let candidates: (Scope) -> [TrackSnapshot]
     private let isBusy: () -> Bool
     @ObservationIgnored private var work: Task<Void, Never>?
@@ -40,11 +42,13 @@ final class StreamPrecacheService {
 
     init(resolution: any ResolvedStreamProvider, defaults: UserDefaults = .standard,
          candidates: @escaping (Scope) -> [TrackSnapshot], isBusy: @escaping () -> Bool,
-         session: URLSession? = nil, directory: URL = MediaFileCache.directory) {
+         session: URLSession? = nil, directory: URL = MediaFileCache.directory,
+         cacheBudget: MediaCacheBudget = .shared) {
         self.resolution = resolution
         self.session = MediaFileCache.ephemeralSession(copying: session)
         self.directory = directory
         self.defaults = defaults
+        self.cacheBudget = cacheBudget
         self.candidates = candidates
         self.isBusy = isBusy
     }
@@ -69,13 +73,19 @@ final class StreamPrecacheService {
     func configure() {
         pauseForPlayback()
         completedCount = 0
-        guard defaults.bool(forKey: PrefKey.streamPrecacheEnabled) else { preparationStatus = .off; return }
+        let enabled = defaults.bool(forKey: PrefKey.streamPrecacheEnabled)
+        if !enabled { preparationStatus = .off }
         let generation = generation
         let scope = Scope(rawValue: defaults.string(forKey: PrefKey.streamPrecacheScope) ?? "favorites") ?? .favorites
         let quality = defaults.string(forKey: PrefKey.ytAudioQuality) ?? "bestaudio"
         let budget = Self.budgetBytes(defaults.integer(forKey: PrefKey.streamPrecacheLimitGB))
         work = Task { @MainActor [weak self] in
             guard let self else { return }
+            let directory = directory, cacheBudget = cacheBudget
+            // Maintenance is independent of prediction consent. Protected decoder
+            // files survive a smaller limit; no further cache is admitted meanwhile.
+            _ = await Task.detached(priority: .utility) { try? cacheBudget.maintain(in: directory) }.value
+            guard enabled, !Task.isCancelled, self.generation == generation else { return }
             // Downloads remain enabled across launches, but wait while playback
             // is active. No high-frequency playback clock is observed.
             while isBusy() {
@@ -106,7 +116,7 @@ final class StreamPrecacheService {
                     let gate = MediaCachePublicationGate()
                     publicationGate = gate
                     let resource = try SharedStreamResource(stream: stream, destination: destination, session: session,
-                        publicationGate: gate)
+                        publicationGate: gate, cacheBudget: cacheBudget, mayEvictCache: false)
                     ownedResource = resource
                     self.resource = resource
                     let info = try await resource.information()
@@ -144,7 +154,7 @@ final class StreamPrecacheService {
 
     func awaitWorkForTests() async { await work?.value }
 
-    static func budgetBytes(_ gigabytes: Int) -> Int64 { Int64([1, 2, 5, 10].contains(gigabytes) ? gigabytes : 2) * 1_073_741_824 }
+    static func budgetBytes(_ gigabytes: Int) -> Int64 { MediaCacheBudget.bytes(forGigabytes: gigabytes) }
     static func fits(size: Int64, used: Int64, budget: Int64) -> Bool {
         size > 0 && used >= 0 && used <= budget && size <= budget - used
     }

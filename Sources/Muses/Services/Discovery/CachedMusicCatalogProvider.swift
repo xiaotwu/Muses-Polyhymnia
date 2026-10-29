@@ -15,6 +15,7 @@ actor CachedMusicCatalogProvider: MusicCatalogProviding {
     }
     private let upstream: any MusicCatalogProviding
     private let directory: URL
+    private let diskCache: RebuildableJSONCache
     private let region: String
     private let language: String
     private let staleLifetime: TimeInterval
@@ -25,13 +26,15 @@ actor CachedMusicCatalogProvider: MusicCatalogProviding {
          directory: URL = MusesDataPaths.caches.appending(path: "public-catalog/v2"),
          region: String = "US", language: String = "en",
          staleLifetime: TimeInterval = 7 * 24 * 60 * 60,
-         now: @escaping @Sendable () -> Date = Date.init) {
+         now: @escaping @Sendable () -> Date = Date.init,
+         diskLimits: JSONCacheLimits = .catalog) {
         let normalizedRegion = Self.normalizedRegion(region)
         let normalizedLanguage = Self.normalizedLanguage(language)
         self.upstream = upstream ?? PublicMusicCatalogProvider(
             region: normalizedRegion, language: normalizedLanguage)
         self.region = normalizedRegion
         self.language = normalizedLanguage
+        diskCache = RebuildableJSONCache(root: directory, limits: diskLimits)
         self.directory = directory
             .appending(path: Self.partitionComponent(normalizedLanguage))
             .appending(path: Self.partitionComponent(normalizedRegion))
@@ -97,9 +100,7 @@ actor CachedMusicCatalogProvider: MusicCatalogProviding {
 
     private func read(_ key: String) -> MusicCatalogPage? {
         let file = url(key)
-        guard let size = try? file.resourceValues(forKeys: [.fileSizeKey]).fileSize,
-              size <= 2 * 1_024 * 1_024,
-              let data = try? Data(contentsOf: file),
+        guard let data = diskCache.read(at: file),
               let record = try? JSONDecoder().decode(Record.self, from: data),
               record.version == 2, record.region == region,
               record.language == language,
@@ -108,7 +109,7 @@ actor CachedMusicCatalogProvider: MusicCatalogProviding {
         }
         let age = now().timeIntervalSince(record.fetchedAt)
         guard age >= 0, age <= staleLifetime else {
-            try? FileManager.default.removeItem(at: file)
+            diskCache.remove(at: file)
             return nil
         }
         return .init(items: record.items, filters: [], next: nil,
@@ -129,20 +130,9 @@ actor CachedMusicCatalogProvider: MusicCatalogProviding {
                 fetchedAt: page.fetchedAt, region: region,
                 language: language)),
               data.count <= 2 * 1_024 * 1_024 else { return }
-        do {
-            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-            let file = url(key)
-            try data.write(to: file, options: .atomic)
-            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
-            // Bound disk usage to 100 pages; network order and saved time are
-            // not rewritten when a stale page is displayed.
-            let files = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.contentModificationDateKey])
-                .filter { $0.pathExtension == "json" }
-                .sorted { ((try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast) > ((try? $1.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast) }
-            for old in files.dropFirst(100) { try? FileManager.default.removeItem(at: old) }
-        } catch {
-            // Cache failure never turns a successful network response into an error.
-        }
+        // Admission/pruning covers all locales together. Cache refusal never
+        // changes a successful provider result or its saved provider timestamp.
+        diskCache.write(data, at: url(key))
     }
 
     private nonisolated static func partitionComponent(_ value: String) -> String {

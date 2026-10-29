@@ -1,6 +1,5 @@
 import Foundation
 import CryptoKit
-import Darwin
 
 /// Generic stale-while-revalidate cache: memory plus disk JSON, with a
 /// `fetchedAt` timestamp.
@@ -30,7 +29,8 @@ final class SWRCache<T: Codable & Sendable> {
 
     private let memory: NSCache<NSString, CacheBox>
     private let directory: URL
-    private let diskWrites = SWRDiskWrites()
+    private let diskCache: RebuildableJSONCache
+    private let diskWrites: SWRDiskWrites
     // NSCache may evict at any time. Retain new values until their detached
     // persistence completes so synchronous readers cannot fall into that gap.
     private var pendingWrites: [String: (id: UUID, cached: Cached)] = [:]
@@ -42,11 +42,13 @@ final class SWRCache<T: Codable & Sendable> {
         init(_ cached: Cached) { self.cached = cached }
     }
 
-    init(directory: URL, memory: NSCache<NSString, CacheBox> = .init()) {
+    init(directory: URL, memory: NSCache<NSString, CacheBox> = .init(),
+         diskCache: RebuildableJSONCache? = nil) {
         self.directory = directory
         self.memory = memory
-        try? FileManager.default.createDirectory(at: directory,
-                                                  withIntermediateDirectories: true)
+        let cache = diskCache ?? RebuildableJSONCache(root: directory, limits: .search)
+        self.diskCache = cache
+        diskWrites = SWRDiskWrites(cache: cache)
     }
 
     /// Reads the cached value (memory first, falling back to disk). nil if not cached.
@@ -58,7 +60,7 @@ final class SWRCache<T: Codable & Sendable> {
         }
         // Backfill memory from disk.
         let url = fileURL(for: key)
-        guard let data = try? Data(contentsOf: url),
+        guard let data = diskCache.read(at: url),
               let envelope = try? JSONDecoder().decode(DiskEnvelope.self, from: data) else {
             return nil
         }
@@ -76,13 +78,13 @@ final class SWRCache<T: Codable & Sendable> {
         let envelope = DiskEnvelope(value: value, fetchedAt: fetchedAt)
         let url = fileURL(for: key)
         let diskWrites = diskWrites
-        diskWrites.begin(key, id: writeID)
+        diskWrites.begin(key, id: writeID, url: url)
         persistenceTasks[writeID] = Task.detached(priority: .utility) { [weak self] in
             let encoder = JSONEncoder()
             if let data = try? encoder.encode(envelope) {
                 diskWrites.persist(data, key: key, id: writeID, url: url)
             }
-            diskWrites.finish(key, id: writeID)
+            diskWrites.finish(key, id: writeID, url: url)
             await MainActor.run {
                 self?.persistenceTasks.removeValue(forKey: writeID)
                 guard self?.pendingWrites[key]?.id == writeID else { return }
@@ -127,45 +129,47 @@ final class SWRCache<T: Codable & Sendable> {
 private final class SWRDiskWrites: @unchecked Sendable {
     private let lock = NSLock()
     private var current: [String: UUID] = [:]
+    private let cache: RebuildableJSONCache
 
-    func begin(_ key: String, id: UUID) {
-        lock.withLock { current[key] = id }
+    init(cache: RebuildableJSONCache) { self.cache = cache }
+
+    func begin(_ key: String, id: UUID, url: URL) {
+        lock.withLock {
+            current[key] = id
+            cache.beginPublication(at: url, id: id)
+        }
     }
 
     func persist(_ data: Data, key: String, id: UUID, url: URL) {
-        let staged = url.appendingPathExtension("\(id.uuidString).tmp")
-        defer { try? FileManager.default.removeItem(at: staged) }
-        guard (try? data.write(to: staged, options: .atomic)) != nil else { return }
-        lock.withLock {
-            guard current[key] == id else { return }
-            // Same-directory rename atomically replaces the old envelope.
-            staged.withUnsafeFileSystemRepresentation { source in
-                url.withUnsafeFileSystemRepresentation { destination in
-                    if let source, let destination { _ = rename(source, destination) }
-                }
+        guard lock.withLock({ current[key] == id }) else { return }
+        cache.write(data, at: url, publicationID: id) { commit in
+            lock.withLock {
+                guard current[key] == id else { return false }
+                let published = commit()
+                current.removeValue(forKey: key)
+                return published
             }
-            current.removeValue(forKey: key)
         }
     }
 
     func invalidate(_ key: String, url: URL) {
         lock.withLock {
             current.removeValue(forKey: key)
-            try? FileManager.default.removeItem(at: url)
+            cache.remove(at: url)
         }
     }
 
-    func finish(_ key: String, id: UUID) {
+    func finish(_ key: String, id: UUID, url: URL) {
         lock.withLock {
             if current[key] == id { current.removeValue(forKey: key) }
+            cache.finishPublication(at: url, id: id)
         }
     }
 
     func clear(directory: URL) {
         lock.withLock {
             current.removeAll()
-            try? FileManager.default.removeItem(at: directory)
-            try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            cache.clear(in: directory)
         }
     }
 }

@@ -10,6 +10,60 @@ import SwiftData
 @Suite("YouTubeImportMetadata", .serialized)
 struct YouTubeImportMetadataTests {
 
+    @Test("imports retain cover URLs without downloading unused duplicate hash files", arguments: [false, true])
+    func noUnusedArtworkWarmWrite(video: Bool) async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: "muses-cover-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let artwork = ArtworkCache(directory: directory)
+        let legacy = directory.appending(path: "legacy-owned-cover.jpg")
+        try Data("unique-existing-cover".utf8).write(to: legacy)
+        let requests = ArtworkWarmWriteRequests()
+        YouTubeImportMetadataStub.reset()
+        let stub = YouTubeImportMetadataStub()
+        stub.respond(forHostContaining: "youtube.com") { request in
+            requests.append((request.url?.host ?? "") + (request.url?.path ?? ""))
+            if request.url?.path == "/oembed" {
+                return StubResponse(statusCode: 200, body: Data("""
+                {"title":"Title","author_name":"Artist","thumbnail_url":"https://i.ytimg.com/vi/abcdefghijk/cover.jpg"}
+                """.utf8), headers: ["Content-Type": "application/json"])
+            }
+            return StubResponse(statusCode: 404, body: Data())
+        }
+        stub.respond(forHostContaining: "i.ytimg.com") { request in
+            requests.append((request.url?.host ?? "") + (request.url?.path ?? ""))
+            return StubResponse(statusCode: 200, body: Data(repeating: 0xAB, count: 64),
+                headers: ["Content-Type": "image/jpeg"])
+        }
+        let session = URLSession(configuration: YouTubeImportMetadataStub.makeConfig())
+        defer { session.invalidateAndCancel() }
+        let container = try makeModelContainer(inMemory: true)
+        let bridge = MockImportBridge()
+        bridge.entries = [.init(id: "abcdefghijk", title: "Track")]
+        let service = YouTubeImportService(bridge: bridge, modelContainer: container,
+            artworkCache: artwork, session: session)
+        let savedID: UUID
+        if video { savedID = try await service.importVideo(url: "https://www.youtube.com/watch?v=abcdefghijk") }
+        else { savedID = try await service.importPlaylist(url: "https://www.youtube.com/playlist?list=PLcover") }
+        #expect(requests.snapshot().contains("www.youtube.com/oembed"))
+        #expect(!requests.snapshot().contains { $0.hasPrefix("i.ytimg.com/") })
+        #expect(try FileManager.default.contentsOfDirectory(atPath: directory.path) == [legacy.lastPathComponent])
+        #expect(try Data(contentsOf: legacy) == Data("unique-existing-cover".utf8))
+        // Retain the read context through property access. A temporary context
+        // may be released after fetch while its returned models still need it.
+        let verificationContext = ModelContext(container)
+        let savedArtwork: String? = try withExtendedLifetime(verificationContext) {
+            if video {
+                let row = try #require(try verificationContext.fetch(FetchDescriptor<Track>())
+                    .first { $0.id == savedID })
+                return row.artworkUrl
+            }
+            let row = try #require(try verificationContext.fetch(FetchDescriptor<YouTubeImport>())
+                .first { $0.id == savedID })
+            return row.artworkUrl
+        }
+        #expect(savedArtwork == "https://i.ytimg.com/vi/abcdefghijk/cover.jpg")
+    }
+
     // MARK: - oEmbed success
 
     @Test("importPlaylist with successful oEmbed populates title, channel, and artwork")
@@ -93,6 +147,12 @@ struct YouTubeImportMetadataTests {
         // Fallback artwork: the first video's hqdefault.
         #expect(imp.artworkUrl == "https://i.ytimg.com/vi/oembed00001/hqdefault.jpg")
     }
+}
+private final class ArtworkWarmWriteRequests: @unchecked Sendable {
+    private let lock = NSLock()
+    private var hosts: [String] = []
+    func append(_ host: String) { lock.withLock { hosts.append(host) } }
+    func snapshot() -> [String] { lock.withLock { hosts } }
 }
 final class YouTubeImportMetadataStub: StubURLProtocolBase, @unchecked Sendable {
     nonisolated(unsafe) private static var _rules: [StubRule] = []

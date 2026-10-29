@@ -57,14 +57,17 @@ struct PlaybackLoadingPipelineTests {
     }
 
     @Test("Pre-download stays off by default and checks complete-file budget")
-    func optionalPrecache() {
+    func optionalPrecache() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("muses-idle-\(UUID())")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
         let domain = "com.muses.tests.precache.\(UUID())"
         let defaults = UserDefaults(suiteName: domain)!
         defer { defaults.removePersistentDomain(forName: domain) }
         let bridge = MockYTDlpBridge()
         let service = StreamPrecacheService(resolution: StreamResolutionCoordinator(bridge: bridge, cache: StreamURLCache()),
             defaults: defaults, candidates: { _ in Issue.record("Disabled pre-download fetched candidates"); return [] },
-            isBusy: { false })
+            isBusy: { false }, directory: directory)
         service.configure()
         #expect(bridge.callCount == 0)
         #expect(service.completedCount == 0)
@@ -74,7 +77,10 @@ struct PlaybackLoadingPipelineTests {
     }
 
     @Test("Pre-download status follows language changes without restarting preparation")
-    func precacheStatusLanguageSwitch() async {
+    func precacheStatusLanguageSwitch() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("muses-idle-\(UUID())")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
         let domain = "com.muses.tests.precache.\(UUID())"
         let defaults = UserDefaults(suiteName: domain)!
         let originalLanguage = UserDefaults.standard.object(forKey: PrefKey.language)
@@ -97,7 +103,7 @@ struct PlaybackLoadingPipelineTests {
         var candidateReads = 0
         let service = StreamPrecacheService(
             resolution: StreamResolutionCoordinator(bridge: bridge, cache: StreamURLCache()),
-            defaults: defaults, candidates: { _ in candidateReads += 1; return [] }, isBusy: { false })
+            defaults: defaults, candidates: { _ in candidateReads += 1; return [] }, isBusy: { false }, directory: directory)
         service.configure()
         #expect(service.status == "Off")
         switchLanguage("zh-Hans")
