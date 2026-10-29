@@ -1,5 +1,9 @@
 # Muses UI/UX reconstruction acceptance — 2026-10-02
 
+## Playing-current reload — October 28, 2026
+
+The [background closeout](engineering/playing-reload-acceptance-2026-10-28.md) adds actual playing-current Clear and Data saver quality reload with advancing clocks, retained Pause intent and post-play Quit/cold retention. The candidate is reused without source/build changes; normal play-count/time changes are audited separately. This does not establish audibility, seamless sound, concurrent pre-download or a complete matrix. The next requested conversation concentrates on remaining foreground input.
+
 ## Populated cache and reload position — October 26, 2026
 
 The [fifth background continuation](engineering/populated-cache-reload-2026-10-26.md) adds the last-known nonzero cache-size Retry branch, populated Library/public-search isolation and restoration, and genuine compact Dark History ranges. It confirms and repairs XW-130: successful cache Clear reset a paused song from 1:11 to 0:00 and saved about 1 ms on Quit. The rebuilt isolated candidate retains 1:11 after actual Clear, Automatic → Data saver → Automatic, normal Quit and cold startup. Component tests cover playing intent and repeated pending reloads separately. Tool refusals and action/observation errors are retained without repeating their actions. These are narrow additions; the original 23 coordinator/matrix statuses, external input/account/platform prerequisites and XW-74/Premium/Erato pauses remain. No publication.

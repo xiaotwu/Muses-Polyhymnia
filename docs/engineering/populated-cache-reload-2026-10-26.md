@@ -75,3 +75,7 @@ The complete 980,929-byte decoded CI log has SHA-256 `3e1a578c642a46fa6a2ac0553e
 Twelve related issues (XW-130/17/11/13/10/8/73/19/12/26/27/5) and both Muses project documents were updated and read back. Existing descriptions/content, project assignments and parents remain intact; only XW-130 changes to Done. The scoped inventory has **116 issues: 93 Done, 17 In Review and six In Progress**. Its open identifiers exactly match the original 23. The current reconciliation rows for search, History and cache/reload now distinguish these accepted cells from the remaining conditions rather than repeating obsolete broad unaccepted labels.
 
 Seven engineering records carry the same evidence boundaries. Child main is integrated before the family's gitlink synchronization; only technical documentation and the submodule reference accompany the source repair. No release assets, appcast or public website content are changed. XW-74 measurements, Premium and Erato remain paused, and **no publication** is performed.
+
+## Playing-current follow-up — October 28
+
+The [subsequent native pass](playing-reload-acceptance-2026-10-28.md) adds real playing-current Clear and Automatic→Data saver reload, continued clocks/intent and the resulting pause/Quit/cold checkpoint. It uses the exact same frozen candidate; this later evidence is separate from the paused-only scope above. Concurrent pre-download, other source/quality combinations and audibility remain unaccepted.
