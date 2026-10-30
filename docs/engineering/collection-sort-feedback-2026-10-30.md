@@ -1,0 +1,31 @@
+# Collection sort feedback and portable packaged resources — October 30, 2026
+
+This work follows the [completed descending-header, paging and bookmark-draft increment](foreground-tables-bookmarks-2026-10-29.md). Previously accepted cells are not repeated. Release remains on hold; XW-74 measurement, Premium and Erato remain paused.
+
+## Sort feedback source and first CI
+
+[XW-133](https://linear.app/xiaotwu/issue/XW-133) tracks the user's report that a table sort lacks clear field/direction feedback. [PR #26](https://github.com/xiaotwu/Muses-Polyhymnia/pull/26), initial functional source `ea04298150062d49fbd37585559b011066e9fd82`, derives a persistent localized description from the real comparator array, including secondary priority. The text remains outside horizontal scrolling and is shared by native/paged tables; its accessibility value and the paged Sort menu report the same description. The fixed Songs subtitle explicitly describes default order. Comparators, canonical collection indices and queue/playback behavior are unchanged.
+
+Four regressions cover actual primary/secondary row order and direction changes, all nine fields, honest empty/unknown fallbacks and immediate English/Simplified/Traditional changes. Independent source review and [exact-source CI41004111405](https://github.com/xiaotwu/Muses-Polyhymnia/actions/runs/41004111405) passed: 1,146 tests/153 suites, nine explicit conditional skips, 15 strict-thread checks, one disk-recovery check, 50 release-configuration checks, App Intents metadata and signed preview packaging. No local whole-application build or duplicate compiler cache was created.
+
+## Exact first preview and preserved signing failure
+
+The CI artifact is ID12955157439, 221,674,825 bytes, SHA-256 `9bc1d5c855fe49ec565f7ed49cea1eb33100be9143339cd168809749d3638f0d`. Its inner ZIP is 222,629,245 bytes, SHA-256 `c1e4a6f219fa652819b7f0eabeb79ecf73108eb233ba8eb9a42b0ba01509e0d1`, with 784 freshly measured nodes and 445,624,700 expanded logical file bytes. These are not inherited old-candidate counts. The preview retains the CI default metadata 0.6.2 / `20261023.4`; that version string does not identify its source or indicate publication.
+
+The production identity in this raw CI preview was never launched. Root Info alone was configured to `com.muses.acceptance.sort-feedback-20261030`, with updates, OAuth, URL handlers and Web Home authority disabled; only the root application was re-signed. Nested files, resources and fresh App Intents metadata remained exact. The first strict conversion guard failed and remains failed: signing reduced the signature size and one `__LINKEDIT` virtual-size page, beyond the original two-field normalization.
+
+Independent byte-level review qualified only this exact observed executable pair. All 38 section descriptors/payloads, the 32-byte header and all other pre-signature bytes are identical. The only changed prefix bytes are three exact length fields: `__LINKEDIT.vmsize` 23,265,280→23,248,896, `filesize` 23,261,072→23,243,104 and signature `datasize` 87,696→69,728. The signature offset remains 35,084,544. A new frozen plan completed only the previously unfinished donor/preferences/after-inventory steps. It did not repeat extraction, configuration, signing or the original journal. The original false result was not rewritten or turned into a general tolerance.
+
+## First native launch aborted before any window
+
+The first mediated launch timed out. The exact candidate then produced SIGTRAP PID98425, with `assertionFailure → NSBundle.module → L10n.traditionalStrings → MusesApp.init`; no native window was observed and no launch was repeated. `MusesApp.init` loads this dictionary at line61, before ModelContainer composition at line77 in the frozen source. The whole isolated main SQLite file still matches the donor SHA-256 `c43d5447d640ed919f102ab65c62bfe50eb9d237707aaf93fe316ca3d9d80310`, with no WAL, SHM or journal. This is an aborted launch, not normal Quit or completed native acceptance.
+
+[XW-134](https://linear.app/xiaotwu/issue/XW-134) records the distinct resource failure. The binary embeds the module bundle name and a runner build-directory fallback, while both installed aliases reside inside `Contents/Resources`. The [SwiftPM6.3.3 generator](https://raw.githubusercontent.com/swiftlang/swift-package-manager/swift-6.3.3-RELEASE/Sources/Build/BuildDescription/SwiftModuleBuildDescription.swift) constructs a bundle-root candidate and then a build-directory fallback. The local Xcode-generated accessor also searches the resource directory; its behavior cannot substitute for the CI executable. The confirmed failure is scoped to this preview, without extrapolating it to another installed or published binary.
+
+## Portable resource repair and next verification
+
+One Foundation resource locator now prefers both existing module aliases in the application's resource directory. Packaged applications missing them return an explicit missing result; SwiftPM development/test fallback remains lazy. All eight production module-resource accesses use this entry, including startup localization, resolver resource discovery, tray assets and settings resource links. The resolver's existing main/source/environment/command search behavior remains otherwise intact.
+
+The real CI module contains full flat copied resources plus a `Contents` shell for bundled tools. Lookup preserves Foundation's resource result first, then permits the requested flat path within the selected module bundle, so localization/fonts remain available beside that shell. Ten fixture cases cover alias priority, relocation, missing bundles/resources, zero/one development fallback evaluation and this actual dual layout. CI previews are assigned a unique acceptance identity before signing; normal release-packaging defaults are preserved.
+
+New-source CI and exact new-preview startup/visual/AX checks remain pending at this checkpoint. Old-candidate ordering success and component tests do not establish the new sort description's rendered behavior. The original strict signing failure, first launch timeout, crash, aborted lifecycle and untouched initial data remain separately retained. Normal native-completion/normal-Quit audit paths are inapplicable to this aborted candidate; its cleanup must use the independently reviewed abort-only plan.

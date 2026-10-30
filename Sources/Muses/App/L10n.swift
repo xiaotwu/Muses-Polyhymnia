@@ -52,13 +52,15 @@ enum L10n {
     /// Loaded once, including before the first scene is composed. Dynamic copy
     /// supplies an explicit Traditional Chinese literal to preserve user text.
     static let traditionalStrings: [String: String] = {
-        let urls = [
-            Bundle.module.url(forResource: "zh-Hant", withExtension: "json", subdirectory: "Resources/Localization"),
-            Bundle.main.url(forResource: "zh-Hant", withExtension: "json", subdirectory: "Localization")
-        ]
-        for case let url? in urls {
-            if let data = try? Data(contentsOf: url),
-               let strings = try? JSONDecoder().decode([String: String].self, from: data) { return strings }
+        if let url = MusesResources.url(forResource: "zh-Hant", withExtension: "json", subdirectory: "Resources/Localization"),
+           let data = try? Data(contentsOf: url),
+           let strings = try? JSONDecoder().decode([String: String].self, from: data) {
+            return strings
+        }
+        if let url = Bundle.main.url(forResource: "zh-Hant", withExtension: "json", subdirectory: "Localization"),
+           let data = try? Data(contentsOf: url),
+           let strings = try? JSONDecoder().decode([String: String].self, from: data) {
+            return strings
         }
         return [:]
     }()

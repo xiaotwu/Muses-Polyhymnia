@@ -351,7 +351,7 @@ final class YTDlpBridge {
         }
 
         // 2) Bundle resources. Prefer the main bundle inside the .app, then the SPM
-        //    module resource bundle (Muses_Muses.bundle, produced by
+        //    portable module resource bundle (produced by
         //    .copy("Resources")), then Resources/yt-dlp relative to the working
         //    directory (for swift run from the repo root), and finally the
         //    MUSES_YTDLP_PATH environment variable.
@@ -360,7 +360,7 @@ final class YTDlpBridge {
         candidateURLs.appendIfPresent(
             Bundle.main.url(forResource: "yt-dlp", withExtension: nil))
         candidateURLs.appendIfPresent(
-            Bundle.module.url(forResource: "yt-dlp", withExtension: nil))
+            MusesResources.url(forResource: "yt-dlp", withExtension: nil, subdirectory: "Resources"))
         candidateURLs.append(URL(fileURLWithPath:
             FileManager.default.currentDirectoryPath
             + "/Sources/Muses/Resources/yt-dlp"))

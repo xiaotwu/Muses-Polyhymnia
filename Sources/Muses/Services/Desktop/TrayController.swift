@@ -266,7 +266,7 @@ final class TrayController: NSObject, NSPopoverDelegate {
 enum TrayIcon {
     static let logoImage = loadLogo()
     private static let menuBarSource: NSImage? = {
-        let url = Bundle.module.url(forResource: "MenuBarMark", withExtension: "png", subdirectory: "Resources")
+        let url = MusesResources.url(forResource: "MenuBarMark", withExtension: "png", subdirectory: "Resources")
         return url.flatMap { NSImage(contentsOf: $0) }
     }()
     static let menuBarImage = templateImage(from: menuBarSource, pointSize: 18,
@@ -279,8 +279,8 @@ enum TrayIcon {
 
     static func loadLogo() -> NSImage? {
         let url = Bundle.main.url(forResource: "icon", withExtension: "png")
-            ?? Bundle.module.url(forResource: "icon", withExtension: "png")
-            ?? Bundle.module.url(forResource: "icon", withExtension: "png", subdirectory: "Resources")
+            ?? MusesResources.url(forResource: "icon", withExtension: "png")
+            ?? MusesResources.url(forResource: "icon", withExtension: "png", subdirectory: "Resources")
         return url.flatMap { NSImage(contentsOf: $0) }
     }
 
