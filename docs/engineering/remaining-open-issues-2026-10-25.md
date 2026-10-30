@@ -1,5 +1,7 @@
 # Remaining open issues — October 25, 2026
 
+2026-10-29 新3项处置完成：用户另行明确批准本轮候选APP／隔离资料／空偏好3项，要求恢复包、证据及其他废纸篓不动。639节点与恢复材料重新核验、脚本／计划冻结并独立审查后已永久处置；自有空Trash根移除、任务Trash余量0，其他8个Trash顶层身份未变。APFS实测区间528,190,615,552→528,440,528,896B，增加249,913,344B／238.34MiB（含后台变化，非独占回收保证）；69份原证据、恢复档及原失败／passed:false均保留，不重做旧1650项。仅维护记录收尾，无新原生通过、构建、权限变更或发布，原23矩阵及暂停保持。[明确批准的3项收尾](foreground-acceptance-2026-10-29.md#separately-approved-disposal-of-the-three-new-targets)。
+
 2026-10-29 前台接续：精确隔离 Release 20261026.3／d7bea1b 新增自有EQ预设 Delete→Flat、前台工具Escape、Diagnostics Preview/Cancel和人类确认无主窗口 Settings→General；手动展开、工具输入与物理键盘边界分列。五涉及文件与f9同值，整份旧候选不代表新缓存源码原生通过；About因无更新源入口禁用仍未验。系统设置实际Spotlight仍显示37旧标识，正常com.muses.app权限不动，通知无可辨旧项不重设。正常Quit、零自有进程、五保护根同值；清理原偏好回读失败与晚期旧LS登记失败保留，从精确未完处续行／现存Trash路径注销后独立闭环。新生成1菜单pair/1Spotlight键有备份后定向撤回；七份helper已可恢复压缩。3个新Trash目标分配350,453,760B（约334MiB），尚未永久处置，旧1650项授权不覆盖。10个Linear事项和两项目文档已同步回读，118项／95Done／原23开放，暂停与暂不发布保持。[本轮证据与未验边界](foreground-acceptance-2026-10-29.md)。
 
 The user requested repairs across all remaining open Muses issues. A fresh project-scoped read found 23 existing open issues: six In Progress and 17 In Review. These include implementation coordinators and acceptance matrices, not 23 independent confirmed defects. Every issue below belongs to [Muses](https://linear.app/xiaotwu/project/muses-5e747ca2af19), project `P-XW-2` / `c2f9c252-e1d1-4210-bbd5-15a5366b9d28`; identifiers, parents and previous evidence are retained.
