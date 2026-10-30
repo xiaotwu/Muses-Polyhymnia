@@ -1,0 +1,65 @@
+# Foreground acceptance — October 29, 2026
+
+This conversation continues the completed background cleanup. The frozen handoff receipt exists, has `passed:true`, and matches SHA-256 `e4e597f9067592b91a685f4e4a583655d5b17cab3d376065f0da6f15b8593ae4`. Parent `53056da` and child `ba37979` were clean at entry. A new owned workspace lock and runtime lock serialize this pass. Publication, XW-74 measurement, Premium and Erato remain paused.
+
+## System Settings observations before restoring a candidate
+
+The actual host is macOS 27.0.1 / 26A434. Native Menu Bar settings show eleven application labels: ChatGPT, Codex Computer Use, Discord, Docker, Google Chrome, Motrix, Muses, QQ, Terminal, WallpaperMachine and WeChat. The old acceptance labels are absent. The single Muses label alone does not identify a bundle or establish that every registration is gone.
+
+Spotlight still displays **37 old `com.muses.acceptance.*` identifiers** in Results from Apps, including `remaining-20261025`, before the candidate is restored. The normal Muses, Manual Shortcut, Scrolling Auxiliary and Tray Menu Icons labels remain. This is a failed UI-absence check, despite the previously successful scoped preference persistence check. No preference clear, indexing rebuild, global reset or service kill was repeated. The exact observed identifiers are in private `system-ui-observations.json`.
+
+Files & Folders displays fourteen application rows. Its Muses-related label is `MusesBrokenSigning.app`, whose expanded child is Google Chrome.app with access on. Live Info.plist identifies the retained app at `remaining-repairs-oct23-01a16186/MusesBrokenSigning.app` as **`com.muses.app` / build `20261021.2`**. That shared normal identity prevents treating the label as an isolated acceptance permission. It remains untouched. Full Disk Access shows ten rows and no old acceptance label. These two panes do not establish cleanliness of all TCC categories, and previous successful `tccutil` commands remain command evidence only.
+
+The refreshed Notifications application list contains 41 rows and one Muses label, with Desktop enabled. No old acceptance application can be identified there for a scoped reset. No notification switch or reset was used; UI absence does not prove deletion of the old service inventory. Both paused identities and ManualShortcut remain protected. Historical TCC commands included both paused identities; retained files do not prove their historical permissions stayed unchanged, and no further reset or automatic regrant occurred. The task-created System Settings window was closed, and the later application inventory reports System Settings not running.
+
+## Candidate and scope
+
+Release 0.6.2 / `20261026.3`, bundle `com.muses.acceptance.remaining-20261025`, was restored from the existing ZIP with SHA-256 `3ad8eebd6f6ab85c4d04e9d2e65bb8ab4a6fc8a29713a9ed8cbae31abcf98f7b`. All 623 archived primary entries and the executable hash match; strict deep signature verification passes. Expanded logical size is 348,957,206 bytes. The profile and physical preference file were initially absent; the logical domain was empty. This pass starts with a new empty store, System language and floating-point app volume zero. No normal library, account, browser, OAuth or cookie material was copied.
+
+The executable's frozen source is **`d7bea1b`**, while current functional source is **`f9d80a9`**. The EQ editor/store, configuration wizard, diagnostics window and single-instance settings-routing files are unchanged between those revisions. Results below belong to the exact old candidate and exercised conditions. They are not native evidence for the newer cache-budget implementation or its changed Settings surfaces. No rebuild or repeated source CI was performed.
+
+Scratch has an explicit 8 GiB total budget and 100 GiB free-space floor. Before extraction, filesystem free space was 562,865,688,576 bytes; a later task allocation was 354,525,184 bytes with 562,608,578,560 bytes free. These are timed filesystem observations, not exclusive APFS recovery claims.
+
+## EQ preset deletion and foreground key
+
+Through Playback → Audio Info → Open EQ Editor, one 1 kHz increment changed the band to +0.5 dB. Native Save As created and selected `Foreground QA 01a18a83`. Its context-menu Delete opened a confirmation naming that exact preset. Confirming Delete removed it, selected Flat and returned all ten gains to zero. A read-only SQLite backup after deletion has zero EQPreset rows, zero Tracks and `integrity_check=ok`; preferences identify Flat.
+
+After raising the EQ sheet, a CUA-generated foreground Escape returned to Audio Info. A second Escape returned to the main Settings view. This adds native key-delivery evidence; it is not human physical-keyboard handoff or VoiceOver evidence. With no stream, the editor truthfully reports that EQ/spectrum cannot process the current stream. No DSP, playback or audibility result follows.
+
+## Diagnostics configuration Preview and Cancel
+
+The independent Diagnostics window opened from Settings. AX and coordinate attempts did not visibly expand Muses playback configuration. Those unsuccessful attempts are retained; the user then explicitly reported manually expanding the row, and the next native screenshot/AX state confirmed it open. This input boundary is not counted as an automated disclosure-control pass.
+
+The Browser draft initially showed None and Preview was disabled. Selecting Safari enabled Preview. The sheet named the target as Muses playback preference on this Mac, Current source None and New source Safari. Native Cancel returned to Diagnostics while retaining Safari only as a draft. Full logical preferences exported before Preview and after Cancel are equal, with no changed keys or cookie-source key. The external standard configuration file's presence/hash also matches. No Apply, import or playback request was invoked. Returning the draft to None disabled Preview again.
+
+The first audit-report serialization rejected EQ Data bytes; both original raw preference exports remained intact. The corrected scalar report records that failure and the successful comparison. It does not repeat the UI operation.
+
+## No-main-window settings routing
+
+The close button, Command-W after Raise and native File → Close each left or returned the main Home window in tool readback. This does not establish a no-main-window precondition; the cause is unproven and these paths were not repeated. The user then reported that Check for Updates is grey and cannot be clicked. The actual candidate has empty `SUFeedURL` and `SUPublicEDKey`, with `MusesUpdateAcceptanceLoopback:false`; the menu requires `updater.canCheck`. Explicit About delayed navigation therefore remains unaccepted on this candidate. No update feed or source change was made to bypass that prerequisite.
+
+For the separate request to use Muses → Settings with no main window, the user replied “哦我之前理解错了，General正确打开”. This is a human-assisted pass for ordinary Settings. The subsequent native AX state and screenshot independently show the main window with General selected, System language and notification permission Not requested. The no-main-window precondition and manual action are human-reported, rather than independently established by the inconclusive tool close attempts. Home was restored before normal native Quit; exact candidate PID 73820 was then absent. No product defect is inferred from the tool limitation or disabled update entry.
+
+## Evidence and remaining work
+
+Private bounded receipts, raw preference exports and SQLite snapshots are under `~/.muses/tmp/engineering-oct15/foreground-oct29-01a18a83`. Native AX states and inline screenshots remain in this chat; no standalone screenshot files were created. Candidate preparation was frozen at helper SHA-256 `0b28453e044146ffda066a2a28695aa1433ab7944940941f9c567e8e682d1b7c` before execution. The original handoff, cleanup failures/journals, recovery archives and 135 prior native inputs are untouched.
+
+This pass does not close the original 23 coordinator/acceptance issues. Descending column-header sorting/paging, real multi-bookmark input, physical keyboard handoff, full accessibility, actual macOS 26, account/device/provider prerequisites and the new cache source's native conditions remain separate.
+
+## Recoverable cleanup and synchronization
+
+Five complete protected-root manifests match between entry and the stopped candidate: formal app, normal data, normal preferences and both shared build roots. Comparing all 27 tables between the post-EQ snapshot and final stopped SQLite backup finds no changed rows. This comparison starts after preset deletion; it does not invent a pre-EQ snapshot or whole-database byte equality.
+
+The first cleanup script stopped after its 15-member profile primary archive passed verification. Importing the initial preferences retained eight generated test keys, so strict whole-dictionary equality failed; both original values were restored, but the operation was not called successful. Its original failure and journal remain. A separately frozen/reviewed continuation rechecked the unfinished state, deleted only those eight fixed keys with typed readback after each, verified the initial two keys including types and stable physical persistence, and then performed the previously unexecuted owned-domain clear. No completed archive/import/key deletion was replayed. Original and continuation hashes, journals and reviews remain in the private record.
+
+The exact app, profile and empty physical preference file moved to `~/.Trash/muses-foreground-oct29-01a18a83`. The final profile archive SHA-256 is `22c2f1a05879a27328ad230e6459901a125687d99c303c939ab684924d069af7`; verification covers primary bytes, modes, ownership, kinds and the complete 15-member set, without claiming xattr/ACL recovery. The existing complete 623-entry app ZIP remains canonical.
+
+An independent later check found an original-path Launch Services record despite the initial immediate unregister readback. That audit remains `passed:false`. A distinct recovery bound the verified existing Trash app's inode, ownership and executable, then issued one supported unregister for that **live staged path**, without re-registering or retrying the nonexistent source path. Final independent readback has zero original/Trash/nested registrations, zero owned processes/holds, absent source/HTTP/Application Scripts paths and an empty logical domain. `independent-final-recoverable-closure.json` SHA-256 is `1bbd21c29653fd74dcbb06eb7fa48fef9de24c59dcc07ea27063aabb7cd5f3b9`. The earlier failed audit remains unchanged.
+
+Launching this candidate had also reintroduced one Menu Bar pair naming this exact task path and one Spotlight preference key. Fresh complete logical/physical backups and a scoped rollback plan were saved. A separately reviewed operation removed only those new entries: Menu Bar 14 → 13 pairs and Spotlight 328 → 327 current keys. Every other fresh typed value and pair order is retained. This does not replay the old eight/41 cleanup or restore an old whole domain. Persistence passed; consumer memory and visible Settings absence were not revalidated, so the earlier 37-label Spotlight observation remains unresolved.
+
+Seven finished generated helper sources (31,266 bytes) were compacted into a verified 7,113-byte archive, SHA-256 `65426698345f00cb409cc1616889608fbd0b06c3f82e8032e591c39b3cda156e`. All seven primary members matched before removing their loose duplicates; failures, journals, plans and reviews remain. No compiler cache was created or archived.
+
+The three new Trash targets account for **349,404,567 logical bytes** (including symlink lengths) and **350,453,760 allocated bytes**. They remain recoverable and **have not been permanently disposed**. The old 1,650-target authorization does not cover these new targets. Their exact proposal is `permanent-disposal-proposal.json`, SHA-256 `8a96de9663cf928c3f95c0065d35958c6e4aa7d22630a8f6a2e7bd6c98d8f8c4`; all other Trash and retained evidence are excluded. Moving to Trash does not establish physical reclamation. At 02:48:02 UTC on October 30, APFS disk3 reported 560,826,937,344 free bytes; the private bounded evidence directory allocated 9,646,080 bytes before these final small records. Unrelated activity contributes to free-space changes.
+
+Ten existing Linear issues and both existing Muses project documents were updated and read back with exact prior history suffixes, titles, states, parents and project membership preserved. The project still has 118 issues: 95 Done, 17 In Review and six In Progress, with the same 23 open identifiers. Linear normalized new issue links, so the readback checks required facts and exact old suffixes rather than claiming new-section byte equality. Publication, installation and all paused scopes remain unchanged. Git bookkeeping and owned-lock release follow this record; new irreversible disposal remains an explicit separate decision.
