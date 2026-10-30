@@ -381,6 +381,10 @@ private struct CollectionTrackTable: View {
 
     private var usesAccessiblePages: Bool { voiceOverEnabled || pagedTablesEnabled }
 
+    private var sortDescription: String {
+        CollectionTableSortFeedback.description(for: sortOrder)
+    }
+
     init(
         rows: [CollectionTrackRow],
         source: QueueSource,
@@ -484,6 +488,17 @@ private struct CollectionTrackTable: View {
 
     var body: some View {
         VStack(spacing: 0) {
+        Text(tr("Sort: \(sortDescription)", "排序：\(sortDescription)", zhHant: "排序：\(sortDescription)"))
+            .font(MusesTypography.callout)
+            .foregroundStyle(BrandColors.textSecondary)
+            .multilineTextAlignment(.leading)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .accessibilityIdentifier("collection.song-sort")
+            .accessibilityLabel(tr("Song sort", "歌曲排序", zhHant: "歌曲排序"))
+            .accessibilityValue(sortDescription)
         if usesAccessiblePages {
             HStack(spacing: 12) {
                 Spacer(minLength: 0)
@@ -514,6 +529,7 @@ private struct CollectionTrackTable: View {
                 }
                 .labelStyle(.iconOnly)
                 .help(tr("Sort songs", "歌曲排序"))
+                .accessibilityValue(sortDescription)
                 .fixedSize()
                 if accessiblePageCount > 1 {
                     Button(tr("Previous page", "上一页", zhHant: "上一頁")) {

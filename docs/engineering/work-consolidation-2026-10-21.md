@@ -1,5 +1,7 @@
 # 多轮工作整理：2026-10-21
 
+2026-10-29 列头／分页／书签前台增量已完成：人类选择 Date Added／Plays 降序后核对真实行序；Appearance 分页 Off→On→25首／第1共22页→Off；test 专属且未入 Liked 的 Stay 通过真实输入两条 Add、内层 Cancel 与外层 Cancel／重开无书签。535曲目／1064成员／40事件、Liked完整534成员和534队列／9份JSON保留，22表同值；两暂停位置列仅−13 ULP，原 strict false 与独立限定量化审查并存，不称全库同值。正常Quit、四自有原物可恢复移入新专用Trash（分配365,555,712B），profile／HTTP原物作为恢复证据保留且禁止永久处置；零共享设置写入，五保护根和其他8个Trash身份同值，两锁释放，移动不算空间回收。新发现 [XW-133](https://linear.app/xiaotwu/issue/XW-133) 当前排序字段／方向提示不足，源码与新候选另验。旧通过格不重做，原23矩阵及既有暂停／暂不发布保持。[精确增量与证据](foreground-tables-bookmarks-2026-10-29.md)。
+
 2026-10-29 新3项处置完成：用户另行明确批准本轮候选APP／隔离资料／空偏好3项，要求恢复包、证据及其他废纸篓不动。639节点与恢复材料重新核验、脚本／计划冻结并独立审查后已永久处置；自有空Trash根移除、任务Trash余量0，其他8个Trash顶层身份未变。APFS实测区间528,190,615,552→528,440,528,896B，增加249,913,344B／238.34MiB（含后台变化，非独占回收保证）；69份原证据、恢复档及原失败／passed:false均保留，不重做旧1650项。仅维护记录收尾，无新原生通过、构建、权限变更或发布，原23矩阵及暂停保持。[明确批准的3项收尾](foreground-acceptance-2026-10-29.md#separately-approved-disposal-of-the-three-new-targets)。
 
 2026-10-29 前台接续：精确隔离 Release 20261026.3／d7bea1b 新增自有EQ预设 Delete→Flat、前台工具Escape、Diagnostics Preview/Cancel和人类确认无主窗口 Settings→General；手动展开、工具输入与物理键盘边界分列。五涉及文件与f9同值，整份旧候选不代表新缓存源码原生通过；About因无更新源入口禁用仍未验。系统设置实际Spotlight仍显示37旧标识，正常com.muses.app权限不动，通知无可辨旧项不重设。正常Quit、零自有进程、五保护根同值；清理原偏好回读失败与晚期旧LS登记失败保留，从精确未完处续行／现存Trash路径注销后独立闭环。新生成1菜单pair/1Spotlight键有备份后定向撤回；七份helper已可恢复压缩。3个新Trash目标分配350,453,760B（约334MiB），尚未永久处置，旧1650项授权不覆盖。10个Linear事项和两项目文档已同步回读，118项／95Done／原23开放，暂停与暂不发布保持。[本轮证据与未验边界](foreground-acceptance-2026-10-29.md)。

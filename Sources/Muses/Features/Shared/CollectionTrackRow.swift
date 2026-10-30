@@ -221,6 +221,48 @@ enum CollectionTrackSort {
     }
 }
 
+/// Describes the active comparator priority without storing translated text or
+/// changing the canonical collection or its visual sorting behavior.
+enum CollectionTableSortFeedback {
+    static func description(for comparators: [KeyPathComparator<CollectionTrackRow>]) -> String {
+        guard !comparators.isEmpty else {
+            return tr("Original song order", "原始歌曲顺序", zhHant: "原始歌曲順序")
+        }
+        return comparators.map { comparator in
+            let field = fieldName(for: comparator.keyPath)
+            let direction = comparator.order == .forward
+                ? tr("Ascending", "升序", zhHant: "升序")
+                : tr("Descending", "降序", zhHant: "降序")
+            return tr("\(field): \(direction)", "\(field)：\(direction)", zhHant: "\(field)：\(direction)")
+        }.joined(separator: tr("; then ", "；其次", zhHant: "；其次"))
+    }
+
+    private static func fieldName(for keyPath: PartialKeyPath<CollectionTrackRow>) -> String {
+        switch keyPath {
+        case \CollectionTrackRow.canonicalIndex:
+            tr("Collection order", "歌单顺序", zhHant: "歌單順序")
+        case \CollectionTrackRow.title:
+            tr("Title", "标题", zhHant: "標題")
+        case \CollectionTrackRow.artist:
+            tr("Artist", "艺术家", zhHant: "藝術家")
+        case \CollectionTrackRow.album:
+            tr("Album", "专辑", zhHant: "專輯")
+        case \CollectionTrackRow.yearSortValue:
+            tr("Year", "年份", zhHant: "年份")
+        case \CollectionTrackRow.genreSortValue:
+            tr("Genre", "类型", zhHant: "類型")
+        case \CollectionTrackRow.duration:
+            tr("Time", "时长", zhHant: "時長")
+        case \CollectionTrackRow.addedAtSortValue:
+            tr("Date Added", "添加日期", zhHant: "加入日期")
+        case \CollectionTrackRow.playCount:
+            tr("Plays", "播放次数", zhHant: "播放次數")
+        default:
+            tr("Custom field", "自定字段", zhHant: "自訂欄位")
+        }
+    }
+}
+
 enum CollectionTablePaging {
     static func pageCount(rowCount: Int, pageSize: Int) -> Int {
         guard pageSize > 0 else { return 1 }
