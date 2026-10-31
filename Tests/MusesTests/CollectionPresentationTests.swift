@@ -99,6 +99,91 @@ struct CollectionPresentationTests {
         #expect(rows.map(\.canonicalIndex) == [0, 1])
     }
 
+    @Test("Sort feedback follows the actual primary and secondary comparators")
+    func sortFeedbackTracksComparatorPriority() {
+        withLanguage("en") {
+            let rows = [("Old", 10.0), ("Zulu", 20.0), ("Alpha", 20.0)].enumerated().map { index, item in
+                CollectionTrackRow(
+                    snapshot: makeRow(title: item.0, artist: "Artist", canonicalIndex: index).snapshot,
+                    canonicalIndex: index, addedAt: Date(timeIntervalSince1970: item.1))
+            }
+            let originalRows = rows
+            var comparators = [
+                KeyPathComparator(\CollectionTrackRow.addedAtSortValue, order: .reverse),
+                KeyPathComparator(\CollectionTrackRow.title, comparator: .localizedStandard)
+            ]
+
+            #expect(CollectionTrackSort.rows(rows, using: comparators).map(\.canonicalIndex) == [2, 1, 0])
+            #expect(CollectionTableSortFeedback.description(for: comparators)
+                    == "Date Added: Descending; then Title: Ascending")
+
+            comparators[0].order = .forward
+            #expect(CollectionTrackSort.rows(rows, using: comparators).map(\.canonicalIndex) == [0, 2, 1])
+            #expect(CollectionTableSortFeedback.description(for: comparators)
+                    == "Date Added: Ascending; then Title: Ascending")
+            #expect(rows == originalRows)
+            #expect(rows.map(\.canonicalIndex) == [0, 1, 2])
+        }
+    }
+
+    @Test("Every native collection column has an identifiable sort field")
+    func sortFeedbackNamesAllColumns() {
+        withLanguage("en") {
+            let fields: [(KeyPathComparator<CollectionTrackRow>, String)] = [
+                (KeyPathComparator(\.canonicalIndex), "Collection order"),
+                (KeyPathComparator(\.title, comparator: .localizedStandard), "Title"),
+                (KeyPathComparator(\.artist, comparator: .localizedStandard), "Artist"),
+                (KeyPathComparator(\.album, comparator: .localizedStandard), "Album"),
+                (KeyPathComparator(\.yearSortValue), "Year"),
+                (KeyPathComparator(\.genreSortValue, comparator: .localizedStandard), "Genre"),
+                (KeyPathComparator(\.duration), "Time"),
+                (KeyPathComparator(\.addedAtSortValue), "Date Added"),
+                (KeyPathComparator(\.playCount), "Plays")
+            ]
+            for (comparator, name) in fields {
+                #expect(CollectionTableSortFeedback.description(for: [comparator]) == "\(name): Ascending")
+                var descending = comparator
+                descending.order = .reverse
+                #expect(CollectionTableSortFeedback.description(for: [descending]) == "\(name): Descending")
+            }
+        }
+    }
+
+    @Test("Empty and unfamiliar comparator lists do not claim the default Title order")
+    func sortFeedbackKeepsHonestFallbacks() {
+        withLanguage("en") {
+            let rows = [makeRow(title: "Alpha", artist: "A", canonicalIndex: 0),
+                        makeRow(title: "Zulu", artist: "B", canonicalIndex: 1)]
+            #expect(CollectionTrackSort.rows(rows, using: []) == rows)
+            #expect(CollectionTableSortFeedback.description(for: []) == "Original song order")
+
+            let unfamiliar = KeyPathComparator(\CollectionTrackRow.snapshot.title,
+                                              comparator: .localizedStandard, order: .reverse)
+            let comparators = [unfamiliar, KeyPathComparator(\CollectionTrackRow.playCount)]
+            #expect(CollectionTrackSort.rows(rows, using: comparators).map(\.canonicalIndex) == [1, 0])
+            #expect(CollectionTableSortFeedback.description(for: comparators)
+                    == "Custom field: Descending; then Plays: Ascending")
+            #expect(rows.map(\.canonicalIndex) == [0, 1])
+        }
+    }
+
+    @Test("Existing sort criteria translate immediately after a language change")
+    func sortFeedbackFollowsLanguageChanges() {
+        let comparators = [KeyPathComparator(\CollectionTrackRow.playCount, order: .reverse),
+                           KeyPathComparator(\CollectionTrackRow.artist, comparator: .localizedStandard)]
+        let descriptions = ["en", "zh-Hans", "zh-Hant", "en"].map { language in
+            withLanguage(language) { CollectionTableSortFeedback.description(for: comparators) }
+        }
+        #expect(descriptions == ["Plays: Descending; then Artist: Ascending",
+                                 "播放次数：降序；其次艺术家：升序",
+                                 "播放次數：降序；其次藝術家：升序",
+                                 "Plays: Descending; then Artist: Ascending"])
+        #expect(withLanguage("zh-Hans") { CollectionTableSortFeedback.description(for: []) }
+                == "原始歌曲顺序")
+        #expect(withLanguage("zh-Hant") { CollectionTableSortFeedback.description(for: []) }
+                == "原始歌曲順序")
+    }
+
     @Test("Default sorts distinguish Songs from playlists")
     func defaultSorts() {
         let songComparator = CollectionTableDefaultSort.titleAZ.comparators
@@ -361,6 +446,22 @@ struct CollectionPresentationTests {
         #expect(MusesMotion.collectionDeckAnimation(reduceMotion: false) != nil)
         #expect(MusesMotion.collectionListAnimation(reduceMotion: false) != nil)
         #expect(MusesMotion.collectionCardAnimation(reduceMotion: false) != nil)
+    }
+
+    private func withLanguage<T>(_ language: String, _ operation: () -> T) -> T {
+        let originalLanguage = UserDefaults.standard.object(forKey: PrefKey.language)
+        let originalObservedLanguage = LanguagePreferences.shared.rawValue
+        defer {
+            if let originalLanguage {
+                UserDefaults.standard.set(originalLanguage, forKey: PrefKey.language)
+            } else {
+                UserDefaults.standard.removeObject(forKey: PrefKey.language)
+            }
+            LanguagePreferences.shared.update(originalObservedLanguage)
+        }
+        UserDefaults.standard.set(language, forKey: PrefKey.language)
+        LanguagePreferences.shared.update(language)
+        return operation()
     }
 
     private func makeRow(title: String, artist: String, canonicalIndex: Int) -> CollectionTrackRow {

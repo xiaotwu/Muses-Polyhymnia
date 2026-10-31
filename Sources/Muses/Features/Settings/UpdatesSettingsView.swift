@@ -1,15 +1,5 @@
 import SwiftUI
 
-/// Muses module resource locator (lets tests reach files copied in via SPM `.copy("Resources")`).
-enum MusesResources {
-    /// Info.plist template URL (packaging injects it into .app/Contents/Info.plist).
-    static let infoPlistURL = Bundle.module.url(forResource: "Info", withExtension: "plist", subdirectory: "Resources")
-    /// Entitlements template URL (used by codesign --entitlements).
-    static let entitlementsURL = Bundle.module.url(forResource: "Muses", withExtension: "entitlements", subdirectory: "Resources")
-    /// Bundled brand font URL (registered at application launch).
-    static let islandMomentsFontURL = Bundle.module.url(forResource: "IslandMoments-Regular", withExtension: "ttf", subdirectory: "Resources")
-}
-
 /// Update preferences and progress share the app-lifetime update facade.
 struct UpdatesSettingsView: View {
     @Environment(UpdateService.self) private var updater

@@ -75,8 +75,8 @@ struct SongsListView: View {
         CollectionPage(
             title: filter.title,
             subtitle: tr(
-                "\(rows.count) songs • Title A–Z",
-                "\(rows.count) 首歌曲 • 标题 A–Z", zhHant: "\(rows.count) 首歌曲 • 標題 A–Z"
+                "\(rows.count) songs • Default order: Title A–Z",
+                "\(rows.count) 首歌曲 • 默认顺序：标题 A–Z", zhHant: "\(rows.count) 首歌曲 • 預設順序：標題 A–Z"
             ),
             rows: rows,
             source: .songs,

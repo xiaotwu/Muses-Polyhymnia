@@ -49,7 +49,8 @@ jobs:
           MUSES_VERSION: 0.6.2
           MUSES_MPV_DEPENDENCY_DIR: ${{ runner.temp }}/muses-mpv
         run: |
-          ./Scripts/build-app.sh --identity -
+          ./Scripts/build-app.sh --identity - \
+            --bundle-id "com.muses.acceptance.ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           ./Scripts/sign-update.sh
       - uses: actions/upload-artifact@v4
         with:
