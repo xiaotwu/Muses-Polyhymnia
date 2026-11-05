@@ -46,7 +46,7 @@ jobs:
         run: python3 Scripts/prepare-mpv.py --work-dir "$RUNNER_TEMP/muses-mpv" --jobs 3
       - name: Package preview
         env:
-          MUSES_VERSION: 0.6.2
+          MUSES_VERSION: 0.6.3
           MUSES_MPV_DEPENDENCY_DIR: ${{ runner.temp }}/muses-mpv
         run: |
           ./Scripts/build-app.sh --identity - \
